@@ -1,0 +1,37 @@
+.panel {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+  user-select: none;
+}
+
+.button {
+  background: #2d2d44;
+  border: 1px solid #4a4a6a;
+  border-radius: 6px;
+  color: #e0e0f0;
+  font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.button:hover {
+  background: #3a3a5a;
+  border-color: #5a9bf5;
+}
+
+.buttonActive {
+  background: #2a4a2a;
+  border-color: #50c878;
+}
+
+.buttonActive:hover {
+  background: #3a5a3a;
+}

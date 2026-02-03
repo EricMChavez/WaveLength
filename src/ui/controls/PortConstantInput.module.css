@@ -1,0 +1,54 @@
+.overlay {
+  position: absolute;
+  z-index: 20;
+  background: #16162a;
+  border: 1px solid #3a7bd5;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  user-select: none;
+  min-width: 140px;
+}
+
+.label {
+  color: #9090b0;
+  font-size: 11px;
+}
+
+.inputRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.numberInput {
+  width: 70px;
+  background: #2d2d44;
+  color: #e0e0f0;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.numberInput:focus {
+  outline: none;
+  border-color: #3a7bd5;
+}
+
+.okBtn {
+  background: #2d2d44;
+  color: #e0e0f0;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.okBtn:hover {
+  background: #3a3a5a;
+}

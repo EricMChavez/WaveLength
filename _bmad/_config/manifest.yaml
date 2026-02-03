@@ -1,0 +1,29 @@
+installation:
+  version: 6.0.0-Beta.5
+  installDate: 2026-02-02T05:37:03.729Z
+  lastUpdated: 2026-02-02T05:37:03.729Z
+modules:
+  - name: core
+    version: 6.0.0-Beta.5
+    installDate: 2026-02-02T05:37:02.997Z
+    lastUpdated: 2026-02-02T05:37:02.997Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: bmm
+    version: 6.0.0-Beta.5
+    installDate: 2026-02-02T05:36:58.315Z
+    lastUpdated: 2026-02-02T05:37:02.997Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: gds
+    version: 0.1.5
+    installDate: 2026-02-02T05:37:02.836Z
+    lastUpdated: 2026-02-02T05:37:03.729Z
+    source: external
+    npmPackage: bmad-game-dev-studio
+    repoUrl: https://github.com/bmad-code-org/bmad-module-game-dev-studio.git
+ides:
+  - claude-code
+  - cursor
