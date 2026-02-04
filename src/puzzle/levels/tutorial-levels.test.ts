@@ -14,8 +14,8 @@ import { generateWaveformValue } from '../waveform-generators.ts';
 // ---------------------------------------------------------------------------
 
 describe('PUZZLE_LEVELS registry', () => {
-  it('contains exactly 5 levels', () => {
-    expect(PUZZLE_LEVELS).toHaveLength(5);
+  it('contains exactly 15 levels', () => {
+    expect(PUZZLE_LEVELS).toHaveLength(15);
   });
 
   it('has levels in correct order by id', () => {
@@ -25,6 +25,16 @@ describe('PUZZLE_LEVELS registry', () => {
       'tutorial-dc-offset',
       'tutorial-clipper',
       'tutorial-square-gen',
+      'signal-inverter',
+      'signal-attenuator',
+      'signal-fullwave-rectifier',
+      'signal-delay',
+      'timing-difference',
+      'timing-crossfader',
+      'timing-ring-modulator',
+      'advanced-splitter',
+      'advanced-gain-stage',
+      'advanced-quadrupler',
     ]);
   });
 

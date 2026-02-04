@@ -14,16 +14,21 @@ export function CompletionCeremony() {
 
   function handleContinue() {
     const store = useGameStore.getState();
+
+    // Mark level as completed in progression state
+    store.completeLevel(puzzle!.id);
+
     store.dismissCeremony();
 
-    // Find the next puzzle after the current one
-    const currentIndex = PUZZLE_LEVELS.findIndex((p) => p.id === puzzle!.id);
-    const nextPuzzle = currentIndex >= 0 ? PUZZLE_LEVELS[currentIndex + 1] : undefined;
+    // Use progression state to determine next level
+    const nextIndex = store.currentLevelIndex;
+    const nextPuzzle = PUZZLE_LEVELS[nextIndex];
 
-    if (nextPuzzle) {
+    if (nextPuzzle && nextPuzzle.id !== puzzle!.id) {
       store.loadPuzzle(nextPuzzle);
       store.setActiveBoard(createPuzzleGameboard(nextPuzzle));
     } else {
+      // Last level completed — go to sandbox
       store.unloadPuzzle();
       store.setActiveBoard({ id: 'sandbox', nodes: new Map(), wires: [] });
     }

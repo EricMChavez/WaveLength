@@ -452,10 +452,10 @@ function triggerCeremony(): void {
 
   const { metadata } = bakeResult.value;
   const puzzleId = activePuzzle.id;
-  const isResolve = store.puzzleNodes.has(puzzleId);
+  const isResolve = store.completedLevels.has(puzzleId);
 
   // Add puzzle node to palette on first completion
-  if (!isResolve) {
+  if (!store.puzzleNodes.has(puzzleId)) {
     store.addPuzzleNode({
       puzzleId,
       title: activePuzzle.title,

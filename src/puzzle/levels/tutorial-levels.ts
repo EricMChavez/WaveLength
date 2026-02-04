@@ -11,30 +11,30 @@ export const TUTORIAL_RECTIFIER: PuzzleDefinition = {
   allowedNodes: ['mix'],
   testCases: [
     {
-      name: 'Square amp=100 period=32',
+      name: 'Sine amp=100 period=32',
       inputs: [
-        { shape: 'square', amplitude: 100, period: 32, phase: 0, offset: 0 },
+        { shape: 'sine', amplitude: 100, period: 32, phase: 0, offset: 0 },
       ],
       expectedOutputs: [
-        { shape: 'square', amplitude: 50, period: 32, phase: 0, offset: 50 },
+        { shape: 'rectified-sine', amplitude: 100, period: 32, phase: 0, offset: 0 },
       ],
     },
     {
-      name: 'Square amp=80 period=16',
+      name: 'Triangle amp=80 period=32',
       inputs: [
-        { shape: 'square', amplitude: 80, period: 16, phase: 0, offset: 0 },
+        { shape: 'triangle', amplitude: 80, period: 32, phase: 0, offset: 0 },
       ],
       expectedOutputs: [
-        { shape: 'square', amplitude: 40, period: 16, phase: 0, offset: 40 },
+        { shape: 'rectified-triangle', amplitude: 80, period: 32, phase: 0, offset: 0 },
       ],
     },
     {
-      name: 'Square amp=60 period=32 offset=20',
+      name: 'Square amp=60 period=16',
       inputs: [
-        { shape: 'square', amplitude: 60, period: 32, phase: 0, offset: 20 },
+        { shape: 'square', amplitude: 60, period: 16, phase: 0, offset: 0 },
       ],
       expectedOutputs: [
-        { shape: 'square', amplitude: 40, period: 32, phase: 0, offset: 40 },
+        { shape: 'square', amplitude: 30, period: 16, phase: 0, offset: 30 },
       ],
     },
   ],
@@ -131,27 +131,27 @@ export const TUTORIAL_CLIPPER: PuzzleDefinition = {
   allowedNodes: ['mix'],
   testCases: [
     {
-      name: 'Square amp=100 period=32 (clipped)',
+      name: 'Sine amp=100 period=32 (clipped)',
       inputs: [
-        { shape: 'square', amplitude: 100, period: 32, phase: 0, offset: 0 },
+        { shape: 'sine', amplitude: 100, period: 32, phase: 0, offset: 0 },
       ],
       expectedOutputs: [
-        { shape: 'square', amplitude: 50, period: 32, phase: 0, offset: 0 },
+        { shape: 'clipped-sine', amplitude: 50, period: 32, phase: 0, offset: 0 },
       ],
     },
     {
-      name: 'Sine amp=30 period=32 (pass-through)',
+      name: 'Triangle amp=30 period=32 (pass-through)',
       inputs: [
-        { shape: 'sine', amplitude: 30, period: 32, phase: 0, offset: 0 },
+        { shape: 'triangle', amplitude: 30, period: 32, phase: 0, offset: 0 },
       ],
       expectedOutputs: [
-        { shape: 'sine', amplitude: 30, period: 32, phase: 0, offset: 0 },
+        { shape: 'triangle', amplitude: 30, period: 32, phase: 0, offset: 0 },
       ],
     },
     {
-      name: 'Square amp=80 period=16 offset=10 (clipped)',
+      name: 'Square amp=80 period=16 (clipped)',
       inputs: [
-        { shape: 'square', amplitude: 80, period: 16, phase: 0, offset: 10 },
+        { shape: 'square', amplitude: 80, period: 16, phase: 0, offset: 0 },
       ],
       expectedOutputs: [
         { shape: 'square', amplitude: 50, period: 16, phase: 0, offset: 0 },

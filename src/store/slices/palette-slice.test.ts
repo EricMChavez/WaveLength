@@ -7,9 +7,11 @@ import { createPuzzleSlice } from './puzzle-slice.ts';
 import { createPaletteSlice } from './palette-slice.ts';
 import { createCeremonySlice } from './ceremony-slice.ts';
 import { createNavigationSlice } from './navigation-slice.ts';
+import { createProgressionSlice } from './progression-slice.ts';
 import type { GameStore } from '../index.ts';
 import type { PuzzleNodeEntry } from './palette-slice.ts';
 import type { BakeMetadata } from '../../engine/baking/index.ts';
+import { FUNDAMENTAL_NODES } from '../../palette/fundamental/index.ts';
 
 function createTestStore() {
   return create<GameStore>()((...a) => ({
@@ -20,6 +22,7 @@ function createTestStore() {
     ...createPaletteSlice(...a),
     ...createCeremonySlice(...a),
     ...createNavigationSlice(...a),
+    ...createProgressionSlice(...a),
   }));
 }
 
@@ -103,5 +106,109 @@ describe('palette-slice', () => {
     const hashAfterUpdate = store.getState().puzzleNodes.get('pass-through')!.versionHash;
 
     expect(hashAfterUpdate).not.toBe(hashAfterAdd);
+  });
+});
+
+describe('palette filtering logic', () => {
+  const entryA: PuzzleNodeEntry = {
+    ...fakeEntry,
+    puzzleId: 'puzzle-a',
+    title: 'Puzzle A',
+  };
+  const entryB: PuzzleNodeEntry = {
+    ...fakeEntry,
+    puzzleId: 'puzzle-b',
+    title: 'Puzzle B',
+  };
+
+  describe('fundamental nodes filtered by allowedNodes', () => {
+    it('null allowedNodes shows all fundamentals', () => {
+      const allowedNodes: string[] | null = null;
+      const visible = allowedNodes
+        ? FUNDAMENTAL_NODES.filter((def) => allowedNodes.includes(def.type))
+        : FUNDAMENTAL_NODES;
+      expect(visible).toEqual(FUNDAMENTAL_NODES);
+      expect(visible.length).toBe(5);
+    });
+
+    it('allowedNodes filters to matching types only', () => {
+      const allowedNodes = ['mix', 'invert'];
+      const visible = FUNDAMENTAL_NODES.filter((def) => allowedNodes.includes(def.type));
+      expect(visible.length).toBe(2);
+      expect(visible.map((d) => d.type)).toEqual(['mix', 'invert']);
+    });
+
+    it('allowedNodes with no matches returns empty', () => {
+      const allowedNodes = ['nonexistent'];
+      const visible = FUNDAMENTAL_NODES.filter((def) => allowedNodes.includes(def.type));
+      expect(visible.length).toBe(0);
+    });
+  });
+
+  describe('puzzle nodes filtered by completedLevels and allowedNodes', () => {
+    it('uncompleted puzzle nodes are hidden', () => {
+      const store = createTestStore();
+      store.getState().addPuzzleNode(entryA);
+      store.getState().addPuzzleNode(entryB);
+
+      const completedLevels = store.getState().completedLevels;
+      const visible = Array.from(store.getState().puzzleNodes.values()).filter((entry) => {
+        if (!completedLevels.has(entry.puzzleId)) return false;
+        return true;
+      });
+      expect(visible.length).toBe(0);
+    });
+
+    it('completed puzzle nodes are visible when allowedNodes is null', () => {
+      const store = createTestStore();
+      store.getState().addPuzzleNode(entryA);
+      store.getState().addPuzzleNode(entryB);
+      store.getState().completeLevel('puzzle-a');
+
+      const completedLevels = store.getState().completedLevels;
+      const allowedNodes: string[] | null = null;
+      const visible = Array.from(store.getState().puzzleNodes.values()).filter((entry) => {
+        if (!completedLevels.has(entry.puzzleId)) return false;
+        if (allowedNodes && !allowedNodes.includes(entry.puzzleId)) return false;
+        return true;
+      });
+      expect(visible.length).toBe(1);
+      expect(visible[0].puzzleId).toBe('puzzle-a');
+    });
+
+    it('allowedNodes further filters completed puzzle nodes', () => {
+      const store = createTestStore();
+      store.getState().addPuzzleNode(entryA);
+      store.getState().addPuzzleNode(entryB);
+      store.getState().completeLevel('puzzle-a');
+      store.getState().completeLevel('puzzle-b');
+
+      const completedLevels = store.getState().completedLevels;
+      const allowedNodes = ['puzzle-b'];
+      const visible = Array.from(store.getState().puzzleNodes.values()).filter((entry) => {
+        if (!completedLevels.has(entry.puzzleId)) return false;
+        if (allowedNodes && !allowedNodes.includes(entry.puzzleId)) return false;
+        return true;
+      });
+      expect(visible.length).toBe(1);
+      expect(visible[0].puzzleId).toBe('puzzle-b');
+    });
+
+    it('both completed and allowed shows all matching', () => {
+      const store = createTestStore();
+      store.getState().addPuzzleNode(entryA);
+      store.getState().addPuzzleNode(entryB);
+      store.getState().completeLevel('puzzle-a');
+      store.getState().completeLevel('puzzle-b');
+
+      const completedLevels = store.getState().completedLevels;
+      const allowedNodes: string[] | null = null;
+      const visible = Array.from(store.getState().puzzleNodes.values()).filter((entry) => {
+        if (!completedLevels.has(entry.puzzleId)) return false;
+        if (allowedNodes && !allowedNodes.includes(entry.puzzleId)) return false;
+        return true;
+      });
+      expect(visible.length).toBe(2);
+    });
   });
 });

@@ -84,6 +84,157 @@ describe('generateWaveformValue', () => {
     });
   });
 
+  describe('rectified-sine shape', () => {
+    it('returns 0 at tick 0 (sin(0) = 0)', () => {
+      const def = makeDef({ shape: 'rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(0, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns +amplitude at quarter period', () => {
+      const def = makeDef({ shape: 'rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(4, def)).toBeCloseTo(50, 5);
+    });
+
+    it('returns 0 at half period', () => {
+      const def = makeDef({ shape: 'rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(8, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns 0 in negative half (three-quarter period)', () => {
+      const def = makeDef({ shape: 'rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(12, def)).toBeCloseTo(0, 5);
+    });
+
+    it('never goes negative across a full period', () => {
+      const def = makeDef({ shape: 'rectified-sine', amplitude: 100, period: 32 });
+      for (let t = 0; t < 32; t++) {
+        expect(generateWaveformValue(t, def)).toBeGreaterThanOrEqual(0);
+      }
+    });
+  });
+
+  describe('rectified-triangle shape', () => {
+    it('returns 0 at tick 0 (triangle starts at -1, clamped to 0)', () => {
+      const def = makeDef({ shape: 'rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(0, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns +amplitude at half period (triangle peak)', () => {
+      const def = makeDef({ shape: 'rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(8, def)).toBeCloseTo(50, 5);
+    });
+
+    it('returns 0 at quarter period (triangle crosses zero rising)', () => {
+      const def = makeDef({ shape: 'rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(4, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns 0 at three-quarter period (triangle crosses zero falling)', () => {
+      const def = makeDef({ shape: 'rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(12, def)).toBeCloseTo(0, 5);
+    });
+
+    it('never goes negative across a full period', () => {
+      const def = makeDef({ shape: 'rectified-triangle', amplitude: 100, period: 32 });
+      for (let t = 0; t < 32; t++) {
+        expect(generateWaveformValue(t, def)).toBeGreaterThanOrEqual(0);
+      }
+    });
+  });
+
+  describe('clipped-sine shape', () => {
+    it('returns 0 at tick 0 (sin(0) = 0)', () => {
+      const def = makeDef({ shape: 'clipped-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(0, def)).toBeCloseTo(0, 5);
+    });
+
+    it('clips at +amplitude at quarter period (sin*2 > 1 → 1)', () => {
+      const def = makeDef({ shape: 'clipped-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(4, def)).toBeCloseTo(50, 5);
+    });
+
+    it('clips at -amplitude at three-quarter period (sin*2 < -1 → -1)', () => {
+      const def = makeDef({ shape: 'clipped-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(12, def)).toBeCloseTo(-50, 5);
+    });
+
+    it('stays in [-amplitude, +amplitude] across a full period', () => {
+      const def = makeDef({ shape: 'clipped-sine', amplitude: 80, period: 32 });
+      for (let t = 0; t < 32; t++) {
+        const val = generateWaveformValue(t, def);
+        expect(val).toBeGreaterThanOrEqual(-80);
+        expect(val).toBeLessThanOrEqual(80);
+      }
+    });
+
+    it('is symmetric: value at t mirrors value at t+half_period', () => {
+      const def = makeDef({ shape: 'clipped-sine', amplitude: 50, period: 32 });
+      for (let t = 0; t < 16; t++) {
+        const v1 = generateWaveformValue(t, def);
+        const v2 = generateWaveformValue(t + 16, def);
+        expect(v1).toBeCloseTo(-v2, 5);
+      }
+    });
+  });
+
+  describe('fullwave-rectified-sine shape', () => {
+    it('returns 0 at tick 0 (sin(0) = 0)', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(0, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns +amplitude at quarter period', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(4, def)).toBeCloseTo(50, 5);
+    });
+
+    it('returns 0 at half period', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(8, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns +amplitude at three-quarter period (abs of negative half)', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-sine', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(12, def)).toBeCloseTo(50, 5);
+    });
+
+    it('never goes negative across a full period', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-sine', amplitude: 100, period: 32 });
+      for (let t = 0; t < 32; t++) {
+        expect(generateWaveformValue(t, def)).toBeGreaterThanOrEqual(0);
+      }
+    });
+  });
+
+  describe('fullwave-rectified-triangle shape', () => {
+    it('returns +amplitude at tick 0 (abs of -1) = 1)', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(0, def)).toBeCloseTo(50, 5);
+    });
+
+    it('returns +amplitude at half period (triangle peak)', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(8, def)).toBeCloseTo(50, 5);
+    });
+
+    it('returns 0 at quarter period (triangle crosses zero)', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(4, def)).toBeCloseTo(0, 5);
+    });
+
+    it('returns 0 at three-quarter period (triangle crosses zero)', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-triangle', amplitude: 50, period: 16 });
+      expect(generateWaveformValue(12, def)).toBeCloseTo(0, 5);
+    });
+
+    it('never goes negative across a full period', () => {
+      const def = makeDef({ shape: 'fullwave-rectified-triangle', amplitude: 100, period: 32 });
+      for (let t = 0; t < 32; t++) {
+        expect(generateWaveformValue(t, def)).toBeGreaterThanOrEqual(0);
+      }
+    });
+  });
+
   describe('clamping', () => {
     it('clamps to +100', () => {
       const def = makeDef({ shape: 'constant', amplitude: 80, offset: 50 });

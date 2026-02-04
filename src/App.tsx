@@ -21,11 +21,12 @@ function App() {
   useEffect(() => {
     if (!useGameStore.getState().activeBoard) {
       const store = useGameStore.getState()
-      // Load the first tutorial puzzle by default
-      const firstPuzzle = PUZZLE_LEVELS[0]
-      if (firstPuzzle) {
-        store.loadPuzzle(firstPuzzle)
-        store.setActiveBoard(createPuzzleGameboard(firstPuzzle))
+      // Load the puzzle at the current progression level
+      const levelIndex = store.currentLevelIndex
+      const puzzle = PUZZLE_LEVELS[levelIndex] ?? PUZZLE_LEVELS[0]
+      if (puzzle) {
+        store.loadPuzzle(puzzle)
+        store.setActiveBoard(createPuzzleGameboard(puzzle))
       } else {
         store.setActiveBoard(createEmptyGameboard())
       }

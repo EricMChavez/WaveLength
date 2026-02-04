@@ -86,7 +86,7 @@ export function GameboardCanvas() {
     };
   }, []);
 
-  // Escape key cancels current interaction
+  // Keyboard shortcuts: Escape, Ctrl+Z (undo), Ctrl+Shift+Z (redo)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -95,6 +95,23 @@ export function GameboardCanvas() {
           state.cancelWireDraw();
         } else if (state.interactionMode.type === 'placing-node') {
           state.cancelPlacing();
+        }
+        return;
+      }
+
+      // Undo/Redo: skip when typing in input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const state = useGameStore.getState();
+        if (!state.activeBoardReadOnly) {
+          if (e.shiftKey) {
+            state.redo();
+          } else {
+            state.undo();
+          }
         }
       }
     }

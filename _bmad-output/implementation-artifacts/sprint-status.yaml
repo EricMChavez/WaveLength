@@ -68,11 +68,11 @@ development_status:
   3-5-node-instance-model-library-sync: done
   epic-3-retrospective: optional
 
-  # Epic 4: Progression & Persistence
-  epic-4: backlog
-  4-1-level-definitions-tutorial-arc: backlog
-  4-2-level-definitions-remaining-arcs: backlog
-  4-3-progression-system: backlog
-  4-4-save-load-system: backlog
-  4-5-undo-redo-system: backlog
+  # Epic 4: Progression & Persistence (DONE)
+  epic-4: done
+  4-1-level-definitions-tutorial-arc: done
+  4-2-level-definitions-remaining-arcs: done
+  4-3-progression-system: done
+  4-4-save-load-system: done
+  4-5-undo-redo-system: done
   epic-4-retrospective: optional

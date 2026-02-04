@@ -3,6 +3,7 @@ import { FUNDAMENTAL_NODES } from '../fundamental/index.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
 import { stopSimulation } from '../../simulation/simulation-controller.ts';
+import { LevelSelect } from '../../ui/puzzle/LevelSelect.tsx';
 import styles from './PalettePanel.module.css';
 
 export function PalettePanel() {
@@ -12,8 +13,12 @@ export function PalettePanel() {
   const puzzleNodes = useGameStore((s) => s.puzzleNodes);
   const utilityNodes = useGameStore((s) => s.utilityNodes);
   const readOnly = useGameStore((s) => s.activeBoardReadOnly);
+  const activePuzzle = useGameStore((s) => s.activePuzzle);
+  const completedLevels = useGameStore((s) => s.completedLevels);
 
   if (readOnly) return null;
+
+  const allowedNodes = activePuzzle?.allowedNodes ?? null;
 
   function handleCreateCustom() {
     const state = useGameStore.getState();
@@ -49,11 +54,26 @@ export function PalettePanel() {
     useGameStore.getState().deleteUtilityNode(utilityId);
   }
 
+  // Filter fundamental nodes by allowedNodes constraint
+  const visibleFundamentals = allowedNodes
+    ? FUNDAMENTAL_NODES.filter((def) => allowedNodes.includes(def.type))
+    : FUNDAMENTAL_NODES;
+
+  // Filter puzzle nodes: must be completed AND allowed
+  const visiblePuzzleNodes = Array.from(puzzleNodes.values()).filter((entry) => {
+    if (!completedLevels.has(entry.puzzleId)) return false;
+    if (allowedNodes && !allowedNodes.includes(entry.puzzleId)) return false;
+    return true;
+  });
+
   return (
     <div className={styles.panel}>
+      <h3 className={styles.title}>Levels</h3>
+      <LevelSelect />
+
       <h3 className={styles.title}>Nodes</h3>
       <div className={styles.list}>
-        {FUNDAMENTAL_NODES.map((def) => {
+        {visibleFundamentals.map((def) => {
           const isActive =
             interactionMode.type === 'placing-node' &&
             interactionMode.nodeType === def.type;
@@ -76,11 +96,11 @@ export function PalettePanel() {
         })}
       </div>
 
-      {puzzleNodes.size > 0 && (
+      {visiblePuzzleNodes.length > 0 && (
         <>
           <h3 className={styles.title}>Puzzles</h3>
           <div className={styles.list}>
-            {Array.from(puzzleNodes.values()).map((entry) => {
+            {visiblePuzzleNodes.map((entry) => {
               const nodeType = `puzzle:${entry.puzzleId}`;
               const isActive =
                 interactionMode.type === 'placing-node' &&

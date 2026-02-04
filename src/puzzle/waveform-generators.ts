@@ -24,6 +24,20 @@ function generateShape(shape: WaveformShape, tick: number, period: number, phase
     case 'sawtooth':
       // Rises from -1 to +1 over the period
       return -1 + 2 * t;
+    case 'rectified-sine':
+      return Math.max(Math.sin(2 * Math.PI * t), 0);
+    case 'rectified-triangle': {
+      const tri = t < 0.5 ? -1 + 4 * t : 3 - 4 * t;
+      return Math.max(tri, 0);
+    }
+    case 'clipped-sine':
+      return Math.max(-1, Math.min(1, Math.sin(2 * Math.PI * t) * 2));
+    case 'fullwave-rectified-sine':
+      return Math.abs(Math.sin(2 * Math.PI * t));
+    case 'fullwave-rectified-triangle': {
+      const triVal = t < 0.5 ? -1 + 4 * t : 3 - 4 * t;
+      return Math.abs(triVal);
+    }
     default:
       return 0;
   }

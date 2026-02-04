@@ -1,0 +1,52 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.levelBtn {
+  background: #2d2d44;
+  color: #e0e0f0;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.levelBtn:hover:not(.locked) {
+  background: #3a3a5a;
+  border-color: #5a5a7a;
+}
+
+.current {
+  background: #3a7bd5;
+  border-color: #5a9bf5;
+}
+
+.current:hover {
+  background: #4a8be5;
+}
+
+.completed {
+  border-left: 3px solid #50c878;
+}
+
+.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.statusIcon {
+  font-size: 10px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
