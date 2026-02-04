@@ -1,5 +1,7 @@
 import { CONNECTION_POINT_CONFIG, COLORS } from '../../shared/constants/index.ts';
 import { getConnectionPointPosition } from './port-positions.ts';
+import { useGameStore } from '../../store/index.ts';
+import { isRunning } from '../../simulation/simulation-controller.ts';
 
 /** Draw the gameboard's input and output connection points. */
 export function renderConnectionPoints(
@@ -15,10 +17,18 @@ export function renderConnectionPoints(
     drawConnectionPoint(ctx, pos.x, pos.y, RADIUS, `In ${i + 1}`);
   }
 
+  // Get validation state for output glow indicators
+  const store = useGameStore.getState();
+  const showValidation = isRunning() && store.activePuzzle !== null;
+  const { perPortMatch } = store;
+
   // Output connection points (right side)
   for (let i = 0; i < OUTPUT_COUNT; i++) {
     const pos = getConnectionPointPosition('output', i, canvasWidth, canvasHeight);
-    drawConnectionPoint(ctx, pos.x, pos.y, RADIUS, `Out ${i + 1}`);
+    const matchState = showValidation && i < perPortMatch.length
+      ? perPortMatch[i]
+      : undefined;
+    drawConnectionPoint(ctx, pos.x, pos.y, RADIUS, `Out ${i + 1}`, matchState);
   }
 }
 
@@ -28,7 +38,22 @@ function drawConnectionPoint(
   y: number,
   radius: number,
   label: string,
+  matchState?: boolean,
 ): void {
+  // Validation glow ring for output CPs
+  if (matchState !== undefined) {
+    const glowColor = matchState ? '#50c878' : '#e05050';
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Circle
   ctx.fillStyle = COLORS.CONNECTION_POINT_FILL;
   ctx.strokeStyle = COLORS.CONNECTION_POINT_STROKE;

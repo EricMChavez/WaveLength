@@ -8,6 +8,8 @@ export interface GameboardSlice {
   activeBoardId: GameboardId | null;
   /** Constant values for unconnected input ports. Key: "nodeId:portIndex" */
   portConstants: Map<string, number>;
+  /** Incremented on structural graph mutations (add/remove node/wire, param change) */
+  graphVersion: number;
 
   /** Set the active gameboard */
   setActiveBoard: (board: GameboardState) => void;
@@ -31,6 +33,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
   activeBoard: null,
   activeBoardId: null,
   portConstants: new Map<string, number>(),
+  graphVersion: 0,
 
   setActiveBoard: (board) =>
     set({ activeBoard: board, activeBoardId: board.id, portConstants: new Map() }),
@@ -42,6 +45,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       nodes.set(node.id, node);
       return {
         activeBoard: { ...state.activeBoard, nodes },
+        graphVersion: state.graphVersion + 1,
       };
     }),
 
@@ -52,6 +56,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       nodes.delete(nodeId);
       return {
         activeBoard: { ...state.activeBoard, nodes },
+        graphVersion: state.graphVersion + 1,
       };
     }),
 
@@ -63,6 +68,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
           ...state.activeBoard,
           wires: [...state.activeBoard.wires, wire],
         },
+        graphVersion: state.graphVersion + 1,
       };
     }),
 
@@ -74,6 +80,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
           ...state.activeBoard,
           wires: state.activeBoard.wires.filter((w) => w.id !== wireId),
         },
+        graphVersion: state.graphVersion + 1,
       };
     }),
 
@@ -86,6 +93,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       nodes.set(nodeId, { ...node, params: { ...node.params, ...params } });
       return {
         activeBoard: { ...state.activeBoard, nodes },
+        graphVersion: state.graphVersion + 1,
       };
     }),
 
@@ -102,6 +110,6 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       const key = `${nodeId}:${portIndex}`;
       const portConstants = new Map(state.portConstants);
       portConstants.set(key, value);
-      return { portConstants };
+      return { portConstants, graphVersion: state.graphVersion + 1 };
     }),
 });

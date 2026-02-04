@@ -52,9 +52,9 @@ development_status:
 
   # Epic 2: Puzzle Play
   epic-2: in-progress
-  2-1-puzzle-definition-loading: review
-  2-2-puzzle-validation-engine: backlog
-  2-3-formula-baking: backlog
+  2-1-puzzle-definition-loading: done
+  2-2-puzzle-validation-engine: done
+  2-3-formula-baking: done
   2-4-puzzle-completion-ceremony: backlog
   2-5-baked-node-runtime-on-gameboard: backlog
   epic-2-retrospective: optional

@@ -5,7 +5,7 @@ import type { SchedulerState } from '../wts/scheduler/tick-scheduler.ts';
 import { topologicalSort } from '../engine/graph/topological-sort.ts';
 import { WaveformBuffer } from '../gameboard/visualization/waveform-buffer.ts';
 import { useGameStore } from '../store/index.ts';
-import { CONNECTION_POINT_CONFIG } from '../shared/constants/index.ts';
+import { CONNECTION_POINT_CONFIG, VALIDATION_CONFIG } from '../shared/constants/index.ts';
 import { evaluateMultiply } from '../engine/nodes/multiply.ts';
 import { evaluateMix } from '../engine/nodes/mix.ts';
 import type { MixMode } from '../engine/nodes/mix.ts';
@@ -14,6 +14,7 @@ import { evaluateThreshold } from '../engine/nodes/threshold.ts';
 import { evaluateDelay } from '../engine/nodes/delay.ts';
 import { generateWaveformValue } from '../puzzle/waveform-generators.ts';
 import { cpInputId, cpOutputId, isConnectionInputNode, getConnectionPointIndex } from '../puzzle/connection-point-nodes.ts';
+import { validateAllPorts, getVictoryThreshold } from '../puzzle/validation.ts';
 
 /** Waveform history length (number of ticks to display) */
 const WAVEFORM_CAPACITY = 64;
@@ -30,6 +31,9 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 
 // Waveform buffers keyed by "input:0", "input:1", "output:0", etc.
 const waveformBuffers = new Map<string, WaveformBuffer>();
+
+// Track graph version for detecting structural mutations during simulation
+let lastGraphVersion = 0;
 
 /** Whether the simulation is currently running. */
 export function isRunning(): boolean {
@@ -86,6 +90,10 @@ export function startSimulation(): void {
       }
     }
   }
+
+  // Reset validation state for new simulation run
+  lastGraphVersion = store.graphVersion;
+  store.resetValidationStreak();
 
   // Initial evaluation: apply constants, evaluate all nodes, emit outputs
   const seededWires = initialEvaluation(nodes, wires, store.portConstants);
@@ -291,6 +299,9 @@ function tick(): void {
 
   // Record waveform data at connection points
   recordWaveforms();
+
+  // Run validation against puzzle targets
+  validateTick();
 }
 
 /** Record current node output values into waveform buffers. */
@@ -327,6 +338,60 @@ function recordWaveforms(): void {
         if (!buf) continue;
         buf.push(generateWaveformValue(currentTick, testCase.expectedOutputs[i]));
       }
+    }
+  }
+}
+
+/** Validate current output signals against puzzle targets. */
+function validateTick(): void {
+  if (!schedulerState || !clock) return;
+
+  const store = useGameStore.getState();
+  const { activePuzzle, activeTestCaseIndex, puzzleStatus } = store;
+  if (!activePuzzle || puzzleStatus === 'victory') return;
+
+  const testCase = activePuzzle.testCases[activeTestCaseIndex];
+  if (!testCase) return;
+
+  // Check for graph mutation — reset streak if graph changed
+  const currentGraphVersion = store.graphVersion;
+  if (currentGraphVersion !== lastGraphVersion) {
+    store.resetValidationStreak();
+    lastGraphVersion = currentGraphVersion;
+  }
+
+  // Gather actual output CP values
+  const actuals: number[] = [];
+  for (let i = 0; i < testCase.expectedOutputs.length; i++) {
+    const nodeId = cpOutputId(i);
+    const runtime = schedulerState.nodeStates.get(nodeId);
+    actuals.push(runtime ? runtime.inputs[0] ?? 0 : 0);
+  }
+
+  // Generate target values for current tick
+  const currentTick = clock.getTick();
+  const targets: number[] = [];
+  for (let i = 0; i < testCase.expectedOutputs.length; i++) {
+    targets.push(generateWaveformValue(currentTick, testCase.expectedOutputs[i]));
+  }
+
+  // Validate
+  const { allMatch, perPort } = validateAllPorts(actuals, targets, VALIDATION_CONFIG.MATCH_TOLERANCE);
+  const victoryThreshold = getVictoryThreshold(testCase);
+  store.updateValidation(perPort, allMatch, victoryThreshold);
+
+  // Check if this test case was just passed
+  const updatedStore = useGameStore.getState();
+  if (updatedStore.testCasesPassed.includes(activeTestCaseIndex) &&
+      !store.testCasesPassed.includes(activeTestCaseIndex)) {
+    // Test case just passed — stop simulation and advance
+    stopSimulation();
+    updatedStore.advanceTestCase();
+
+    // Auto-restart simulation if more test cases remain
+    const finalStore = useGameStore.getState();
+    if (finalStore.puzzleStatus === 'playing') {
+      startSimulation();
     }
   }
 }

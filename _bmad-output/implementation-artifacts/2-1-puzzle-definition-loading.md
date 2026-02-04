@@ -1,6 +1,6 @@
 # Story 2.1: Puzzle Definition & Loading
 
-Status: review
+Status: complete
 
 ## Story
 
@@ -42,6 +42,14 @@ so that I have a clear goal to work toward.
   - [x] 5.1 Fixed TUTORIAL_INVERT expectedOutputs (were identical to inputs; corrected to phase-shifted inversions)
   - [x] 5.2 Fixed TUTORIAL_MIX expectedOutputs (was constant-0 placeholder; corrected to representable sums) and added second test case
   - [x] 5.3 Created comprehensive level integrity test suite verifying activeInputs/activeOutputs match test case array lengths, unique IDs, positive periods, and mathematical correctness of expected outputs
+
+### Review Follow-ups (AI)
+
+- [x] [AI-Review][CRITICAL] Moved `createPuzzleGameboard` from App.tsx to `src/puzzle/puzzle-gameboard.ts`. Added 5 unit tests in `src/puzzle/puzzle-gameboard.test.ts` covering 1-in/1-out, 2-in/1-out, 3-in/2-out, ID format, and empty wires.
+- [x] [AI-Review][MEDIUM] `setActiveTestCase` now clamps index to `[0, testCases.length - 1]` and no-ops when no puzzle is loaded. [src/store/slices/puzzle-slice.ts]
+- [x] [AI-Review][MEDIUM] File List and Dev Notes updated to reflect `createPuzzleGameboard` in `src/puzzle/puzzle-gameboard.ts`.
+- [ ] [AI-Review][LOW] Consider adding UI to switch test case (dropdown or buttons) — deferred to future story.
+- [ ] [AI-Review][LOW] Replace magic numbers in PuzzleInfoBar.module.css with constants or design tokens — deferred; consistent with existing CSS patterns in project.
 
 ## Dev Notes
 
@@ -90,11 +98,14 @@ N/A
 - Fixed critical data bug: TUTORIAL_MIX expected output was a constant-0 placeholder. Corrected by choosing same-frequency inputs whose sum is representable as a single WaveformDef. Added second test case (sine + constant).
 - Created PuzzleInfoBar UI component showing puzzle title, description, and active test case indicator.
 - Added 26 new tests across tutorial level integrity checks, including mathematical verification that expected outputs match inverted/summed inputs.
-- All 174 tests pass. TypeScript compiles cleanly.
+- Review follow-up: Extracted `createPuzzleGameboard` from App.tsx to `src/puzzle/puzzle-gameboard.ts` for testability. Added 5 unit tests covering 1-in/1-out, 2-in/1-out, 3-in/2-out puzzles.
+- Review follow-up: Added index clamping to `setActiveTestCase` in puzzle-slice.ts to prevent out-of-range access.
+- All 179 tests pass. TypeScript compiles cleanly.
 
 ### Change Log
 
 - 2026-02-03: Story 2.1 implementation — fixed level data, added PuzzleInfoBar, added level integrity tests
+- 2026-02-03: Review follow-ups — extracted createPuzzleGameboard to puzzle module, added tests, clamped activeTestCaseIndex
 
 ### File List
 
@@ -102,4 +113,49 @@ N/A
 - `src/puzzle/levels/tutorial-levels.test.ts` — Created (26 tests: level integrity, inversion correctness, sum correctness)
 - `src/ui/puzzle/PuzzleInfoBar.tsx` — Created (puzzle title/description/test case display)
 - `src/ui/puzzle/PuzzleInfoBar.module.css` — Created (styles)
-- `src/App.tsx` — Modified (integrated PuzzleInfoBar)
+- `src/puzzle/puzzle-gameboard.ts` — Created (extracted `createPuzzleGameboard` from App.tsx)
+- `src/puzzle/puzzle-gameboard.test.ts` — Created (5 tests: node counts for various input/output combos, ID format, empty wires)
+- `src/store/slices/puzzle-slice.ts` — Modified (added index clamping in `setActiveTestCase`)
+- `src/App.tsx` — Modified (integrated PuzzleInfoBar; imports `createPuzzleGameboard` from puzzle module)
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Code review workflow (adversarial)  
+**Date:** 2026-02-03
+
+**Git vs Story:** Story File List matches implementation (all listed files exist). No uncommitted source changes; story changes are committed. `.claude/settings.local.json` is modified but excluded from review per workflow.
+
+### Findings
+
+**CRITICAL**
+
+1. **Task 1.3 marked [x] but not implemented**  
+   Story claims: "Write unit tests for `createPuzzleGameboard()` (verify correct virtual nodes created for 1-input/1-output and 2-input/1-output puzzles)". There are no unit tests for `createPuzzleGameboard()`. The function lives in `App.tsx` and is not exported; `connection-point-nodes.test.ts` only tests `createConnectionPointNode()`, not the gameboard factory. So 1-input/1-output and 2-input/1-output node counts are not asserted anywhere. [Story tasks; src/App.tsx]
+
+**MEDIUM**
+
+2. **`activeTestCaseIndex` can be out of range**  
+   `setActiveTestCase(index)` in `puzzle-slice.ts` does not clamp or validate `index` against `activePuzzle.testCases.length`. If `activeTestCaseIndex` is >= length (or < 0), `PuzzleInfoBar` and `simulation-controller` use `testCase = activePuzzle.testCases[activeTestCaseIndex]` and get `undefined`. No UI currently calls `setActiveTestCase`, but the slice allows invalid state. Recommend clamping in `setActiveTestCase` or when reading (e.g. `Math.max(0, Math.min(index, testCases.length - 1))`). [src/store/slices/puzzle-slice.ts:28-29]
+
+3. **Documentation gap**  
+   Story File List and Dev Notes do not mention that `createPuzzleGameboard` is in `App.tsx` (and thus not under test). Makes the missing Task 1.3 tests easy to overlook.
+
+**LOW**
+
+4. **No UI to switch test case**  
+   AC 4.2 is satisfied (indicator shows "Test 1/2: Sine wave"). The store exposes `setActiveTestCase` but no control (e.g. dropdown or buttons) exists to change test case. Acceptable for Story 2.1 but could be noted as future improvement.
+
+5. **Magic numbers in PuzzleInfoBar CSS**  
+   `PuzzleInfoBar.module.css` uses hard-coded spacing (8px, 12px, 6px, 16px, etc.). Consider constants or design tokens for consistency.
+
+### Outcome
+
+**Changes Requested.** One CRITICAL (Task 1.3 tests missing), two MEDIUM (index validation, documentation). Address CRITICAL and MEDIUM before marking story done.
+
+**Resolution:** All CRITICAL and MEDIUM items addressed. `createPuzzleGameboard` extracted to testable module with 5 tests. `setActiveTestCase` clamped. Documentation updated. Two LOW items deferred.
+
+### Change Log (review)
+
+- 2026-02-03: Code review — 1 CRITICAL (Task 1.3 tests not implemented), 2 MEDIUM (activeTestCaseIndex validation, doc gap), 2 LOW
+- 2026-02-03: Added 5 Review Follow-ups (AI) as action items — 1 CRITICAL, 2 MEDIUM, 2 LOW
+- 2026-02-03: All CRITICAL and MEDIUM follow-ups resolved. 2 LOW deferred.

@@ -6,6 +6,14 @@ export interface PuzzleSlice {
   activePuzzle: PuzzleDefinition | null;
   /** Index of the active test case within the puzzle */
   activeTestCaseIndex: number;
+  /** Consecutive ticks where all output ports match targets */
+  validationStreak: number;
+  /** Per-output-port match result for the latest tick */
+  perPortMatch: boolean[];
+  /** Overall puzzle state */
+  puzzleStatus: 'playing' | 'victory';
+  /** Indices of test cases that have reached victory threshold */
+  testCasesPassed: number[];
 
   /** Load a puzzle definition (entering puzzle mode) */
   loadPuzzle: (puzzle: PuzzleDefinition) => void;
@@ -13,18 +21,84 @@ export interface PuzzleSlice {
   unloadPuzzle: () => void;
   /** Switch to a different test case within the active puzzle */
   setActiveTestCase: (index: number) => void;
+  /** Update validation state each tick */
+  updateValidation: (perPortMatch: boolean[], allMatch: boolean, victoryThreshold: number) => void;
+  /** Reset streak to 0 (called on graph mutation) */
+  resetValidationStreak: () => void;
+  /** Advance to next unpassed test case, or set victory if all passed */
+  advanceTestCase: () => void;
 }
+
+const initialValidationState = {
+  validationStreak: 0,
+  perPortMatch: [] as boolean[],
+  puzzleStatus: 'playing' as const,
+  testCasesPassed: [] as number[],
+};
 
 export const createPuzzleSlice: StateCreator<PuzzleSlice> = (set) => ({
   activePuzzle: null,
   activeTestCaseIndex: 0,
+  ...initialValidationState,
 
   loadPuzzle: (puzzle) =>
-    set({ activePuzzle: puzzle, activeTestCaseIndex: 0 }),
+    set({ activePuzzle: puzzle, activeTestCaseIndex: 0, ...initialValidationState }),
 
   unloadPuzzle: () =>
-    set({ activePuzzle: null, activeTestCaseIndex: 0 }),
+    set({ activePuzzle: null, activeTestCaseIndex: 0, ...initialValidationState }),
 
   setActiveTestCase: (index) =>
-    set({ activeTestCaseIndex: index }),
+    set((state) => {
+      const len = state.activePuzzle?.testCases.length ?? 0;
+      if (len === 0) return {};
+      return { activeTestCaseIndex: Math.max(0, Math.min(index, len - 1)) };
+    }),
+
+  updateValidation: (perPortMatch, allMatch, victoryThreshold) =>
+    set((state) => {
+      const newStreak = allMatch ? state.validationStreak + 1 : 0;
+
+      if (newStreak >= victoryThreshold && victoryThreshold > 0) {
+        const passed = state.testCasesPassed.includes(state.activeTestCaseIndex)
+          ? state.testCasesPassed
+          : [...state.testCasesPassed, state.activeTestCaseIndex];
+        return {
+          validationStreak: newStreak,
+          perPortMatch,
+          testCasesPassed: passed,
+        };
+      }
+
+      return {
+        validationStreak: newStreak,
+        perPortMatch,
+      };
+    }),
+
+  resetValidationStreak: () =>
+    set({ validationStreak: 0 }),
+
+  advanceTestCase: () =>
+    set((state) => {
+      if (!state.activePuzzle) return {};
+      const totalCases = state.activePuzzle.testCases.length;
+
+      // Check if all test cases are passed
+      if (state.testCasesPassed.length >= totalCases) {
+        return { puzzleStatus: 'victory' as const };
+      }
+
+      // Find next unpassed test case
+      for (let i = 0; i < totalCases; i++) {
+        if (!state.testCasesPassed.includes(i)) {
+          return {
+            activeTestCaseIndex: i,
+            validationStreak: 0,
+            perPortMatch: [],
+          };
+        }
+      }
+
+      return { puzzleStatus: 'victory' as const };
+    }),
 });
