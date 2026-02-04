@@ -15,6 +15,7 @@ import { evaluateDelay } from '../engine/nodes/delay.ts';
 import { generateWaveformValue } from '../puzzle/waveform-generators.ts';
 import { cpInputId, cpOutputId, isConnectionInputNode, getConnectionPointIndex } from '../puzzle/connection-point-nodes.ts';
 import { validateAllPorts, getVictoryThreshold } from '../puzzle/validation.ts';
+import { bakeGraph, reconstructFromMetadata } from '../engine/baking/index.ts';
 
 /** Waveform history length (number of ticks to display) */
 const WAVEFORM_CAPACITY = 64;
@@ -63,6 +64,21 @@ export function startSimulation(): void {
   // Initialize scheduler state
   clock = new WtsClock();
   schedulerState = createSchedulerState(nodes);
+
+  // Initialize baked evaluate closures for puzzle nodes
+  for (const [nodeId, node] of nodes) {
+    if (node.type.startsWith('puzzle:')) {
+      const puzzleId = node.type.slice('puzzle:'.length);
+      const entry = store.puzzleNodes.get(puzzleId);
+      if (entry) {
+        const runtime = schedulerState.nodeStates.get(nodeId);
+        if (runtime) {
+          const { evaluate } = reconstructFromMetadata(entry.bakeMetadata);
+          runtime.bakedEvaluate = evaluate;
+        }
+      }
+    }
+  }
 
   // Identify source nodes (no incoming wires on any port)
   const nodesWithIncoming = new Set<NodeId>();
@@ -190,7 +206,7 @@ function initialEvaluation(
 }
 
 /** Evaluate a node for initial seeding. Mirrors tick-scheduler's evaluateNode. */
-function evaluateNodeForInit(node: NodeState, runtime: { inputs: number[]; outputs: number[]; delayState?: import('../engine/nodes/delay.ts').DelayState }, currentTick?: number): void {
+function evaluateNodeForInit(node: NodeState, runtime: { inputs: number[]; outputs: number[]; delayState?: import('../engine/nodes/delay.ts').DelayState; bakedEvaluate?: (inputs: number[]) => number[] }, currentTick?: number): void {
   switch (node.type) {
     case 'multiply': {
       runtime.outputs[0] = evaluateMultiply(runtime.inputs[0] ?? 0, runtime.inputs[1] ?? 0);
@@ -233,6 +249,16 @@ function evaluateNodeForInit(node: NodeState, runtime: { inputs: number[]; outpu
     case 'connection-output':
       // Output CPs just receive signals — no evaluation needed
       break;
+    default: {
+      // Puzzle nodes use their baked evaluate closure
+      if (node.type.startsWith('puzzle:') && runtime.bakedEvaluate) {
+        const results = runtime.bakedEvaluate([...runtime.inputs]);
+        for (let i = 0; i < results.length && i < runtime.outputs.length; i++) {
+          runtime.outputs[i] = results[i];
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -388,10 +414,52 @@ function validateTick(): void {
     stopSimulation();
     updatedStore.advanceTestCase();
 
-    // Auto-restart simulation if more test cases remain
+    // Check if puzzle is now fully complete
     const finalStore = useGameStore.getState();
-    if (finalStore.puzzleStatus === 'playing') {
+    if (finalStore.puzzleStatus === 'victory') {
+      triggerCeremony();
+    } else if (finalStore.puzzleStatus === 'playing') {
+      // Auto-restart simulation if more test cases remain
       startSimulation();
     }
   }
+}
+
+/** Trigger the completion ceremony after puzzle victory. */
+function triggerCeremony(): void {
+  const store = useGameStore.getState();
+  const { activePuzzle, activeBoard } = store;
+  if (!activePuzzle || !activeBoard) return;
+
+  // Capture canvas snapshot
+  const canvas = document.querySelector('canvas');
+  const snapshot = canvas ? canvas.toDataURL() : '';
+
+  // Bake the winning graph
+  const bakeResult = bakeGraph(activeBoard.nodes, activeBoard.wires);
+  if (!bakeResult.ok) return;
+
+  const { metadata } = bakeResult.value;
+  const puzzleId = activePuzzle.id;
+  const isResolve = store.puzzleNodes.has(puzzleId);
+
+  // Add puzzle node to palette on first completion
+  if (!isResolve) {
+    store.addPuzzleNode({
+      puzzleId,
+      title: activePuzzle.title,
+      description: activePuzzle.description,
+      inputCount: activePuzzle.activeInputs,
+      outputCount: activePuzzle.activeOutputs,
+      bakeMetadata: metadata,
+    });
+  }
+
+  // Start the ceremony overlay
+  store.startCeremony(
+    snapshot,
+    { id: puzzleId, title: activePuzzle.title, description: activePuzzle.description },
+    isResolve,
+    metadata,
+  );
 }

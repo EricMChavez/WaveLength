@@ -16,6 +16,8 @@ export interface NodeRuntimeState {
   outputs: number[];
   /** Delay-node-specific circular buffer state. */
   delayState?: DelayState;
+  /** Baked evaluate closure for puzzle nodes. */
+  bakedEvaluate?: (inputs: number[]) => number[];
 }
 
 /** All runtime state needed by the scheduler. */
@@ -147,6 +149,16 @@ function evaluateNode(node: NodeState, runtime: NodeRuntimeState): void {
       // Virtual CP nodes — no-op. Input CPs are driven by the simulation
       // controller as source nodes; output CPs just receive signals.
       break;
+    default: {
+      // Puzzle nodes (type starts with 'puzzle:') use their baked evaluate closure
+      if (node.type.startsWith('puzzle:') && runtime.bakedEvaluate) {
+        const results = runtime.bakedEvaluate([...runtime.inputs]);
+        for (let i = 0; i < results.length && i < runtime.outputs.length; i++) {
+          runtime.outputs[i] = results[i];
+        }
+      }
+      break;
+    }
   }
 }
 

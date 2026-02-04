@@ -2,6 +2,7 @@ import type { NodeState } from '../../shared/types/index.ts';
 import { NODE_CONFIG, COLORS, NODE_TYPE_LABELS } from '../../shared/constants/index.ts';
 import { getNodePortPosition } from './port-positions.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
+import { useGameStore } from '../../store/index.ts';
 
 /** Draw all nodes on the canvas. */
 export function renderNodes(
@@ -34,7 +35,12 @@ function drawNodeBody(ctx: CanvasRenderingContext2D, node: NodeState): void {
   ctx.font = NODE_CONFIG.LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const label = NODE_TYPE_LABELS[node.type] ?? node.type;
+  let label = NODE_TYPE_LABELS[node.type] ?? node.type;
+  if (node.type.startsWith('puzzle:')) {
+    const puzzleId = node.type.slice('puzzle:'.length);
+    const entry = useGameStore.getState().puzzleNodes.get(puzzleId);
+    if (entry) label = entry.title;
+  }
   ctx.fillText(label, x + WIDTH / 2, y + HEIGHT / 2 - 7);
 
   // Parameter hint

@@ -49,3 +49,7 @@
 .active:hover {
   background: #4a8be5;
 }
+
+.puzzleItem {
+  border-left: 3px solid #e8a838;
+}

@@ -5,6 +5,7 @@ import { NodeControls } from './ui/controls/NodeControls.tsx'
 import { PortConstantInput } from './ui/controls/PortConstantInput.tsx'
 import { SimulationControls } from './ui/controls/SimulationControls.tsx'
 import { PuzzleInfoBar } from './ui/puzzle/PuzzleInfoBar.tsx'
+import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
 import { useGameStore } from './store/index.ts'
 import type { GameboardState } from './shared/types/index.ts'
 import { createPuzzleGameboard } from './puzzle/puzzle-gameboard.ts'
@@ -39,6 +40,7 @@ function App() {
         <PortConstantInput />
         <SimulationControls />
       </div>
+      <CompletionCeremony />
     </div>
   )
 }

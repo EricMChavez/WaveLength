@@ -126,6 +126,25 @@ export function GameboardCanvas() {
     // --- Placing node mode ---
     if (state.interactionMode.type === 'placing-node') {
       const nodeType = state.interactionMode.nodeType;
+
+      // Handle puzzle node placement
+      if (nodeType.startsWith('puzzle:')) {
+        const puzzleId = nodeType.slice('puzzle:'.length);
+        const entry = state.puzzleNodes.get(puzzleId);
+        if (!entry) return;
+
+        state.addNode({
+          id: generateId(),
+          type: nodeType,
+          position: { x: x - NODE_CONFIG.WIDTH / 2, y: y - NODE_CONFIG.HEIGHT / 2 },
+          params: {},
+          inputCount: entry.inputCount,
+          outputCount: entry.outputCount,
+        });
+        state.cancelPlacing();
+        return;
+      }
+
       const def = FUNDAMENTAL_NODES.find((d) => d.type === nodeType);
       if (!def) return;
 
