@@ -123,6 +123,18 @@ export function GameboardCanvas() {
 
     const state = useGameStore.getState();
 
+    // --- Read-only mode: only allow selection ---
+    if (state.activeBoardReadOnly) {
+      if (!state.activeBoard) return;
+      const hit = hitTest(x, y, state.activeBoard.nodes, w, h);
+      if (hit.type === 'node') {
+        state.selectNode(hit.nodeId);
+      } else {
+        state.clearSelection();
+      }
+      return;
+    }
+
     // --- Placing node mode ---
     if (state.interactionMode.type === 'placing-node') {
       const nodeType = state.interactionMode.nodeType;
@@ -140,6 +152,26 @@ export function GameboardCanvas() {
           params: {},
           inputCount: entry.inputCount,
           outputCount: entry.outputCount,
+          libraryVersionHash: entry.versionHash,
+        });
+        state.cancelPlacing();
+        return;
+      }
+
+      // Handle utility node placement
+      if (nodeType.startsWith('utility:')) {
+        const utilityId = nodeType.slice('utility:'.length);
+        const entry = state.utilityNodes.get(utilityId);
+        if (!entry) return;
+
+        state.addNode({
+          id: generateId(),
+          type: nodeType,
+          position: { x: x - NODE_CONFIG.WIDTH / 2, y: y - NODE_CONFIG.HEIGHT / 2 },
+          params: {},
+          inputCount: entry.inputCount,
+          outputCount: entry.outputCount,
+          libraryVersionHash: entry.versionHash,
         });
         state.cancelPlacing();
         return;
@@ -260,6 +292,7 @@ export function GameboardCanvas() {
     }
 
     // Right-click on an input port opens constant value editor
+    if (state.activeBoardReadOnly) return;
     if (state.activeBoard && state.interactionMode.type === 'idle') {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;

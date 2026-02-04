@@ -50,22 +50,22 @@ development_status:
   1-8-waveform-visualization-signal-animation: done
   epic-1-retrospective: optional
 
-  # Epic 2: Puzzle Play
-  epic-2: in-progress
+  # Epic 2: Puzzle Play (DONE - commit 8b45c59)
+  epic-2: done
   2-1-puzzle-definition-loading: done
   2-2-puzzle-validation-engine: done
   2-3-formula-baking: done
-  2-4-puzzle-completion-ceremony: backlog
-  2-5-baked-node-runtime-on-gameboard: backlog
+  2-4-puzzle-completion-ceremony: done
+  2-5-baked-node-runtime-on-gameboard: done
   epic-2-retrospective: optional
 
-  # Epic 3: Node Building & Navigation
-  epic-3: backlog
-  3-1-gameboard-tree-zoom-navigation: backlog
-  3-2-zoom-transition-animations: backlog
-  3-3-breadcrumb-bar: backlog
-  3-4-utility-node-creation-management: backlog
-  3-5-node-instance-model-library-sync: backlog
+  # Epic 3: Node Building & Navigation (DONE)
+  epic-3: done
+  3-1-gameboard-tree-zoom-navigation: done
+  3-2-zoom-transition-animations: done
+  3-3-breadcrumb-bar: done
+  3-4-utility-node-creation-management: done
+  3-5-node-instance-model-library-sync: done
   epic-3-retrospective: optional
 
   # Epic 4: Progression & Persistence

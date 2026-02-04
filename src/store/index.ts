@@ -11,8 +11,10 @@ import { createPaletteSlice } from './slices/palette-slice.ts';
 import type { PaletteSlice } from './slices/palette-slice.ts';
 import { createCeremonySlice } from './slices/ceremony-slice.ts';
 import type { CeremonySlice } from './slices/ceremony-slice.ts';
+import { createNavigationSlice } from './slices/navigation-slice.ts';
+import type { NavigationSlice } from './slices/navigation-slice.ts';
 
-export type GameStore = GameboardSlice & InteractionSlice & SimulationSlice & PuzzleSlice & PaletteSlice & CeremonySlice;
+export type GameStore = GameboardSlice & InteractionSlice & SimulationSlice & PuzzleSlice & PaletteSlice & CeremonySlice & NavigationSlice;
 
 export const useGameStore = create<GameStore>()((...a) => ({
   ...createGameboardSlice(...a),
@@ -21,4 +23,5 @@ export const useGameStore = create<GameStore>()((...a) => ({
   ...createPuzzleSlice(...a),
   ...createPaletteSlice(...a),
   ...createCeremonySlice(...a),
+  ...createNavigationSlice(...a),
 }));

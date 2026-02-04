@@ -150,8 +150,8 @@ function evaluateNode(node: NodeState, runtime: NodeRuntimeState): void {
       // controller as source nodes; output CPs just receive signals.
       break;
     default: {
-      // Puzzle nodes (type starts with 'puzzle:') use their baked evaluate closure
-      if (node.type.startsWith('puzzle:') && runtime.bakedEvaluate) {
+      // Puzzle and utility nodes use their baked evaluate closure
+      if ((node.type.startsWith('puzzle:') || node.type.startsWith('utility:')) && runtime.bakedEvaluate) {
         const results = runtime.bakedEvaluate([...runtime.inputs]);
         for (let i = 0; i < results.length && i < runtime.outputs.length; i++) {
           runtime.outputs[i] = results[i];

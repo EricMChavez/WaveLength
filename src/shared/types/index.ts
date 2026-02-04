@@ -52,6 +52,8 @@ export interface NodeState {
   inputCount: number;
   /** Number of output ports */
   outputCount: number;
+  /** Version hash from the library entry at placement time */
+  libraryVersionHash?: string;
 }
 
 /** Complete state of a gameboard */

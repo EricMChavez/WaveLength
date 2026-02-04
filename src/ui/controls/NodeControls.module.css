@@ -26,6 +26,31 @@
   font-weight: 600;
 }
 
+.headerButtons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.editBtn {
+  background: none;
+  border: 1px solid #3a5a3a;
+  border-radius: 4px;
+  color: #80c080;
+  font-size: 12px;
+  padding: 2px 8px;
+  height: 26px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editBtn:hover {
+  background: #203a20;
+  border-color: #80c080;
+}
+
 .deleteBtn {
   background: none;
   border: 1px solid #5a3a3a;
@@ -66,4 +91,10 @@
   border-radius: 4px;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+.modifiedBadge {
+  color: #e8a030;
+  font-size: 11px;
+  font-weight: 400;
 }

@@ -4,8 +4,10 @@ import { PalettePanel } from './palette/components/PalettePanel.tsx'
 import { NodeControls } from './ui/controls/NodeControls.tsx'
 import { PortConstantInput } from './ui/controls/PortConstantInput.tsx'
 import { SimulationControls } from './ui/controls/SimulationControls.tsx'
+import { NavigationBar } from './ui/controls/NavigationBar.tsx'
 import { PuzzleInfoBar } from './ui/puzzle/PuzzleInfoBar.tsx'
 import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
+import { ZoomTransition } from './ui/puzzle/ZoomTransition.tsx'
 import { useGameStore } from './store/index.ts'
 import type { GameboardState } from './shared/types/index.ts'
 import { createPuzzleGameboard } from './puzzle/puzzle-gameboard.ts'
@@ -35,11 +37,13 @@ function App() {
       <PalettePanel />
       <div style={{ flex: 1, position: 'relative' }}>
         <GameboardCanvas />
+        <NavigationBar />
         <PuzzleInfoBar />
         <NodeControls />
         <PortConstantInput />
         <SimulationControls />
       </div>
+      <ZoomTransition />
       <CompletionCeremony />
     </div>
   )

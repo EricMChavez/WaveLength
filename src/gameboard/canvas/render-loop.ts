@@ -28,6 +28,13 @@ export function startRenderLoop(canvas: HTMLCanvasElement): () => void {
     ctx!.fillStyle = COLORS.BACKGROUND;
     ctx!.fillRect(0, 0, width, height);
 
+    // During zoom transition, keep canvas cleared and skip drawing
+    // so the snapshot overlay is the only thing visible.
+    if (useGameStore.getState().zoomTransition) {
+      animationId = requestAnimationFrame(render);
+      return;
+    }
+
     // Read state directly from store (not React hooks)
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth = width / dpr;

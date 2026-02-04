@@ -27,6 +27,8 @@ export interface GameboardSlice {
   updateWires: (wires: Wire[]) => void;
   /** Set a constant value for an unconnected input port */
   setPortConstant: (nodeId: NodeId, portIndex: number, value: number) => void;
+  /** Restore a board and its port constants (used by navigation zoom-out) */
+  restoreBoard: (board: GameboardState, portConstants: Map<string, number>) => void;
 }
 
 export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
@@ -112,4 +114,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       portConstants.set(key, value);
       return { portConstants, graphVersion: state.graphVersion + 1 };
     }),
+
+  restoreBoard: (board, portConstants) =>
+    set({ activeBoard: board, activeBoardId: board.id, portConstants }),
 });

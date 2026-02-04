@@ -40,6 +40,10 @@ function drawNodeBody(ctx: CanvasRenderingContext2D, node: NodeState): void {
     const puzzleId = node.type.slice('puzzle:'.length);
     const entry = useGameStore.getState().puzzleNodes.get(puzzleId);
     if (entry) label = entry.title;
+  } else if (node.type.startsWith('utility:')) {
+    const utilityId = node.type.slice('utility:'.length);
+    const entry = useGameStore.getState().utilityNodes.get(utilityId);
+    if (entry) label = entry.title;
   }
   ctx.fillText(label, x + WIDTH / 2, y + HEIGHT / 2 - 7);
 
@@ -49,6 +53,24 @@ function drawNodeBody(ctx: CanvasRenderingContext2D, node: NodeState): void {
     ctx.fillStyle = COLORS.NODE_PARAM;
     ctx.font = NODE_CONFIG.PARAM_FONT;
     ctx.fillText(paramText, x + WIDTH / 2, y + HEIGHT / 2 + 10);
+  }
+
+  // Modified indicator — orange dot at top-right when instance hash differs from library
+  if (node.libraryVersionHash) {
+    let currentHash: string | undefined;
+    if (node.type.startsWith('puzzle:')) {
+      const puzzleId = node.type.slice('puzzle:'.length);
+      currentHash = useGameStore.getState().puzzleNodes.get(puzzleId)?.versionHash;
+    } else if (node.type.startsWith('utility:')) {
+      const utilityId = node.type.slice('utility:'.length);
+      currentHash = useGameStore.getState().utilityNodes.get(utilityId)?.versionHash;
+    }
+    if (currentHash && currentHash !== node.libraryVersionHash) {
+      ctx.fillStyle = '#e8a030';
+      ctx.beginPath();
+      ctx.arc(x + WIDTH - 4, y + 4, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 

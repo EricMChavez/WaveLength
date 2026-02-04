@@ -1,0 +1,79 @@
+.bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #16162a;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  padding: 8px 14px;
+  z-index: 10;
+  user-select: none;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 13px;
+}
+
+.crumb {
+  color: #9090b0;
+}
+
+.activeCrumb {
+  color: #c0c0e0;
+}
+
+.separator {
+  color: #4a4a6a;
+  margin: 0 6px;
+}
+
+.doneBtn {
+  background: none;
+  border: 1px solid #3a5a3a;
+  border-radius: 4px;
+  color: #80c080;
+  font-size: 13px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.doneBtn:hover {
+  background: #203a20;
+  border-color: #80c080;
+}
+
+.saveBtn {
+  background: none;
+  border: 1px solid #3a5a3a;
+  border-radius: 4px;
+  color: #80c080;
+  font-size: 13px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.saveBtn:hover {
+  background: #203a20;
+  border-color: #80c080;
+}
+
+.cancelBtn {
+  background: none;
+  border: 1px solid #5a3a3a;
+  border-radius: 4px;
+  color: #c08080;
+  font-size: 13px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: #3a2020;
+  border-color: #c08080;
+}

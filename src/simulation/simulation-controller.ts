@@ -16,6 +16,7 @@ import { generateWaveformValue } from '../puzzle/waveform-generators.ts';
 import { cpInputId, cpOutputId, isConnectionInputNode, getConnectionPointIndex } from '../puzzle/connection-point-nodes.ts';
 import { validateAllPorts, getVictoryThreshold } from '../puzzle/validation.ts';
 import { bakeGraph, reconstructFromMetadata } from '../engine/baking/index.ts';
+import { generateId } from '../shared/generate-id.ts';
 
 /** Waveform history length (number of ticks to display) */
 const WAVEFORM_CAPACITY = 64;
@@ -65,11 +66,21 @@ export function startSimulation(): void {
   clock = new WtsClock();
   schedulerState = createSchedulerState(nodes);
 
-  // Initialize baked evaluate closures for puzzle nodes
+  // Initialize baked evaluate closures for puzzle and utility nodes
   for (const [nodeId, node] of nodes) {
     if (node.type.startsWith('puzzle:')) {
       const puzzleId = node.type.slice('puzzle:'.length);
       const entry = store.puzzleNodes.get(puzzleId);
+      if (entry) {
+        const runtime = schedulerState.nodeStates.get(nodeId);
+        if (runtime) {
+          const { evaluate } = reconstructFromMetadata(entry.bakeMetadata);
+          runtime.bakedEvaluate = evaluate;
+        }
+      }
+    } else if (node.type.startsWith('utility:')) {
+      const utilityId = node.type.slice('utility:'.length);
+      const entry = store.utilityNodes.get(utilityId);
       if (entry) {
         const runtime = schedulerState.nodeStates.get(nodeId);
         if (runtime) {
@@ -250,8 +261,8 @@ function evaluateNodeForInit(node: NodeState, runtime: { inputs: number[]; outpu
       // Output CPs just receive signals — no evaluation needed
       break;
     default: {
-      // Puzzle nodes use their baked evaluate closure
-      if (node.type.startsWith('puzzle:') && runtime.bakedEvaluate) {
+      // Puzzle and utility nodes use their baked evaluate closure
+      if ((node.type.startsWith('puzzle:') || node.type.startsWith('utility:')) && runtime.bakedEvaluate) {
         const results = runtime.bakedEvaluate([...runtime.inputs]);
         for (let i = 0; i < results.length && i < runtime.outputs.length; i++) {
           runtime.outputs[i] = results[i];
@@ -452,6 +463,7 @@ function triggerCeremony(): void {
       inputCount: activePuzzle.activeInputs,
       outputCount: activePuzzle.activeOutputs,
       bakeMetadata: metadata,
+      versionHash: generateId(),
     });
   }
 

@@ -1,32 +1,52 @@
 import { describe, it, expect } from 'vitest';
 import { PUZZLE_LEVELS, getPuzzleById } from './index.ts';
-import { TUTORIAL_PASSTHROUGH, TUTORIAL_INVERT, TUTORIAL_MIX } from './tutorial-levels.ts';
+import {
+  TUTORIAL_RECTIFIER,
+  TUTORIAL_AMPLIFIER,
+  TUTORIAL_DC_OFFSET,
+  TUTORIAL_CLIPPER,
+  TUTORIAL_SQUARE_GEN,
+} from './tutorial-levels.ts';
 import { generateWaveformValue } from '../waveform-generators.ts';
 
-describe('PUZZLE_LEVELS', () => {
-  it('contains all tutorial levels in order', () => {
-    expect(PUZZLE_LEVELS.length).toBeGreaterThanOrEqual(3);
-    expect(PUZZLE_LEVELS[0]).toBe(TUTORIAL_PASSTHROUGH);
-    expect(PUZZLE_LEVELS[1]).toBe(TUTORIAL_INVERT);
-    expect(PUZZLE_LEVELS[2]).toBe(TUTORIAL_MIX);
+// ---------------------------------------------------------------------------
+// Registry tests
+// ---------------------------------------------------------------------------
+
+describe('PUZZLE_LEVELS registry', () => {
+  it('contains exactly 5 levels', () => {
+    expect(PUZZLE_LEVELS).toHaveLength(5);
+  });
+
+  it('has levels in correct order by id', () => {
+    expect(PUZZLE_LEVELS.map((p) => p.id)).toEqual([
+      'tutorial-rectifier',
+      'tutorial-amplifier',
+      'tutorial-dc-offset',
+      'tutorial-clipper',
+      'tutorial-square-gen',
+    ]);
   });
 
   it('each level has a unique id', () => {
     const ids = PUZZLE_LEVELS.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
-});
 
-describe('getPuzzleById', () => {
-  it('finds existing puzzles', () => {
-    expect(getPuzzleById('tutorial-passthrough')).toBe(TUTORIAL_PASSTHROUGH);
-    expect(getPuzzleById('tutorial-invert')).toBe(TUTORIAL_INVERT);
+  it('getPuzzleById finds every level', () => {
+    for (const level of PUZZLE_LEVELS) {
+      expect(getPuzzleById(level.id)).toBe(level);
+    }
   });
 
-  it('returns undefined for unknown id', () => {
+  it('getPuzzleById returns undefined for unknown id', () => {
     expect(getPuzzleById('nonexistent')).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Data integrity (generic, iterates all levels)
+// ---------------------------------------------------------------------------
 
 describe('level data integrity', () => {
   for (const puzzle of PUZZLE_LEVELS) {
@@ -71,56 +91,102 @@ describe('level data integrity', () => {
   }
 });
 
-describe('TUTORIAL_INVERT expected outputs are actually inverted', () => {
-  it('sine inversion: output is phase-shifted by half period', () => {
-    const tc = TUTORIAL_INVERT.testCases[0];
-    const inputDef = tc.inputs[0];
-    const outputDef = tc.expectedOutputs[0];
+// ---------------------------------------------------------------------------
+// Mathematical correctness — Rectifier: max(input, 0)
+// ---------------------------------------------------------------------------
 
-    // At any tick, output should be -input (within floating point tolerance)
-    for (let t = 0; t < 64; t++) {
-      const inputVal = generateWaveformValue(t, inputDef);
-      const outputVal = generateWaveformValue(t, outputDef);
-      expect(outputVal).toBeCloseTo(-inputVal, 5);
-    }
-  });
+describe('TUTORIAL_RECTIFIER mathematical correctness', () => {
+  for (const tc of TUTORIAL_RECTIFIER.testCases) {
+    it(`${tc.name}: max(input, 0) matches expected output over 64 ticks`, () => {
+      const inputDef = tc.inputs[0];
+      const expectedDef = tc.expectedOutputs[0];
 
-  it('square inversion: output is phase-shifted by half period', () => {
-    const tc = TUTORIAL_INVERT.testCases[1];
-    const inputDef = tc.inputs[0];
-    const outputDef = tc.expectedOutputs[0];
-
-    for (let t = 0; t < 32; t++) {
-      const inputVal = generateWaveformValue(t, inputDef);
-      const outputVal = generateWaveformValue(t, outputDef);
-      expect(outputVal).toBeCloseTo(-inputVal, 5);
-    }
-  });
+      for (let t = 0; t < 64; t++) {
+        const inputVal = generateWaveformValue(t, inputDef);
+        const rectified = Math.max(inputVal, 0);
+        const expected = generateWaveformValue(t, expectedDef);
+        expect(expected).toBeCloseTo(rectified, 5);
+      }
+    });
+  }
 });
 
-describe('TUTORIAL_MIX expected outputs match input sums', () => {
-  it('same-frequency sines: sum amplitude equals input amplitudes added', () => {
-    const tc = TUTORIAL_MIX.testCases[0];
-    const [in1, in2] = tc.inputs;
-    const expectedDef = tc.expectedOutputs[0];
+// ---------------------------------------------------------------------------
+// Mathematical correctness — Amplifier: input + input (clamped to [-100,100])
+// ---------------------------------------------------------------------------
 
-    for (let t = 0; t < 64; t++) {
-      const sum = generateWaveformValue(t, in1) + generateWaveformValue(t, in2);
-      const expected = generateWaveformValue(t, expectedDef);
-      // Sum of two same-frequency sines = sine with summed amplitude
-      expect(expected).toBeCloseTo(sum, 5);
-    }
-  });
+describe('TUTORIAL_AMPLIFIER mathematical correctness', () => {
+  for (const tc of TUTORIAL_AMPLIFIER.testCases) {
+    it(`${tc.name}: input + input matches expected output over 64 ticks`, () => {
+      const inputDef = tc.inputs[0];
+      const expectedDef = tc.expectedOutputs[0];
 
-  it('sine plus constant: expected output is sine with DC offset', () => {
-    const tc = TUTORIAL_MIX.testCases[1];
-    const [sineDef, constDef] = tc.inputs;
-    const expectedDef = tc.expectedOutputs[0];
+      for (let t = 0; t < 64; t++) {
+        const inputVal = generateWaveformValue(t, inputDef);
+        const doubled = Math.max(-100, Math.min(100, inputVal + inputVal));
+        const expected = generateWaveformValue(t, expectedDef);
+        expect(expected).toBeCloseTo(doubled, 5);
+      }
+    });
+  }
+});
 
-    for (let t = 0; t < 64; t++) {
-      const sum = generateWaveformValue(t, sineDef) + generateWaveformValue(t, constDef);
-      const expected = generateWaveformValue(t, expectedDef);
-      expect(expected).toBeCloseTo(sum, 5);
-    }
-  });
+// ---------------------------------------------------------------------------
+// Mathematical correctness — DC Offset: clamp(input + 50)
+// ---------------------------------------------------------------------------
+
+describe('TUTORIAL_DC_OFFSET mathematical correctness', () => {
+  for (const tc of TUTORIAL_DC_OFFSET.testCases) {
+    it(`${tc.name}: clamp(input + 50) matches expected output over 64 ticks`, () => {
+      const inputDef = tc.inputs[0];
+      const expectedDef = tc.expectedOutputs[0];
+
+      for (let t = 0; t < 64; t++) {
+        const inputVal = generateWaveformValue(t, inputDef);
+        const offset = Math.max(-100, Math.min(100, inputVal + 50));
+        const expected = generateWaveformValue(t, expectedDef);
+        expect(expected).toBeCloseTo(offset, 5);
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Mathematical correctness — Clipper: min(max(input, -50), 50)
+// ---------------------------------------------------------------------------
+
+describe('TUTORIAL_CLIPPER mathematical correctness', () => {
+  for (const tc of TUTORIAL_CLIPPER.testCases) {
+    it(`${tc.name}: clamp(input, -50, 50) matches expected output over 64 ticks`, () => {
+      const inputDef = tc.inputs[0];
+      const expectedDef = tc.expectedOutputs[0];
+
+      for (let t = 0; t < 64; t++) {
+        const inputVal = generateWaveformValue(t, inputDef);
+        const clipped = Math.min(50, Math.max(-50, inputVal));
+        const expected = generateWaveformValue(t, expectedDef);
+        expect(expected).toBeCloseTo(clipped, 5);
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Mathematical correctness — Square Wave Gen: input > 0 ? 100 : -100
+// ---------------------------------------------------------------------------
+
+describe('TUTORIAL_SQUARE_GEN mathematical correctness', () => {
+  for (const tc of TUTORIAL_SQUARE_GEN.testCases) {
+    it(`${tc.name}: threshold(input, 0) matches expected output over 64 ticks`, () => {
+      const inputDef = tc.inputs[0];
+      const expectedDef = tc.expectedOutputs[0];
+
+      for (let t = 0; t < 64; t++) {
+        const inputVal = generateWaveformValue(t, inputDef);
+        const thresholded = inputVal > 0 ? 100 : -100;
+        const expected = generateWaveformValue(t, expectedDef);
+        expect(expected).toBeCloseTo(thresholded, 5);
+      }
+    });
+  }
 });
