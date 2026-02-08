@@ -105,6 +105,10 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
         break;
       case 'inspect':
         if (target.type === 'node') {
+          if (state.simulationRunning) {
+            stopSimulation();
+            state.setSimulationRunning(false);
+          }
           captureAndStartLidOpen(state);
           state.zoomIntoNode(target.nodeId);
         }

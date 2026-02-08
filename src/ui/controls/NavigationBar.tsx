@@ -1,5 +1,5 @@
 import { useGameStore } from '../../store/index.ts';
-import { stopSimulation } from '../../simulation/simulation-controller.ts';
+import { stopSimulation, startSimulation } from '../../simulation/simulation-controller.ts';
 import { bakeGraph } from '../../engine/baking/index.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import type { BoardStackEntry, NodeSwap } from '../../store/slices/navigation-slice.ts';
@@ -58,6 +58,9 @@ export function NavigationBar() {
     const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
     state.startZoomTransition('out', snapshot);
     zoomOut();
+    // Restart simulation on the restored parent board
+    useGameStore.getState().setSimulationRunning(true);
+    startSimulation();
   }
 
   function handleSave() {
@@ -88,6 +91,9 @@ export function NavigationBar() {
         const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
         state.startZoomTransition('out', snapshot);
         state.finishEditingUtility();
+        // Restart simulation on the restored parent board
+        useGameStore.getState().setSimulationRunning(true);
+        startSimulation();
       } else {
         // Rename: create a new utility node and swap only this instance
         const newName = window.prompt('Name for new custom node:');
@@ -114,6 +120,9 @@ export function NavigationBar() {
           cpLayout,
         } : undefined;
         state.finishEditingUtility(swap);
+        // Restart simulation on the restored parent board
+        useGameStore.getState().setSimulationRunning(true);
+        startSimulation();
       }
     } else {
       // First save: prompt for name, add to palette, swap blank→named
@@ -140,6 +149,9 @@ export function NavigationBar() {
         cpLayout,
       } : undefined;
       state.finishEditingUtility(swap);
+      // Restart simulation on the restored parent board
+      useGameStore.getState().setSimulationRunning(true);
+      startSimulation();
     }
   }
 
@@ -152,6 +164,9 @@ export function NavigationBar() {
     const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
     state.startZoomTransition('out', snapshot);
     state.finishEditingUtility();
+    // Restart simulation on the restored parent board
+    useGameStore.getState().setSimulationRunning(true);
+    startSimulation();
   }
 
   const isEditing = editingUtilityId !== null;
