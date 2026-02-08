@@ -1,8 +1,16 @@
 # Development Status & Next Steps
 
 **Project:** Signal Processing Puzzle Game
-**Date:** 2026-02-04
+**Date:** 2026-02-08
 **Stack:** Canvas 2D + React 19 + Zustand + TypeScript + Vite
+
+---
+
+## Notification Test — 2026-02-08
+
+- Verified branch `claude/test-notifications-zxhPh` is active and clean
+- Updated development date to current
+- Commit + push to confirm notification pipeline works
 
 ---
 
