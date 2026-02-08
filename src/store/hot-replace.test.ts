@@ -4,6 +4,7 @@ import type { GameboardState, NodeState } from '../shared/types/index.ts';
 import type { BoardStackEntry } from './slices/navigation-slice.ts';
 import type { UtilityNodeEntry } from './slices/palette-slice.ts';
 import type { BakeMetadata } from '../engine/baking/index.ts';
+import { createDefaultMeterSlots } from './slices/meter-slice.ts';
 
 function makeNode(id: string, type: string, overrides?: Partial<NodeState>): NodeState {
   return {
@@ -81,6 +82,7 @@ describe('hotReplaceNodes', () => {
       portConstants: new Map(),
       nodeIdInParent: 'parent-node',
       readOnly: false,
+      meterSlots: createDefaultMeterSlots(),
     };
 
     const result = hotReplaceNodes('utility:u1', patch, null, [stackEntry], new Map());

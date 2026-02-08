@@ -16,7 +16,7 @@ export interface MeterSlice {
   resetMeters: () => void;
 }
 
-function createDefaultMeterSlots(): Map<MeterKey, MeterSlotState> {
+export function createDefaultMeterSlots(): Map<MeterKey, MeterSlotState> {
   const slots = new Map<MeterKey, MeterSlotState>();
   for (let i = 0; i < METERS_PER_SIDE; i++) {
     slots.set(meterKey('left', i), {

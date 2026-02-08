@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNodePortPosition, getConnectionPointPosition } from './port-positions.ts';
+import { getNodePortPosition, getConnectionPointPosition, getNodeBodyPixelRect } from './port-positions.ts';
 import type { NodeState } from '../../shared/types/index.ts';
 import {
   FUNDAMENTAL_GRID_COLS,
@@ -11,8 +11,8 @@ import {
 } from '../../shared/grid/index.ts';
 import { METER_GRID_ROWS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS } from '../meters/meter-types.ts';
 
-function makeNode(id: string, type: string, col: number, row: number, inputs = 1, outputs = 1): NodeState {
-  return { id, type, position: { col, row }, params: {}, inputCount: inputs, outputCount: outputs };
+function makeNode(id: string, type: string, col: number, row: number, inputs = 1, outputs = 1, params: Record<string, unknown> = {}): NodeState {
+  return { id, type, position: { col, row }, params, inputCount: inputs, outputCount: outputs };
 }
 
 describe('getNodePortPosition', () => {
@@ -111,5 +111,42 @@ describe('getConnectionPointPosition', () => {
     const pos64 = getConnectionPointPosition('left', 1, 64);
     expect(pos64.x).toBe(pos32.x * 2);
     expect(pos64.y).toBe(pos32.y * 2);
+  });
+});
+
+describe('getNodeBodyPixelRect — utility nodes with cpLayout', () => {
+  const cellSize = 40;
+
+  it('utility node with cpLayout extends 0.5 cells above and below (like fundamental nodes)', () => {
+    const cpLayout = ['input', 'off', 'off', 'output', 'off', 'off'];
+    const node = makeNode('u1', 'utility:myutil', 10, 5, 1, 1, { cpLayout });
+    const rect = getNodeBodyPixelRect(node, cellSize);
+
+    // Ports at integer grid rows; body extends 0.5 above first port to 0.5 below last port
+    expect(rect.x).toBe(10 * cellSize);
+    expect(rect.y).toBe((5 - 0.5) * cellSize);
+    expect(rect.width).toBe(UTILITY_GRID_COLS * cellSize);
+    expect(rect.height).toBe(UTILITY_GRID_ROWS * cellSize);
+  });
+
+  it('custom-blank with cpLayout extends 0.5 cells above and below', () => {
+    const cpLayout = ['input', 'input', 'off', 'output', 'off', 'off'];
+    const node = makeNode('cb1', 'custom-blank', 10, 5, 2, 1, { cpLayout });
+    const rect = getNodeBodyPixelRect(node, cellSize);
+
+    expect(rect.x).toBe(10 * cellSize);
+    expect(rect.y).toBe((5 - 0.5) * cellSize);
+    expect(rect.width).toBe(UTILITY_GRID_COLS * cellSize);
+    expect(rect.height).toBe(UTILITY_GRID_ROWS * cellSize);
+  });
+
+  it('custom-blank without cpLayout (no ports) uses full grid footprint', () => {
+    const node = makeNode('cb2', 'custom-blank', 10, 5, 0, 0);
+    const rect = getNodeBodyPixelRect(node, cellSize);
+
+    expect(rect.x).toBe(10 * cellSize);
+    expect(rect.y).toBe(5 * cellSize);
+    expect(rect.width).toBe(UTILITY_GRID_COLS * cellSize);
+    expect(rect.height).toBe(UTILITY_GRID_ROWS * cellSize);
   });
 });

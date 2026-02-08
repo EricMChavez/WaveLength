@@ -16,6 +16,7 @@ import {
 import { NODE_STYLE } from '../../shared/constants/index.ts';
 import type { MeterKey, MeterSlotState } from '../meters/meter-types.ts';
 import { METER_GRID_COLS, METER_GRID_ROWS, CHANNEL_RATIOS } from '../meters/meter-types.ts';
+import { cpBidirectionalId } from '../../puzzle/connection-point-nodes.ts';
 
 function makeNode(id: string, type: string, col: number, row: number, inputs = 1, outputs = 1): NodeState {
   return { id, type, position: { col, row }, params: {}, inputCount: inputs, outputCount: outputs };
@@ -304,5 +305,38 @@ describe('hitTestMeter', () => {
     const y = (METER_GRID_ROWS * cellSize) / 2;
     const result = hitTestMeter(x, y, cellSize, slots);
     expect(result).toBeNull();
+  });
+});
+
+describe('hitTest CP node filtering', () => {
+  const cellSize = 40;
+  const canvasWidth = GRID_COLS * cellSize;
+  const canvasHeight = GRID_ROWS * cellSize;
+
+  it('skips bidirectional CP nodes in body hit test', () => {
+    // Place bidir CP nodes at position {0, 0} (in meter zone)
+    const nodes = new Map<string, NodeState>();
+    for (let i = 0; i < 6; i++) {
+      const id = cpBidirectionalId(i);
+      nodes.set(id, makeNode(id, 'connection-bidirectional', 0, 0, 1, 1));
+    }
+
+    // Click at (0, 0) — should be empty, not a node hit
+    const result = hitTest(0, 0, nodes, canvasWidth, canvasHeight, cellSize);
+    expect(result.type).toBe('empty');
+  });
+
+  it('still hits regular nodes placed near CP nodes', () => {
+    const nodes = new Map<string, NodeState>();
+    // Add a bidir CP and a regular node at the same position
+    const cpId = cpBidirectionalId(0);
+    nodes.set(cpId, makeNode(cpId, 'connection-bidirectional', 15, 5, 1, 1));
+    nodes.set('n1', makeNode('n1', 'invert', 15, 5));
+
+    const x = 15 * cellSize + cellSize;
+    const y = 5 * cellSize + cellSize / 2;
+    const result = hitTest(x, y, nodes, canvasWidth, canvasHeight, cellSize);
+    expect(result.type).toBe('node');
+    if (result.type === 'node') expect(result.nodeId).toBe('n1');
   });
 });

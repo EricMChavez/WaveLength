@@ -3,6 +3,7 @@ import { createWire } from '../shared/types/index.ts';
 import type { BakeMetadata } from '../engine/baking/index.ts';
 import { createConnectionPointNode } from './connection-point-nodes.ts';
 import { isConnectionPointNode } from './connection-point-nodes.ts';
+import { PLAYABLE_START, PLAYABLE_END } from '../shared/grid/index.ts';
 
 /**
  * Reconstruct a read-only GameboardState from bake metadata.
@@ -36,14 +37,20 @@ export function gameboardFromBakeMetadata(
     (cfg) => !isConnectionPointNode(cfg.id),
   );
 
-  // Spread processing nodes across middle columns in topo order
+  // Spread processing nodes across playable area in topo order
+  const margin = 4; // cells inside playable area edges
+  const startCol = PLAYABLE_START + margin;
+  const endCol = PLAYABLE_END - margin;
+  const spacing = processingConfigs.length > 1
+    ? Math.min(6, Math.floor((endCol - startCol) / (processingConfigs.length - 1)))
+    : 0;
   for (let i = 0; i < processingConfigs.length; i++) {
     const cfg = processingConfigs[i];
 
     const node: NodeState = {
       id: cfg.id,
       type: cfg.type,
-      position: { col: 4 + i * 2, row: 4 },
+      position: { col: startCol + i * spacing, row: 4 },
       params: { ...cfg.params },
       inputCount: cfg.inputCount,
       outputCount: cfg.outputCount,

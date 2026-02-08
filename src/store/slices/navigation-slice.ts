@@ -2,12 +2,16 @@ import type { StateCreator } from 'zustand';
 import type { GameStore } from '../index.ts';
 import type { GameboardState, NodeId } from '../../shared/types/index.ts';
 import { gameboardFromBakeMetadata } from '../../puzzle/gameboard-from-metadata.ts';
+import { recomputeOccupancy } from '../../shared/grid/index.ts';
+import { createDefaultMeterSlots } from './meter-slice.ts';
+import type { MeterKey, MeterSlotState } from '../../gameboard/meters/meter-types.ts';
 
 export interface BoardStackEntry {
   board: GameboardState;
   portConstants: Map<string, number>;
   nodeIdInParent: NodeId;
   readOnly: boolean;
+  meterSlots: Map<MeterKey, MeterSlotState>;
 }
 
 export interface ZoomTransition {
@@ -86,6 +90,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       portConstants: state.portConstants,
       nodeIdInParent: nodeId,
       readOnly: state.activeBoardReadOnly,
+      meterSlots: state.meterSlots,
     };
 
     const newStack = [...state.boardStack, stackEntry];
@@ -98,6 +103,8 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       activeBoardReadOnly: true,
       navigationDepth: newStack.length,
       selectedNodeId: null,
+      occupancy: recomputeOccupancy(childBoard.nodes),
+      meterSlots: createDefaultMeterSlots(),
     });
   },
 
@@ -116,6 +123,8 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       activeBoardReadOnly: entry.readOnly,
       navigationDepth: newStack.length,
       selectedNodeId: null,
+      occupancy: recomputeOccupancy(entry.board.nodes),
+      meterSlots: entry.meterSlots,
     });
   },
 
@@ -128,6 +137,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       portConstants: state.portConstants,
       nodeIdInParent: (nodeIdInParent ?? '') as NodeId,
       readOnly: state.activeBoardReadOnly,
+      meterSlots: state.meterSlots,
     };
 
     const newStack = [...state.boardStack, stackEntry];
@@ -142,6 +152,8 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       selectedNodeId: null,
       editingUtilityId: utilityId,
       editingNodeIdInParent: (nodeIdInParent ?? null) as NodeId | null,
+      occupancy: recomputeOccupancy(board.nodes),
+      meterSlots: createDefaultMeterSlots(),
     });
   },
 
@@ -180,6 +192,8 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       selectedNodeId: null,
       editingUtilityId: null,
       editingNodeIdInParent: null,
+      occupancy: recomputeOccupancy(parentBoard.nodes),
+      meterSlots: entry.meterSlots,
     });
   },
 });

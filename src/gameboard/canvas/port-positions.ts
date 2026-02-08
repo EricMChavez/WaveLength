@@ -139,8 +139,8 @@ function getUtilityPortPosition(
         const x = isLeft
           ? node.position.col * cellSize
           : (node.position.col + cols) * cellSize;
-        // Distribute 3 slots evenly across the height (same as standard 3-port distribution)
-        const y = (node.position.row + (slotOnSide + 0.5) * rows / 3) * cellSize;
+        // Place port at integer grid position (same formula as standard port distribution)
+        const y = (node.position.row + Math.floor(slotOnSide * rows / 3)) * cellSize;
         return { x, y };
       }
       count++;
@@ -202,10 +202,18 @@ export function getNodeBodyPixelRect(
     return { x, y, width: cols * cellSize, height: rows * cellSize };
   }
 
-  // Multi-side port nodes: body extends to grid edge on port-bearing sides,
-  // and 0.5 cells OUTWARD on non-port sides (to wrap around adjacent ports).
-  // This matches standard node behavior where the body extends 0.5 beyond
-  // the grid footprint perpendicular to port-bearing edges.
+  // Utility/custom-blank nodes with cpLayout: ports at integer grid rows 0..rows-1,
+  // body spans 0.5 above first port to 0.5 below last port (= rows cells tall).
+  if ((node.type.startsWith('utility:') || node.type === 'custom-blank') && node.params?.cpLayout) {
+    const x = node.position.col * cellSize;
+    const y = (node.position.row - 0.5) * cellSize;
+    const width = cols * cellSize;
+    const height = rows * cellSize;
+    return { x, y, width, height };
+  }
+
+  // Multi-side port nodes (e.g. Mixer with ports on left/right/bottom): body extends to grid edge
+  // on port-bearing sides, and 0.5 cells OUTWARD on non-port sides.
   if (hasMultiSidePorts(node)) {
     const portSides = getPortBearingSides(node);
     const pad = 0.5;

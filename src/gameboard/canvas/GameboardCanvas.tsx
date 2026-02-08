@@ -399,7 +399,7 @@ export function GameboardCanvas() {
     // --- Read-only mode: only allow selection ---
     if (state.activeBoardReadOnly) {
       if (!state.activeBoard) return;
-      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints);
+      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
       if (hit.type === 'node') {
         state.selectNode(hit.nodeId);
       } else {
@@ -502,7 +502,7 @@ export function GameboardCanvas() {
     }
 
     if (!state.activeBoard) return;
-    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints);
+    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
 
     // --- Drawing wire mode ---
     if (state.interactionMode.type === 'drawing-wire') {
@@ -600,7 +600,7 @@ export function GameboardCanvas() {
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
     const { w, h } = getCanvasLogicalSize(canvas);
-    const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints);
+    const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
 
     // Right-click on input port still opens constant value editor
     if (hit.type === 'port' && hit.portRef.side === 'input') {
@@ -645,7 +645,7 @@ export function GameboardCanvas() {
     const y = e.clientY - rect.top;
     const { w, h } = getCanvasLogicalSize(canvas);
 
-    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints);
+    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
 
     // Start knob adjust on knob hit (when knob port is unwired)
     if (hit.type === 'knob') {
@@ -789,7 +789,7 @@ export function GameboardCanvas() {
     // Update hover state for node highlighting (skip if dragging)
     if (state.interactionMode.type !== 'dragging-node' && state.activeBoard) {
       const { w, h } = getCanvasLogicalSize(canvas);
-      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints);
+      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
       state.setHoveredNode(hit.type === 'node' ? hit.nodeId : null);
     }
   }, []);

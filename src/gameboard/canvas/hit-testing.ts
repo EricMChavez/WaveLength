@@ -6,7 +6,7 @@ import { gridToPixel, getNodeGridSize, METER_LEFT_START, METER_RIGHT_START } fro
 import type { MeterKey, MeterSlotState } from '../meters/meter-types.ts';
 import { METER_GRID_ROWS, METER_GRID_COLS, METER_GAP_ROWS, CHANNEL_RATIOS } from '../meters/meter-types.ts';
 import type { ConnectionPointConfig } from '../../puzzle/types.ts';
-import { buildConnectionPointConfig } from '../../puzzle/types.ts';
+import { buildConnectionPointConfig, buildCustomNodeConnectionPointConfig } from '../../puzzle/types.ts';
 
 export type HitResult =
   | { type: 'port'; portRef: PortRef; position: Vec2 }
@@ -59,6 +59,7 @@ export function hitTest(
   activeInputs?: number,
   activeOutputs?: number,
   connectionPointConfig?: ConnectionPointConfig,
+  editingUtilityId?: string | null,
 ): HitResult {
   // 1. Check node ports (highest priority — skip virtual CP nodes)
   for (const node of nodes.values()) {
@@ -86,11 +87,13 @@ export function hitTest(
   }
 
   // 2. Check connection points (only active ones)
-  const cpConfig = connectionPointConfig
-    ?? buildConnectionPointConfig(
-      activeInputs ?? CONNECTION_POINT_CONFIG.INPUT_COUNT,
-      activeOutputs ?? CONNECTION_POINT_CONFIG.OUTPUT_COUNT,
-    );
+  const cpConfig = editingUtilityId
+    ? buildCustomNodeConnectionPointConfig()
+    : connectionPointConfig
+      ?? buildConnectionPointConfig(
+        activeInputs ?? CONNECTION_POINT_CONFIG.INPUT_COUNT,
+        activeOutputs ?? CONNECTION_POINT_CONFIG.OUTPUT_COUNT,
+      );
 
   // Left side CPs
   for (let i = 0; i < cpConfig.left.length; i++) {
@@ -128,6 +131,7 @@ export function hitTest(
   // 4. Check node bodies (using full grid footprint for hit detection)
   const entries = Array.from(nodes.entries()).reverse();
   for (const [id, node] of entries) {
+    if (isConnectionPointNode(id)) continue;
     const rect = getNodeHitRect(node, cellSize);
     if (
       x >= rect.x &&

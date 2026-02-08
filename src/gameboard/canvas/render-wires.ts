@@ -151,7 +151,8 @@ export function drawWires(
   const neutralColor = useOverrides ? devOverrides.colors.colorNeutral : tokens.colorNeutral;
 
   for (const wire of wires) {
-    if (wire.path.length === 0) continue;
+    // Allow wires with empty paths if we can resolve endpoints from nodes
+    if (wire.path.length === 0 && !nodes) continue;
 
     // Pre-compute pixel positions for path cells (at gridline intersections)
     const pathPts = wire.path.map((gp) => ({

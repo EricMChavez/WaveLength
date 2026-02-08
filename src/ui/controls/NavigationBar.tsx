@@ -18,7 +18,9 @@ export function computeBreadcrumbs(
 
   for (const entry of boardStack) {
     const node = entry.board.nodes.get(entry.nodeIdInParent);
-    if (node && node.type.startsWith('puzzle:')) {
+    if (node && node.type === 'custom-blank') {
+      segments.push('New Custom Node');
+    } else if (node && node.type.startsWith('puzzle:')) {
       const puzzleId = node.type.slice('puzzle:'.length);
       const title = puzzleNodes.get(puzzleId)?.title ?? puzzleId;
       segments.push(title);

@@ -9,7 +9,7 @@ import { createCeremonySlice } from './ceremony-slice.ts';
 import { createNavigationSlice } from './navigation-slice.ts';
 import { createProgressionSlice } from './progression-slice.ts';
 import { createHistorySlice } from './history-slice.ts';
-import { createMeterSlice } from './meter-slice.ts';
+import { createMeterSlice, createDefaultMeterSlots } from './meter-slice.ts';
 import { createRoutingSlice } from './routing-slice.ts';
 import { createOverlaySlice } from './overlay-slice.ts';
 import { createAnimationSlice } from './animation-slice.ts';
@@ -191,6 +191,125 @@ describe('navigation-slice', () => {
     store.getState().zoomIntoNode('p1');
     expect(store.getState().boardStack).toHaveLength(0);
   });
+
+  it('zoomIntoNode recomputes occupancy for child board', () => {
+    const store = createTestStore();
+    setupBoardWithPuzzleNode(store);
+
+    store.getState().zoomIntoNode('p1');
+
+    const s = store.getState();
+    // The child board has nodes — occupancy should reflect them
+    expect(s.occupancy).toBeDefined();
+    // Occupancy is a 2D array (GRID_COLS x GRID_ROWS)
+    expect(s.occupancy.length).toBeGreaterThan(0);
+  });
+
+  it('zoomOut recomputes occupancy for parent board', () => {
+    const store = createTestStore();
+    setupBoardWithPuzzleNode(store);
+
+    store.getState().zoomIntoNode('p1');
+    store.getState().zoomOut();
+
+    const s = store.getState();
+    // Parent board has nodes at (100,100) and (200,200) — occupancy should have marked cells
+    expect(s.occupancy).toBeDefined();
+    expect(s.occupancy.length).toBeGreaterThan(0);
+  });
+
+  it('zoomIntoNode resets meter slots to all hidden', () => {
+    const store = createTestStore();
+    setupBoardWithPuzzleNode(store);
+
+    store.getState().zoomIntoNode('p1');
+
+    const s = store.getState();
+    for (const slot of s.meterSlots.values()) {
+      expect(slot.visualState).toBe('hidden');
+    }
+  });
+
+  it('zoomOut restores parent meter slots', () => {
+    const store = createTestStore();
+    setupBoardWithPuzzleNode(store);
+
+    // Simulate active meters before zoom-in
+    const { meterSlots } = store.getState();
+    for (const [key, slot] of meterSlots) {
+      meterSlots.set(key, { ...slot, visualState: 'active' });
+    }
+    store.setState({ meterSlots: new Map(meterSlots) });
+
+    store.getState().zoomIntoNode('p1');
+    // Child board gets default (hidden) meters
+    for (const slot of store.getState().meterSlots.values()) {
+      expect(slot.visualState).toBe('hidden');
+    }
+
+    store.getState().zoomOut();
+    // Parent meters should be restored to 'active'
+    for (const slot of store.getState().meterSlots.values()) {
+      expect(slot.visualState).toBe('active');
+    }
+  });
+
+  it('startEditingUtility recomputes occupancy and resets meters', () => {
+    const store = createTestStore();
+    setupBoardWithPuzzleNode(store);
+
+    const utilityBoard: GameboardState = {
+      id: 'utility-board',
+      nodes: new Map([
+        ['un1', { id: 'un1', type: 'invert', position: { col: 15, row: 10 }, params: {}, inputCount: 1, outputCount: 1 }],
+      ]),
+      wires: [],
+    };
+
+    store.getState().startEditingUtility('util1', utilityBoard, 'p1' as any);
+
+    const s = store.getState();
+    // Occupancy should be recomputed for utility board
+    expect(s.occupancy).toBeDefined();
+    // Meters should be reset to hidden
+    for (const slot of s.meterSlots.values()) {
+      expect(slot.visualState).toBe('hidden');
+    }
+  });
+
+  it('finishEditingUtility recomputes occupancy and restores parent meters', () => {
+    const store = createTestStore();
+    setupBoardWithPuzzleNode(store);
+
+    // Set parent meters to active
+    const { meterSlots } = store.getState();
+    for (const [key, slot] of meterSlots) {
+      meterSlots.set(key, { ...slot, visualState: 'active' });
+    }
+    store.setState({ meterSlots: new Map(meterSlots) });
+
+    const utilityBoard: GameboardState = {
+      id: 'utility-board',
+      nodes: new Map(),
+      wires: [],
+    };
+
+    store.getState().startEditingUtility('util1', utilityBoard, 'p1' as any);
+    // Child should have hidden meters
+    for (const slot of store.getState().meterSlots.values()) {
+      expect(slot.visualState).toBe('hidden');
+    }
+
+    store.getState().finishEditingUtility();
+
+    const s = store.getState();
+    // Occupancy should be recomputed for parent board
+    expect(s.occupancy).toBeDefined();
+    // Meters should be restored to active
+    for (const slot of s.meterSlots.values()) {
+      expect(slot.visualState).toBe('active');
+    }
+  });
 });
 
 describe('computeBreadcrumbs', () => {
@@ -223,7 +342,7 @@ describe('computeBreadcrumbs', () => {
       ]),
       wires: [],
     };
-    const entry = { board, portConstants: new Map(), nodeIdInParent: 'x' as any, readOnly: false };
+    const entry = { board, portConstants: new Map(), nodeIdInParent: 'x' as any, readOnly: false, meterSlots: createDefaultMeterSlots() };
     const result = computeBreadcrumbs([entry], new Map(), null);
     expect(result).toEqual(['Sandbox', 'unknown-node']);
   });
@@ -236,8 +355,35 @@ describe('computeBreadcrumbs', () => {
       ]),
       wires: [],
     };
-    const entry = { board, portConstants: new Map(), nodeIdInParent: 'n1' as any, readOnly: false };
+    const entry = { board, portConstants: new Map(), nodeIdInParent: 'n1' as any, readOnly: false, meterSlots: createDefaultMeterSlots() };
     const result = computeBreadcrumbs([entry], new Map(), null);
     expect(result).toEqual(['Sandbox', 'n1']);
+  });
+
+  it('shows "New Custom Node" for custom-blank nodes', () => {
+    const board: GameboardState = {
+      id: 'b',
+      nodes: new Map([
+        ['cb1', { id: 'cb1', type: 'custom-blank', position: { col: 15, row: 10 }, params: {}, inputCount: 0, outputCount: 0 }],
+      ]),
+      wires: [],
+    };
+    const entry = { board, portConstants: new Map(), nodeIdInParent: 'cb1' as any, readOnly: false, meterSlots: createDefaultMeterSlots() };
+    const result = computeBreadcrumbs([entry], new Map(), null);
+    expect(result).toEqual(['Sandbox', 'New Custom Node']);
+  });
+
+  it('shows utility title for utility nodes', () => {
+    const board: GameboardState = {
+      id: 'b',
+      nodes: new Map([
+        ['u1', { id: 'u1', type: 'utility:myutil', position: { col: 15, row: 10 }, params: {}, inputCount: 1, outputCount: 1 }],
+      ]),
+      wires: [],
+    };
+    const entry = { board, portConstants: new Map(), nodeIdInParent: 'u1' as any, readOnly: false, meterSlots: createDefaultMeterSlots() };
+    const utilityNodes = new Map([['myutil', { title: 'My Filter' } as any]]);
+    const result = computeBreadcrumbs([entry], new Map(), null, utilityNodes);
+    expect(result).toEqual(['Sandbox', 'My Filter']);
   });
 });
