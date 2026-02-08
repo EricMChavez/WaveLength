@@ -3,6 +3,7 @@ import { startRenderLoop } from './render-loop.ts';
 import { useGameStore } from '../../store/index.ts';
 import { hitTest, hitTestMeter } from './hit-testing.ts';
 import { getEscapeAction, executeEscapeAction } from '../interaction/escape-handler.ts';
+import { stopSimulation } from '../../simulation/simulation-controller.ts';
 import { getKeyboardAction, executeKeyboardAction } from '../interaction/keyboard-handler.ts';
 import { setFocusVisible } from '../interaction/keyboard-focus.ts';
 import { generateId } from '../../shared/generate-id.ts';
@@ -290,6 +291,10 @@ export function GameboardCanvas() {
         activePuzzle: state.activePuzzle,
         keyboardGhostPosition: state.keyboardGhostPosition,
         onEnterNode: (nodeId: string) => {
+          if (state.simulationRunning) {
+            stopSimulation();
+            state.setSimulationRunning(false);
+          }
           const canvas = canvasRef.current;
           if (canvas) {
             const snapshot = new OffscreenCanvas(canvas.width, canvas.height);
