@@ -101,6 +101,7 @@ export function DevTools() {
       borderShadow: { value: DEFAULT_DEV_OVERRIDES.gridStyle.borderShadow, min: 0, max: 1, step: 0.05, label: 'Border Shadow' },
       insetDepthTop: { value: DEFAULT_DEV_OVERRIDES.gridStyle.insetDepthTop, min: 0, max: 1, step: 0.05, label: 'Inset Depth (Top)' },
       insetDepthSide: { value: DEFAULT_DEV_OVERRIDES.gridStyle.insetDepthSide, min: 0, max: 1, step: 0.05, label: 'Inset Depth (Side)' },
+      showGridLabels: { value: DEFAULT_DEV_OVERRIDES.gridStyle.showGridLabels, label: 'Grid Labels' },
     },
     { collapsed: true }
   );

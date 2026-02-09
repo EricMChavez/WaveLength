@@ -1,6 +1,7 @@
 import type { ThemeTokens } from '../../shared/tokens/index.ts';
 import type { RenderGridState } from './render-types.ts';
 import {
+  GRID_COLS,
   GRID_ROWS,
   METER_LEFT_START,
   METER_LEFT_END,
@@ -113,6 +114,58 @@ export function drawGrid(
   }
   ctx.fill();
   ctx.restore();
+
+  // 6. Debug grid labels (dev override only)
+  const showLabels = devOverrides.enabled && devOverrides.gridStyle.showGridLabels;
+  if (showLabels) {
+    ctx.save();
+    const fontSize = Math.max(8, Math.floor(cellSize * 0.35));
+    ctx.font = `${fontSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let col = 0; col < GRID_COLS; col++) {
+      for (let row = 0; row < GRID_ROWS; row++) {
+        // Show every 5th intersection, plus edges
+        const isEdgeCol = col === 0 || col === GRID_COLS - 1 || col === PLAYABLE_START || col === PLAYABLE_END;
+        const isEdgeRow = row === 0 || row === GRID_ROWS - 1;
+        const isFifth = col % 5 === 0 && row % 5 === 0;
+
+        if (!isFifth && !isEdgeCol && !isEdgeRow) continue;
+
+        const x = col * cellSize + cellSize / 2;
+        const y = row * cellSize + cellSize / 2;
+        const label = `${col},${row}`;
+
+        // Background pill for readability
+        const metrics = ctx.measureText(label);
+        const padX = 2;
+        const padY = 1;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(
+          x - metrics.width / 2 - padX,
+          y - fontSize / 2 - padY,
+          metrics.width + padX * 2,
+          fontSize + padY * 2,
+        );
+
+        // Zone coloring: playable = green, meter = cyan, other = white
+        if (col >= PLAYABLE_START && col <= PLAYABLE_END) {
+          ctx.fillStyle = '#88ff88';
+        } else if (
+          (col >= METER_LEFT_START && col <= METER_LEFT_END) ||
+          (col >= METER_RIGHT_START && col <= METER_RIGHT_END)
+        ) {
+          ctx.fillStyle = '#88ffff';
+        } else {
+          ctx.fillStyle = '#ffffff';
+        }
+
+        ctx.fillText(label, x, y);
+      }
+    }
+    ctx.restore();
+  }
 
   // Restore alpha
   if (state.gridOpacity !== undefined) {

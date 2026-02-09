@@ -28,6 +28,7 @@ export interface GridStyleOverrides {
   borderShadow: number;
   insetDepthTop: number;
   insetDepthSide: number;
+  showGridLabels: boolean;
 }
 
 export interface MeterStyleOverrides {
@@ -90,6 +91,7 @@ export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
     borderShadow: 0.4,
     insetDepthTop: 0.4,
     insetDepthSide: 0.3,
+    showGridLabels: false,
   },
   meterStyle: {
     waveformRatio: 0.59,

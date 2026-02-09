@@ -53,12 +53,16 @@ export function isPassable(
   return isRoutable(col, row) && !occupancy[col][row];
 }
 
+/** Number of stem phases: 0 = in-stem (forced straight), 1 = free routing */
+export const STEM_PHASES = 2;
+
 /**
- * Encode (col, row, dir) into a unique integer key.
+ * Encode (col, row, dir, stemPhase) into a unique integer key.
  * Used for A* visited sets and parent tracking.
+ * stemPhase: 0 = still in start stem, 1 = free routing.
  */
-export function stateKey(col: number, row: number, dir: number): number {
-  return (col * GRID_ROWS + row) * DIR_COUNT + dir;
+export function stateKey(col: number, row: number, dir: number, stem: number = 1): number {
+  return ((col * GRID_ROWS + row) * DIR_COUNT + dir) * STEM_PHASES + stem;
 }
 
 /** Chebyshev distance -- correct admissible heuristic for 8-directional movement. */
