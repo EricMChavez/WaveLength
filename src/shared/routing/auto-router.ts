@@ -233,6 +233,20 @@ export function getPortGridAnchor(
   // Get the port's offset from node's top-left
   const offset = getPortOffset(cols, rows, totalOnSide, indexOnSide, portSide);
 
+  // Apply explicit gridPosition override from port definition (must match renderer)
+  const def = getNodeDefinition(node.type);
+  if (def) {
+    const ports = side === 'input' ? def.inputs : def.outputs;
+    const portDef = ports[portIndex];
+    if (portDef?.gridPosition !== undefined) {
+      if (portSide === 'left' || portSide === 'right') {
+        offset.row = portDef.gridPosition;
+      } else {
+        offset.col = portDef.gridPosition;
+      }
+    }
+  }
+
   // Compute anchor at the port's grid line (matching the port pixel position).
   // getPortOffset returns col=0 for left, col=nodeWidth for right, etc.
   // These land on the node's grid lines — the boundary between the node body

@@ -104,3 +104,102 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* Utility row: item + delete button side by side */
+.utilityRow {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.utilityRow .item {
+  flex: 1;
+  min-width: 0;
+}
+
+.deleteBtn {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #9090b0;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  padding: 0;
+  margin-right: 4px;
+}
+
+.utilityRow:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  background: rgba(224, 56, 56, 0.2);
+  border-color: rgba(224, 56, 56, 0.4);
+  color: #E03838;
+}
+
+/* Confirm row replaces the normal utility row */
+.confirmItem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgba(224, 56, 56, 0.08);
+}
+
+.confirmText {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.confirmYes,
+.confirmNo {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.confirmYes {
+  background: rgba(224, 56, 56, 0.2);
+  border: 1px solid rgba(224, 56, 56, 0.4);
+  color: #E03838;
+}
+
+.confirmYes:hover {
+  background: rgba(224, 56, 56, 0.35);
+}
+
+.confirmNo {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+}
+
+.confirmNo:hover {
+  background: rgba(255, 255, 255, 0.15);
+}

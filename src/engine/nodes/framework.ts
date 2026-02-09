@@ -43,6 +43,8 @@ export interface PortDefinition {
   description?: string;
   /** Override the default side for this port (inputs default to 'left', outputs to 'right') */
   side?: PortSide;
+  /** Override the distributed position along the port's side (row for left/right, col for top/bottom) */
+  gridPosition?: number;
 }
 
 // =============================================================================

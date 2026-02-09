@@ -97,7 +97,7 @@ export function drawMatchOverlay(
 
   ctx.save();
   ctx.fillStyle = tokens.colorValidationMatch;
-  ctx.globalAlpha = 0.50;
+  ctx.globalAlpha = 0.75;
 
   // Walk samples, coalescing adjacent matches into spans
   let spanStart = -1;

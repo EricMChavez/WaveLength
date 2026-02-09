@@ -9,7 +9,7 @@ export const mixerNode = defineNode<MixerParams>({
 
   inputs: [
     { name: 'A' },
-    { name: 'B' },
+    { name: 'B', gridPosition: 2 },
     { name: 'X', description: 'Crossfade control', side: 'bottom' },
   ],
   outputs: [{ name: 'Out' }],
@@ -25,5 +25,5 @@ export const mixerNode = defineNode<MixerParams>({
     return [clamp(a * t + b * (1 - t))];
   },
 
-  size: { width: 3, height: 3 },
+  size: { width: 4, height: 3 },
 });

@@ -15,7 +15,7 @@ describe('Mixer node', () => {
     expect(mixerNode.category).toBe('routing');
     expect(mixerNode.inputs).toHaveLength(3);
     expect(mixerNode.outputs).toHaveLength(1);
-    expect(mixerNode.size).toEqual({ width: 3, height: 3 });
+    expect(mixerNode.size).toEqual({ width: 4, height: 3 });
   });
 
   it('has X input with bottom side override', () => {

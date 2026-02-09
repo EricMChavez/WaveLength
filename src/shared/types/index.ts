@@ -61,6 +61,8 @@ export interface NodeState {
   libraryVersionHash?: string;
   /** Node rotation (0, 90, 180, or 270 degrees). Default 0. */
   rotation?: NodeRotation;
+  /** If true, node cannot be deleted (used for starting nodes in custom puzzles) */
+  locked?: boolean;
 }
 
 /** Complete state of a gameboard */

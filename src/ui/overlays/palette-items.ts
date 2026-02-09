@@ -1,4 +1,4 @@
-import type { PuzzleNodeEntry, UtilityNodeEntry } from '../../store/slices/palette-slice.ts';
+import type { UtilityNodeEntry } from '../../store/slices/palette-slice.ts';
 import { nodeRegistry, getNodeLabel, CATEGORY_LABELS } from '../../engine/nodes/registry.ts';
 import type { NodeCategory } from '../../engine/nodes/framework.ts';
 
@@ -6,21 +6,18 @@ export interface PaletteItem {
   id: string;
   nodeType: string;
   label: string;
-  section: 'fundamental' | 'puzzle' | 'utility';
+  section: 'fundamental' | 'utility';
   category?: NodeCategory;
 }
 
 /**
  * Build the list of palette items available for placement.
- * Filters fundamentals and puzzles by allowedNodes if set.
- * In creative mode, all puzzle nodes are available regardless of completion.
+ * Filters fundamentals by allowedNodes if set.
+ * Named utility nodes are always available.
  */
 export function buildPaletteItems(
   allowedNodes: ReadonlyArray<string> | null,
-  puzzleNodes: ReadonlyMap<string, PuzzleNodeEntry>,
   utilityNodes: ReadonlyMap<string, UtilityNodeEntry>,
-  completedLevels: ReadonlySet<string>,
-  isCreativeMode = false,
 ): PaletteItem[] {
   const items: PaletteItem[] = [];
 
@@ -38,20 +35,16 @@ export function buildPaletteItems(
     });
   }
 
-  // Puzzle nodes (must be completed AND allowed, unless in creative mode)
-  for (const entry of puzzleNodes.values()) {
-    // In creative mode, all puzzle nodes are available
-    if (!isCreativeMode && !completedLevels.has(entry.puzzleId)) continue;
-    if (allowedNodes && !allowedNodes.includes(entry.puzzleId)) continue;
-    items.push({
-      id: `puzzle:${entry.puzzleId}`,
-      nodeType: `puzzle:${entry.puzzleId}`,
-      label: entry.title,
-      section: 'puzzle',
-    });
-  }
+  // Permanent "Custom" item — places a blank custom node on the board
+  items.push({
+    id: 'custom-blank',
+    nodeType: 'custom-blank',
+    label: 'Custom',
+    section: 'fundamental',
+    category: 'custom',
+  });
 
-  // Utility nodes (always available)
+  // Named utility nodes (always available)
   for (const entry of utilityNodes.values()) {
     items.push({
       id: `utility:${entry.utilityId}`,
@@ -60,14 +53,6 @@ export function buildPaletteItems(
       section: 'utility',
     });
   }
-
-  // Permanent "Custom" item — places a blank custom node on the board
-  items.push({
-    id: 'custom-blank',
-    nodeType: 'custom-blank',
-    label: 'Custom',
-    section: 'utility',
-  });
 
   return items;
 }
@@ -91,8 +76,6 @@ export function groupPaletteItemsByCategory(items: ReadonlyArray<PaletteItem>): 
     let groupKey: string;
     if (item.section === 'fundamental' && item.category) {
       groupKey = CATEGORY_LABELS[item.category];
-    } else if (item.section === 'puzzle') {
-      groupKey = 'Puzzle Nodes';
     } else if (item.section === 'utility') {
       groupKey = 'Utility Nodes';
     } else {

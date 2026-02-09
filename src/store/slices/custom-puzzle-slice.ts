@@ -3,6 +3,8 @@ import type { NodeState, Wire, GameboardState } from '../../shared/types/index.t
 import { WIRE_BUFFER_SIZE } from '../../shared/types/index.ts';
 import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition, PuzzleTestCase } from '../../puzzle/types.ts';
 import { createConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
+import { PLAYABLE_START } from '../../shared/grid/index.ts';
 
 /** Definition of a custom puzzle created in Creative Mode */
 export interface CustomPuzzle {
@@ -17,18 +19,23 @@ export interface CustomPuzzle {
   }>;
   /** Target output samples (one array per active output slot) */
   targetSamples: Map<number, number[]>;
-  /** Initial nodes (serialized) */
+  /** Initial nodes (serialized) — starting nodes pre-placed on the board */
   initialNodes: Array<{
     id: string;
     type: string;
     position: { col: number; row: number };
     params: Record<string, unknown>;
+    inputCount: number;
+    outputCount: number;
+    rotation?: 0 | 90 | 180 | 270;
   }>;
   /** Initial wires (serialized) */
   initialWires: Array<{
     source: { nodeId: string; portIndex: number };
     target: { nodeId: string; portIndex: number };
   }>;
+  /** Which fundamental node types are available in the palette. null = all allowed */
+  allowedNodes: string[] | null;
 }
 
 /** Serialized format for localStorage */
@@ -45,6 +52,8 @@ export interface SerializedCustomPuzzle {
   targetSamples: Array<[number, number[]]>;
   initialNodes: CustomPuzzle['initialNodes'];
   initialWires: CustomPuzzle['initialWires'];
+  /** Which fundamental node types are available. null = all. Optional for backward compat. */
+  allowedNodes?: string[] | null;
 }
 
 export interface CustomPuzzleSlice {
@@ -118,6 +127,41 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       nodes.set(node.id, node);
     }
 
+    // Place starting nodes (locked, horizontally centered in playable area)
+    const PLAYABLE_COLS = 46; // PLAYABLE_END - PLAYABLE_START
+    if (puzzle.initialNodes.length > 0) {
+      // Compute total width needed for all starting nodes
+      let totalWidth = 0;
+      const nodeWidths: number[] = [];
+      for (const sn of puzzle.initialNodes) {
+        const def = getNodeDefinition(sn.type);
+        const w = def ? def.size.width : 3;
+        nodeWidths.push(w);
+        totalWidth += w;
+      }
+      // Add 1-col gaps between nodes
+      totalWidth += Math.max(0, puzzle.initialNodes.length - 1);
+
+      let currentCol = PLAYABLE_START + Math.floor((PLAYABLE_COLS - totalWidth) / 2);
+      const startRow = 10;
+
+      for (let i = 0; i < puzzle.initialNodes.length; i++) {
+        const sn = puzzle.initialNodes[i];
+        const startingNode: NodeState = {
+          id: sn.id,
+          type: sn.type,
+          position: { col: currentCol, row: startRow },
+          params: sn.params as Record<string, number | string | boolean>,
+          inputCount: sn.inputCount,
+          outputCount: sn.outputCount,
+          rotation: sn.rotation,
+          locked: true,
+        };
+        nodes.set(startingNode.id, startingNode);
+        currentCol += nodeWidths[i] + 1;
+      }
+    }
+
     // Create gameboard
     const board: GameboardState = {
       id: `custom-puzzle-${puzzle.id}`,
@@ -170,7 +214,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       description: puzzle.description,
       activeInputs: inputCount,
       activeOutputs: outputCount,
-      allowedNodes: null, // All nodes allowed
+      allowedNodes: puzzle.allowedNodes ?? null,
       testCases: [{
         name: 'Custom',
         inputs,
@@ -197,6 +241,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         targetSamples: Array.from(puzzle.targetSamples.entries()),
         initialNodes: puzzle.initialNodes,
         initialWires: puzzle.initialWires,
+        allowedNodes: puzzle.allowedNodes,
       });
     }
     return puzzles;
@@ -214,6 +259,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         targetSamples: new Map(s.targetSamples),
         initialNodes: s.initialNodes,
         initialWires: s.initialWires,
+        allowedNodes: s.allowedNodes ?? null,
       });
     }
     set({ customPuzzles: puzzles });

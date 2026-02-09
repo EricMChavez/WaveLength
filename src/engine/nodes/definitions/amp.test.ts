@@ -15,7 +15,7 @@ describe('Amp node', () => {
     expect(ampNode.category).toBe('math');
     expect(ampNode.inputs).toHaveLength(2);
     expect(ampNode.outputs).toHaveLength(1);
-    expect(ampNode.size).toEqual({ width: 3, height: 3 });
+    expect(ampNode.size).toEqual({ width: 4, height: 3 });
   });
 
   it('has X input with bottom side override', () => {
@@ -96,7 +96,7 @@ describe('Amp node', () => {
     expect(param.step).toBe(25);
   });
 
-  describe('gain parameter affects output', () => {
+  describe('gain parameter ignored in evaluate (knob sets port constant only)', () => {
     const evaluateWithGain = (a: number, x: number, gain: number) =>
       ampNode.evaluate({
         inputs: [a, x],
@@ -105,29 +105,11 @@ describe('Amp node', () => {
         tickIndex: 0,
       });
 
-    it('gain=100 with X=0 doubles the signal', () => {
-      // A=50, X=0, gain=100 → 50 * (1 + 100/100) = 100
-      expect(evaluateWithGain(50, 0, 100)).toEqual([100]);
-    });
-
-    it('gain=-100 with X=0 mutes the signal', () => {
-      // A=50, X=0, gain=-100 → 50 * (1 - 1) = 0
-      expect(evaluateWithGain(50, 0, -100)).toEqual([0]);
-    });
-
-    it('gain and X combine additively', () => {
-      // A=40, X=25, gain=25 → 40 * (1 + 50/100) = 60
-      expect(evaluateWithGain(40, 25, 25)).toEqual([60]);
-    });
-
-    it('gain=50 with X=0 amplifies by 1.5x', () => {
-      // A=40, X=0, gain=50 → 40 * 1.5 = 60
-      expect(evaluateWithGain(40, 0, 50)).toEqual([60]);
-    });
-
-    it('clamps when gain+X causes overflow', () => {
-      // A=100, X=50, gain=50 → 100 * 2 = 200 → clamped to 100
-      expect(evaluateWithGain(100, 50, 50)).toEqual([100]);
+    it('gain param does not affect output (only X input matters)', () => {
+      // Gain param is for UI display only; knob value reaches evaluate via port constant → inputs[1]
+      expect(evaluateWithGain(50, 0, 100)).toEqual([50]);
+      expect(evaluateWithGain(50, 0, -100)).toEqual([50]);
+      expect(evaluateWithGain(40, 25, 25)).toEqual([50]);
     });
   });
 });

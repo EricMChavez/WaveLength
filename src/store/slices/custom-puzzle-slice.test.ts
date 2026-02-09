@@ -1,0 +1,119 @@
+import { describe, it, expect } from 'vitest';
+import type { CustomPuzzle, SerializedCustomPuzzle } from './custom-puzzle-slice.ts';
+import { createCustomPuzzleSlice } from './custom-puzzle-slice.ts';
+
+function makePuzzle(overrides: Partial<CustomPuzzle> = {}): CustomPuzzle {
+  return {
+    id: 'test-puzzle',
+    title: 'Test',
+    description: '',
+    createdAt: 1000,
+    slots: [
+      { direction: 'input' },
+      { direction: 'off' },
+      { direction: 'off' },
+      { direction: 'output' },
+      { direction: 'off' },
+      { direction: 'off' },
+    ],
+    targetSamples: new Map([[3, [50, 60, 70]]]),
+    initialNodes: [],
+    initialWires: [],
+    allowedNodes: null,
+    ...overrides,
+  };
+}
+
+describe('custom-puzzle-slice serialization', () => {
+  it('serializes and hydrates allowedNodes', () => {
+    const puzzles = new Map<string, CustomPuzzle>();
+    const puzzle = makePuzzle({ allowedNodes: ['invert', 'mixer'] });
+    puzzles.set(puzzle.id, puzzle);
+
+    // Create a minimal store-like API for getSerializableCustomPuzzles
+    let state = { customPuzzles: puzzles };
+    const get = () => state;
+    const set = (fn: (s: typeof state) => typeof state | Partial<typeof state>) => {
+      const result = typeof fn === 'function' ? fn(state) : fn;
+      state = { ...state, ...result };
+    };
+    const slice = createCustomPuzzleSlice(set as any, get as any, {} as any);
+
+    // Manually set the state for getSerializableCustomPuzzles
+    state.customPuzzles = puzzles;
+    // Access the serializer via the actual slice — it reads from get()
+    const serialized = slice.getSerializableCustomPuzzles();
+
+    expect(serialized.length).toBe(1);
+    expect(serialized[0].allowedNodes).toEqual(['invert', 'mixer']);
+
+    // Hydrate back
+    slice.hydrateCustomPuzzles(serialized);
+    const hydrated = state.customPuzzles.get('test-puzzle');
+    expect(hydrated).toBeDefined();
+    expect(hydrated!.allowedNodes).toEqual(['invert', 'mixer']);
+  });
+
+  it('hydrates allowedNodes as null when missing (backward compat)', () => {
+    const serialized: SerializedCustomPuzzle[] = [{
+      id: 'old-puzzle',
+      title: 'Old',
+      description: '',
+      createdAt: 1000,
+      slots: [
+        { direction: 'input' },
+        { direction: 'off' },
+        { direction: 'off' },
+        { direction: 'output' },
+        { direction: 'off' },
+        { direction: 'off' },
+      ],
+      targetSamples: [[3, [50]]],
+      initialNodes: [],
+      initialWires: [],
+      // No allowedNodes field — old format
+    }];
+
+    let state = { customPuzzles: new Map<string, CustomPuzzle>() };
+    const get = () => state;
+    const set = (fn: any) => {
+      const result = typeof fn === 'function' ? fn(state) : fn;
+      state = { ...state, ...result };
+    };
+    const slice = createCustomPuzzleSlice(set as any, get as any, {} as any);
+
+    slice.hydrateCustomPuzzles(serialized);
+    const hydrated = state.customPuzzles.get('old-puzzle');
+    expect(hydrated).toBeDefined();
+    expect(hydrated!.allowedNodes).toBeNull();
+  });
+
+  it('serializes initialNodes with inputCount/outputCount/rotation', () => {
+    const puzzle = makePuzzle({
+      initialNodes: [{
+        id: 'n1',
+        type: 'invert',
+        position: { col: 10, row: 5 },
+        params: {},
+        inputCount: 1,
+        outputCount: 1,
+        rotation: 90,
+      }],
+    });
+    const puzzles = new Map<string, CustomPuzzle>();
+    puzzles.set(puzzle.id, puzzle);
+
+    let state = { customPuzzles: puzzles };
+    const get = () => state;
+    const set = (fn: any) => {
+      const result = typeof fn === 'function' ? fn(state) : fn;
+      state = { ...state, ...result };
+    };
+    const slice = createCustomPuzzleSlice(set as any, get as any, {} as any);
+
+    const serialized = slice.getSerializableCustomPuzzles();
+    expect(serialized[0].initialNodes[0].inputCount).toBe(1);
+    expect(serialized[0].initialNodes[0].outputCount).toBe(1);
+    expect(serialized[0].initialNodes[0].rotation).toBe(90);
+  });
+});

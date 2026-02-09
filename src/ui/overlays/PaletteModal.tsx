@@ -13,19 +13,18 @@ export function PaletteModal() {
 function PaletteModalInner() {
   const closeOverlay = useGameStore((s) => s.closeOverlay);
   const startPlacingNode = useGameStore((s) => s.startPlacingNode);
-  const puzzleNodes = useGameStore((s) => s.puzzleNodes);
+  const deleteUtilityNode = useGameStore((s) => s.deleteUtilityNode);
   const utilityNodes = useGameStore((s) => s.utilityNodes);
-  const completedLevels = useGameStore((s) => s.completedLevels);
   const activePuzzle = useGameStore((s) => s.activePuzzle);
-  const isCreativeMode = useGameStore((s) => s.isCreativeMode);
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const allowedNodes = activePuzzle?.allowedNodes ?? null;
-  const allItems = buildPaletteItems(allowedNodes, puzzleNodes, utilityNodes, completedLevels, isCreativeMode);
+  const allItems = buildPaletteItems(allowedNodes, utilityNodes);
   const filtered = filterPaletteItems(allItems, query);
 
   // Auto-focus search input
@@ -37,6 +36,11 @@ function PaletteModalInner() {
   useEffect(() => {
     setActiveIndex((prev) => Math.min(prev, Math.max(0, filtered.length - 1)));
   }, [filtered.length]);
+
+  // Clear confirm state when search query changes
+  useEffect(() => {
+    setConfirmingDeleteId(null);
+  }, [query]);
 
   const handleSelect = useCallback((item: PaletteItem) => {
     closeOverlay();
@@ -67,17 +71,14 @@ function PaletteModalInner() {
 
   // Group items by section
   const sections: Array<{ title: string; items: PaletteItem[] }> = [];
-  let fundamentals: PaletteItem[] = [];
-  let puzzles: PaletteItem[] = [];
-  let utilities: PaletteItem[] = [];
+  const fundamentals: PaletteItem[] = [];
+  const utilities: PaletteItem[] = [];
 
   for (const item of filtered) {
     if (item.section === 'fundamental') fundamentals.push(item);
-    else if (item.section === 'puzzle') puzzles.push(item);
     else utilities.push(item);
   }
   if (fundamentals.length > 0) sections.push({ title: 'Fundamental', items: fundamentals });
-  if (puzzles.length > 0) sections.push({ title: 'Puzzle (Earned)', items: puzzles });
   if (utilities.length > 0) sections.push({ title: 'Utility (Custom)', items: utilities });
 
   // Compute flat index offset for each section item
@@ -108,6 +109,60 @@ function PaletteModalInner() {
               <div className={styles.sectionTitle}>{section.title}</div>
               {section.items.map((item) => {
                 const idx = flatIndex++;
+                const isUtility = item.section === 'utility';
+                const utilityId = isUtility ? item.id.replace('utility:', '') : null;
+                const isConfirming = utilityId !== null && confirmingDeleteId === utilityId;
+
+                if (isConfirming) {
+                  return (
+                    <div key={item.id} className={styles.confirmItem}>
+                      <span className={styles.confirmText}>Delete &ldquo;{item.label}&rdquo;?</span>
+                      <div className={styles.confirmActions}>
+                        <button
+                          className={styles.confirmYes}
+                          onClick={() => {
+                            deleteUtilityNode(utilityId!);
+                            setConfirmingDeleteId(null);
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className={styles.confirmNo}
+                          onClick={() => setConfirmingDeleteId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isUtility) {
+                  return (
+                    <div key={item.id} className={styles.utilityRow}>
+                      <button
+                        className={`${styles.item} ${idx === activeIndex ? styles.active : ''}`}
+                        onClick={() => handleSelect(item)}
+                        data-palette-item
+                      >
+                        {item.label}
+                      </button>
+                      <button
+                        className={styles.deleteBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmingDeleteId(utilityId!);
+                        }}
+                        title="Delete utility node"
+                        aria-label={`Delete ${item.label}`}
+                      >
+                        &#x2715;
+                      </button>
+                    </div>
+                  );
+                }
+
                 return (
                   <button
                     key={item.id}

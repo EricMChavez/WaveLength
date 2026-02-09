@@ -8,21 +8,19 @@ export const ampNode = defineNode<AmpParams>({
   category: 'math',
 
   inputs: [
-    { name: 'A' },
+    { name: 'A', gridPosition: 0 },
     { name: 'X', description: 'Gain control', side: 'bottom' },
   ],
-  outputs: [{ name: 'Out' }],
+  outputs: [{ name: 'Out', gridPosition: 0 }],
 
   params: [
     { key: 'gain', type: 'number', default: 0, label: 'Gain', min: -100, max: 100, step: 25 },
   ],
 
-  evaluate: ({ inputs, params }) => {
+  evaluate: ({ inputs }) => {
     const [a, x] = inputs;
-    const gain = typeof params.gain === 'number' ? params.gain : 0;
-    const effectiveGain = x + gain;
-    return [clamp(a * (1 + effectiveGain / 100))];
+    return [clamp(a * (1 + x / 100))];
   },
 
-  size: { width: 3, height: 3 },
+  size: { width: 4, height: 3 },
 });

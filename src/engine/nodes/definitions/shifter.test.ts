@@ -15,7 +15,7 @@ describe('Shifter node', () => {
     expect(shifterNode.category).toBe('math');
     expect(shifterNode.inputs).toHaveLength(2);
     expect(shifterNode.outputs).toHaveLength(1);
-    expect(shifterNode.size).toEqual({ width: 3, height: 3 });
+    expect(shifterNode.size).toEqual({ width: 4, height: 3 });
   });
 
   it('has X input with bottom side override', () => {

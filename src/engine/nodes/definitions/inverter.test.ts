@@ -34,6 +34,6 @@ describe('Inverter node', () => {
     expect(inverterNode.category).toBe('math');
     expect(inverterNode.inputs).toHaveLength(1);
     expect(inverterNode.outputs).toHaveLength(1);
-    expect(inverterNode.size).toEqual({ width: 2, height: 2 });
+    expect(inverterNode.size).toEqual({ width: 3, height: 2 });
   });
 });

@@ -1,7 +1,8 @@
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import { useGameStore } from '../../store/index.ts';
 import { slotToMeterInfo } from '../../store/slices/creative-slice.ts';
 import type { CustomPuzzle } from '../../store/slices/custom-puzzle-slice.ts';
+import { nodeRegistry, getNodeLabel } from '../../engine/nodes/registry.ts';
 import styles from './SavePuzzleDialog.module.css';
 
 /** Samples per WTS (16 subdivisions) */
@@ -25,7 +26,16 @@ function SavePuzzleDialogInner() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const [allowedNodeSet, setAllowedNodeSet] = useState<Set<string>>(() => new Set(nodeRegistry.allTypes));
+  const [startingNodeIds, setStartingNodeIds] = useState<Set<string>>(new Set());
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // Non-CP board nodes available as starting nodes
+  const boardNodes = useMemo(() => {
+    if (!activeBoard) return [];
+    return Array.from(activeBoard.nodes.values())
+      .filter((node) => !node.id.startsWith('creative-slot-'));
+  }, [activeBoard]);
 
   // Focus title input on mount
   useEffect(() => {
@@ -80,26 +90,26 @@ function SavePuzzleDialogInner() {
       waveform: slot.direction === 'input' ? slot.waveform : undefined,
     }));
 
-    // Serialize current nodes (excluding connection point nodes)
+    // Serialize starting nodes (only those selected by the author)
     const initialNodes = Array.from(activeBoard.nodes.values())
-      .filter((node) => !node.id.startsWith('creative-slot-'))
+      .filter((node) => !node.id.startsWith('creative-slot-') && startingNodeIds.has(node.id))
       .map((node) => ({
         id: node.id,
         type: node.type,
         position: { col: node.position.col, row: node.position.row },
         params: { ...node.params },
+        inputCount: node.inputCount,
+        outputCount: node.outputCount,
+        rotation: node.rotation,
       }));
 
-    // Serialize wires (only those connected to non-CP nodes)
-    const initialWires = activeBoard.wires
-      .filter((wire) =>
-        !wire.source.nodeId.startsWith('creative-slot-') &&
-        !wire.target.nodeId.startsWith('creative-slot-')
-      )
-      .map((wire) => ({
-        source: { nodeId: wire.source.nodeId, portIndex: wire.source.portIndex },
-        target: { nodeId: wire.target.nodeId, portIndex: wire.target.portIndex },
-      }));
+    // No wires for starting nodes (they're placed individually)
+    const initialWires: CustomPuzzle['initialWires'] = [];
+
+    // Compute allowedNodes: null means all types allowed
+    const computedAllowed = allowedNodeSet.size === nodeRegistry.allTypes.length
+      ? null
+      : Array.from(allowedNodeSet);
 
     // Create puzzle
     const puzzle: CustomPuzzle = {
@@ -111,6 +121,7 @@ function SavePuzzleDialogInner() {
       targetSamples,
       initialNodes,
       initialWires,
+      allowedNodes: computedAllowed,
     };
 
     addCustomPuzzle(puzzle);
@@ -128,6 +139,8 @@ function SavePuzzleDialogInner() {
     addCustomPuzzle,
     cancelAuthoring,
     closeOverlay,
+    startingNodeIds,
+    allowedNodeSet,
   ]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -211,6 +224,65 @@ function SavePuzzleDialogInner() {
               </div>
             </div>
           </div>
+
+          <div className={styles.checkboxSection}>
+            <h3 className={styles.summaryTitle}>
+              Allowed Nodes
+              <button
+                type="button"
+                className={styles.toggleAllButton}
+                onClick={() => {
+                  if (allowedNodeSet.size === nodeRegistry.allTypes.length) {
+                    setAllowedNodeSet(new Set());
+                  } else {
+                    setAllowedNodeSet(new Set(nodeRegistry.allTypes));
+                  }
+                }}
+              >
+                {allowedNodeSet.size === nodeRegistry.allTypes.length ? 'None' : 'All'}
+              </button>
+            </h3>
+            <div className={styles.checkboxGrid}>
+              {nodeRegistry.all.map((def) => (
+                <label key={def.type} className={styles.checkboxItem}>
+                  <input
+                    type="checkbox"
+                    checked={allowedNodeSet.has(def.type)}
+                    onChange={(e) => {
+                      const next = new Set(allowedNodeSet);
+                      if (e.target.checked) next.add(def.type);
+                      else next.delete(def.type);
+                      setAllowedNodeSet(next);
+                    }}
+                  />
+                  <span>{getNodeLabel(def.type)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {boardNodes.length > 0 && (
+            <div className={styles.checkboxSection}>
+              <h3 className={styles.summaryTitle}>Starting Nodes</h3>
+              <div className={styles.startingNodeList}>
+                {boardNodes.map((node) => (
+                  <label key={node.id} className={styles.checkboxItem}>
+                    <input
+                      type="checkbox"
+                      checked={startingNodeIds.has(node.id)}
+                      onChange={(e) => {
+                        const next = new Set(startingNodeIds);
+                        if (e.target.checked) next.add(node.id);
+                        else next.delete(node.id);
+                        setStartingNodeIds(next);
+                      }}
+                    />
+                    <span>{getNodeLabel(node.type)} ({node.position.col}, {node.position.row})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className={styles.footer}>

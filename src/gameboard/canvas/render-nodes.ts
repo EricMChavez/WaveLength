@@ -161,8 +161,8 @@ function drawNodeBody(
   ctx.restore(); // restore shadow state
 
   // --- Border ---
-  ctx.strokeStyle = visualState === 'selected' ? tokens.colorSelection : tokens.depthRaised;
-  ctx.lineWidth = visualState === 'selected' ? 2.5 : borderWidth;
+  ctx.strokeStyle = tokens.depthRaised;
+  ctx.lineWidth = borderWidth;
   ctx.beginPath();
   ctx.roundRect(rect.x, rect.y, rect.width, rect.height, borderRadius);
   ctx.stroke();

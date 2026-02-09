@@ -48,7 +48,8 @@
       "Bash(C:\\\\nvm4w\\\\nodejs\\\\node.exe:*)",
       "Bash(git reset:*)",
       "Bash(git checkout:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

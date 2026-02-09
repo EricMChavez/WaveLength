@@ -32,8 +32,8 @@ export const delayNode = defineNode<DelayParams>({
   type: 'delay',
   category: 'timing',
 
-  inputs: [{ name: 'A' }],
-  outputs: [{ name: 'Out' }],
+  inputs: [{ name: 'A', gridPosition: 0 }],
+  outputs: [{ name: 'Out', gridPosition: 0 }],
 
   params: [
     {
@@ -70,5 +70,5 @@ export const delayNode = defineNode<DelayParams>({
     return [output];
   },
 
-  size: { width: 2, height: 2 },
+  size: { width: 3, height: 2 },
 });

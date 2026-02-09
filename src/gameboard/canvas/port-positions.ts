@@ -108,6 +108,20 @@ export function getNodePortPosition(
   // Get the port offset within the node's grid footprint
   const offset = getPortOffset(cols, rows, totalOnSide, indexOnSide, physicalSide);
 
+  // Check for explicit grid position override from port definition
+  const def = getNodeDefinition(node.type);
+  if (def) {
+    const ports = side === 'input' ? def.inputs : def.outputs;
+    const portDef = ports[portIndex];
+    if (portDef?.gridPosition !== undefined) {
+      if (physicalSide === 'left' || physicalSide === 'right') {
+        offset.row = portDef.gridPosition;
+      } else {
+        offset.col = portDef.gridPosition;
+      }
+    }
+  }
+
   // Calculate pixel position - ports are on grid lines (no body offset)
   const x = (node.position.col + offset.col) * cellSize;
   const y = (node.position.row + offset.row) * cellSize;
@@ -195,10 +209,10 @@ export function getNodeBodyPixelRect(
 ): { x: number; y: number; width: number; height: number } {
   const { cols, rows } = getNodeGridSize(node);
 
-  // custom-blank with no ports: full grid footprint, no padding
+  // custom-blank with no ports: same body as a saved utility node (0.5 cell above/below)
   if (node.type === 'custom-blank' && node.inputCount === 0 && node.outputCount === 0) {
     const x = node.position.col * cellSize;
-    const y = node.position.row * cellSize;
+    const y = (node.position.row - 0.5) * cellSize;
     return { x, y, width: cols * cellSize, height: rows * cellSize };
   }
 
@@ -237,7 +251,8 @@ export function getNodeBodyPixelRect(
   const portsOnVerticalSides = rotation === 0 || rotation === 180;
 
   if (portsOnVerticalSides) {
-    // Ports on left/right edges - body extends 0.5 above/below port span
+    // Ports on left/right edges - body extends 0.5 above/below port span,
+    // but always covers the full grid height when the definition is larger.
     const firstPortRow = maxPortCount === 1
       ? Math.floor(rows / 2)
       : Math.floor(0 * rows / maxPortCount);
@@ -246,14 +261,24 @@ export function getNodeBodyPixelRect(
       : Math.floor((maxPortCount - 1) * rows / maxPortCount);
     const portSpan = lastPortRow - firstPortRow + 1;
 
+    // Body top/height: use port span or full grid footprint, whichever is larger
+    const portBasedTop = firstPortRow - 0.5;
+    const portBasedHeight = portSpan;
+    const gridBasedTop = -0.5;
+    const gridBasedHeight = rows;
+
+    const bodyTop = Math.min(portBasedTop, gridBasedTop);
+    const bodyBottom = Math.max(portBasedTop + portBasedHeight, gridBasedTop + gridBasedHeight);
+
     const x = node.position.col * cellSize;
-    const y = (node.position.row + firstPortRow - 0.5) * cellSize;
+    const y = (node.position.row + bodyTop) * cellSize;
     const width = cols * cellSize;
-    const height = portSpan * cellSize;
+    const height = (bodyBottom - bodyTop) * cellSize;
 
     return { x, y, width, height };
   } else {
-    // Ports on top/bottom edges - body extends 0.5 left/right of port span
+    // Ports on top/bottom edges - body extends 0.5 left/right of port span,
+    // but always covers the full grid width when the definition is larger.
     const firstPortCol = maxPortCount === 1
       ? Math.floor(cols / 2)
       : Math.floor(0 * cols / maxPortCount);
@@ -262,9 +287,18 @@ export function getNodeBodyPixelRect(
       : Math.floor((maxPortCount - 1) * cols / maxPortCount);
     const portSpan = lastPortCol - firstPortCol + 1;
 
-    const x = (node.position.col + firstPortCol - 0.5) * cellSize;
+    // Body left/width: use port span or full grid footprint, whichever is larger
+    const portBasedLeft = firstPortCol - 0.5;
+    const portBasedWidth = portSpan;
+    const gridBasedLeft = -0.5;
+    const gridBasedWidth = cols;
+
+    const bodyLeft = Math.min(portBasedLeft, gridBasedLeft);
+    const bodyRight = Math.max(portBasedLeft + portBasedWidth, gridBasedLeft + gridBasedWidth);
+
+    const x = (node.position.col + bodyLeft) * cellSize;
     const y = node.position.row * cellSize;
-    const width = portSpan * cellSize;
+    const width = (bodyRight - bodyLeft) * cellSize;
     const height = rows * cellSize;
 
     return { x, y, width, height };

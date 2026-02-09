@@ -36,6 +36,6 @@ describe('Polarizer node', () => {
     expect(polarizerNode.category).toBe('math');
     expect(polarizerNode.inputs).toHaveLength(1);
     expect(polarizerNode.outputs).toHaveLength(1);
-    expect(polarizerNode.size).toEqual({ width: 2, height: 2 });
+    expect(polarizerNode.size).toEqual({ width: 3, height: 2 });
   });
 });

@@ -140,12 +140,12 @@ describe('getNodeBodyPixelRect — utility nodes with cpLayout', () => {
     expect(rect.height).toBe(UTILITY_GRID_ROWS * cellSize);
   });
 
-  it('custom-blank without cpLayout (no ports) uses full grid footprint', () => {
+  it('custom-blank without cpLayout (no ports) matches saved utility body', () => {
     const node = makeNode('cb2', 'custom-blank', 10, 5, 0, 0);
     const rect = getNodeBodyPixelRect(node, cellSize);
 
     expect(rect.x).toBe(10 * cellSize);
-    expect(rect.y).toBe(5 * cellSize);
+    expect(rect.y).toBe((5 - 0.5) * cellSize);
     expect(rect.width).toBe(UTILITY_GRID_COLS * cellSize);
     expect(rect.height).toBe(UTILITY_GRID_ROWS * cellSize);
   });

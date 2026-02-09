@@ -143,6 +143,9 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
     if (!focus) return { type: 'noop' };
 
     if (focus.type === 'node') {
+      // Locked nodes cannot be deleted
+      const node = state.activeBoard?.nodes.get(focus.nodeId);
+      if (node?.locked) return { type: 'noop' };
       return { type: 'delete-node', nodeId: focus.nodeId };
     }
     if (focus.type === 'wire') {

@@ -53,6 +53,17 @@ describe('buildContextMenuItems', () => {
     expect(items.find((i) => i.action === 'delete-node')).toBeTruthy();
     expect(items.find((i) => i.action === 'set-params')).toBeFalsy();
   });
+
+  it('omits Delete for locked node', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'invert', locked: true });
+    expect(items.find((i) => i.action === 'delete-node')).toBeFalsy();
+  });
+
+  it('shows Set Parameters for locked node with editable params', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'mix', locked: true });
+    expect(items.find((i) => i.action === 'set-params')).toBeTruthy();
+    expect(items.find((i) => i.action === 'delete-node')).toBeFalsy();
+  });
 });
 
 describe('hasEditableParams', () => {

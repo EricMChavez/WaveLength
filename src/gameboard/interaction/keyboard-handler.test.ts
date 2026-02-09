@@ -219,6 +219,22 @@ describe('getKeyboardAction', () => {
     const action = getKeyboardAction('n', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
     expect(action.type).toBe('noop');
   });
+
+  it('Delete on locked focused node returns noop', () => {
+    const nodes = new Map<string, NodeState>();
+    nodes.set('n1', { ...makeNode('n1', 'invert', 10, 5), locked: true });
+    setFocusTarget({ type: 'node', nodeId: 'n1' });
+    const action = getKeyboardAction('Delete', makeKeyEvent(), makeState({ activeBoard: { nodes, wires: [] } }));
+    expect(action.type).toBe('noop');
+  });
+
+  it('Backspace on locked focused node returns noop', () => {
+    const nodes = new Map<string, NodeState>();
+    nodes.set('n1', { ...makeNode('n1', 'invert', 10, 5), locked: true });
+    setFocusTarget({ type: 'node', nodeId: 'n1' });
+    const action = getKeyboardAction('Backspace', makeKeyEvent(), makeState({ activeBoard: { nodes, wires: [] } }));
+    expect(action.type).toBe('noop');
+  });
 });
 
 describe('executeKeyboardAction', () => {

@@ -25,7 +25,7 @@ const DARK_VALUES: Record<string, string> = {
   '--token-depth-sunken': 'rgba(0, 0, 0, 0.6)',
   '--token-text-primary': '#e0e0f0',
   '--token-text-secondary': '#9090b0',
-  '--token-color-selection': '#5a9bf5',
+  '--token-color-selection': '#ffffff',
   '--token-wire-width-base': '6',
   '--token-port-fill': '#3a7bd5',
   '--token-port-stroke': '#5a9bf5',
@@ -51,7 +51,7 @@ const LIGHT_VALUES: Record<string, string> = {
   '--token-signal-negative': '#208870',
   '--token-text-primary': '#1a1a28',
   '--token-text-secondary': '#4a4a60',
-  '--token-color-selection': '#2a6ad0',
+  '--token-color-selection': '#1a1a2e',
 };
 
 function mockGetComputedStyle(values: Record<string, string>) {

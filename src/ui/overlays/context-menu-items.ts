@@ -6,7 +6,7 @@ export interface ContextMenuItem {
 }
 
 export type ContextTarget =
-  | { type: 'node'; nodeId: string; nodeType: string }
+  | { type: 'node'; nodeId: string; nodeType: string; locked?: boolean }
   | { type: 'wire'; wireId: string };
 
 /**
@@ -40,7 +40,7 @@ export function buildContextMenuItems(
       items.push({ id: 'edit', label: 'Edit', action: 'edit' });
     }
 
-    if (!isReadOnly) {
+    if (!isReadOnly && !target.locked) {
       items.push({ id: 'delete-node', label: 'Delete Node', action: 'delete-node', danger: true });
     }
 

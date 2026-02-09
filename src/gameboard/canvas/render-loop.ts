@@ -13,7 +13,6 @@ import { renderWirePreview } from './render-wire-preview.ts';
 import { drawGrid } from './render-grid.ts';
 import { renderPlacementGhost } from './render-placement-ghost.ts';
 import { drawLidAnimation, computeProgress, parseDurationMs, drawVictoryBurst, drawNameReveal } from '../animation/index.ts';
-import { generateId } from '../../shared/generate-id.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
 import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts';
 import { getRejectedKnobNodeId } from './rejected-knob.ts';
@@ -336,22 +335,6 @@ function handleCeremonyCompletion(state: ReturnType<typeof useGameStore.getState
   if (!ceremonyPuzzle || !ceremonyBakeMetadata) {
     state.dismissCeremony();
     return;
-  }
-
-  // Add puzzle node to palette on first completion
-  if (!state.puzzleNodes.has(ceremonyPuzzle.id)) {
-    const puzzle = state.activePuzzle;
-    if (puzzle) {
-      state.addPuzzleNode({
-        puzzleId: ceremonyPuzzle.id,
-        title: ceremonyPuzzle.title,
-        description: ceremonyPuzzle.description,
-        inputCount: puzzle.activeInputs,
-        outputCount: puzzle.activeOutputs,
-        bakeMetadata: ceremonyBakeMetadata,
-        versionHash: generateId(),
-      });
-    }
   }
 
   // Mark level as completed

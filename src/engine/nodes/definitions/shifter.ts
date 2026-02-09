@@ -22,5 +22,5 @@ export const shifterNode = defineNode<ShifterParams>({
     return [clamp(a + x)];
   },
 
-  size: { width: 3, height: 3 },
+  size: { width: 4, height: 3 },
 });

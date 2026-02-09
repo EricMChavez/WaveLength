@@ -29,7 +29,7 @@ describe('Diverter Node', () => {
     });
 
     it('has 3x3 size', () => {
-      expect(diverterNode.size).toEqual({ width: 3, height: 3 });
+      expect(diverterNode.size).toEqual({ width: 4, height: 3 });
     });
   });
 

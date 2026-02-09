@@ -125,10 +125,63 @@ export const createPaletteSlice: StateCreator<GameStore, [], [], PaletteSlice> =
     }),
 
   deleteUtilityNode: (utilityId) =>
-    set((state) => {
+    set(() => {
+      const state = get();
       if (!state.utilityNodes.has(utilityId)) return {};
+      const nodeType = 'utility:' + utilityId;
       const next = new Map(state.utilityNodes);
       next.delete(utilityId);
-      return { utilityNodes: next };
+
+      const result: Record<string, unknown> = { utilityNodes: next };
+
+      // Cascade: remove instances from activeBoard
+      if (state.activeBoard) {
+        const patched = removeNodesFromBoard(state.activeBoard, nodeType);
+        if (patched) result.activeBoard = patched;
+      }
+
+      // Cascade: remove instances from boardStack
+      let stackChanged = false;
+      const newStack = state.boardStack.map((entry) => {
+        const patched = removeNodesFromBoard(entry.board, nodeType);
+        if (patched) {
+          stackChanged = true;
+          return { ...entry, board: patched };
+        }
+        return entry;
+      });
+      if (stackChanged) result.boardStack = newStack;
+
+      // Cascade: remove instances from other utility nodes' internal boards
+      let utilityChanged = false;
+      const newUtility = new Map(next);
+      for (const [id, entry] of newUtility) {
+        const patched = removeNodesFromBoard(entry.board, nodeType);
+        if (patched) {
+          newUtility.set(id, { ...entry, board: patched });
+          utilityChanged = true;
+        }
+      }
+      if (utilityChanged) result.utilityNodes = newUtility;
+
+      return result;
     }),
 });
+
+/** Remove all nodes of the given type from a board, plus any wires connected to them. */
+function removeNodesFromBoard(board: GameboardState, nodeType: string): GameboardState | null {
+  const removedIds = new Set<string>();
+  for (const [id, node] of board.nodes) {
+    if (node.type === nodeType) removedIds.add(id);
+  }
+  if (removedIds.size === 0) return null;
+
+  const nodes = new Map(board.nodes);
+  for (const id of removedIds) nodes.delete(id);
+
+  const wires = board.wires.filter(
+    (w) => !removedIds.has(w.source.nodeId) && !removedIds.has(w.target.nodeId),
+  );
+
+  return { ...board, nodes, wires };
+}

@@ -10,11 +10,9 @@ export function PalettePanel() {
   const interactionMode = useGameStore((s) => s.interactionMode);
   const startPlacingNode = useGameStore((s) => s.startPlacingNode);
   const cancelPlacing = useGameStore((s) => s.cancelPlacing);
-  const puzzleNodes = useGameStore((s) => s.puzzleNodes);
   const utilityNodes = useGameStore((s) => s.utilityNodes);
   const readOnly = useGameStore((s) => s.activeBoardReadOnly);
   const activePuzzle = useGameStore((s) => s.activePuzzle);
-  const completedLevels = useGameStore((s) => s.completedLevels);
 
   if (readOnly) return null;
 
@@ -59,13 +57,6 @@ export function PalettePanel() {
     ? nodeRegistry.all.filter((def) => allowedNodes.includes(def.type))
     : nodeRegistry.all;
 
-  // Filter puzzle nodes: must be completed AND allowed
-  const visiblePuzzleNodes = Array.from(puzzleNodes.values()).filter((entry) => {
-    if (!completedLevels.has(entry.puzzleId)) return false;
-    if (allowedNodes && !allowedNodes.includes(entry.puzzleId)) return false;
-    return true;
-  });
-
   return (
     <div className={styles.panel}>
       <h3 className={styles.title}>Levels</h3>
@@ -95,36 +86,6 @@ export function PalettePanel() {
           );
         })}
       </div>
-
-      {visiblePuzzleNodes.length > 0 && (
-        <>
-          <h3 className={styles.title}>Puzzles</h3>
-          <div className={styles.list}>
-            {visiblePuzzleNodes.map((entry) => {
-              const nodeType = `puzzle:${entry.puzzleId}`;
-              const isActive =
-                interactionMode.type === 'placing-node' &&
-                interactionMode.nodeType === nodeType;
-
-              return (
-                <button
-                  key={nodeType}
-                  className={`${styles.item} ${styles.puzzleItem} ${isActive ? styles.active : ''}`}
-                  onClick={() => {
-                    if (isActive) {
-                      cancelPlacing();
-                    } else {
-                      startPlacingNode(nodeType);
-                    }
-                  }}
-                >
-                  {entry.title}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
 
       <button className={`${styles.item} ${styles.createCustomBtn}`} onClick={handleCreateCustom}>
         + Create Custom Node

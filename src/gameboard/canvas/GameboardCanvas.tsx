@@ -616,10 +616,11 @@ export function GameboardCanvas() {
     }
 
     if (hit.type === 'node') {
+      const node = state.activeBoard.nodes.get(hit.nodeId);
       state.openOverlay({
         type: 'context-menu',
         position: { x: e.clientX, y: e.clientY },
-        target: { type: 'node', nodeId: hit.nodeId },
+        target: { type: 'node', nodeId: hit.nodeId, locked: node?.locked },
       });
       return;
     }

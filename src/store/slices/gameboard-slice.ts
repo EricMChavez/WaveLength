@@ -75,6 +75,8 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
     set((state) => {
       if (!state.activeBoard) return state;
       const node = state.activeBoard.nodes.get(nodeId);
+      // Locked nodes cannot be deleted
+      if (node?.locked) return state;
       const nodes = new Map(state.activeBoard.nodes);
       nodes.delete(nodeId);
       const wires = state.activeBoard.wires.filter(

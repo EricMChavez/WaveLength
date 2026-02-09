@@ -11,7 +11,7 @@ export const diverterNode = defineNode<DiverterParams>({
     { name: 'A' },
     { name: 'X', description: 'Fade control', side: 'bottom' },
   ],
-  outputs: [{ name: 'Y' }, { name: 'Z' }],
+  outputs: [{ name: 'Y' }, { name: 'Z', gridPosition: 2 }],
 
   params: [
     { key: 'fade', type: 'number', default: 0, label: 'Fade', min: -100, max: 100, step: 25 },
@@ -25,5 +25,5 @@ export const diverterNode = defineNode<DiverterParams>({
     return [y, z];
   },
 
-  size: { width: 3, height: 3 },
+  size: { width: 4, height: 3 },
 });

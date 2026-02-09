@@ -136,7 +136,7 @@ describe('Delay node', () => {
     expect(delayNode.category).toBe('timing');
     expect(delayNode.inputs).toHaveLength(1);
     expect(delayNode.outputs).toHaveLength(1);
-    expect(delayNode.size).toEqual({ width: 2, height: 2 });
+    expect(delayNode.size).toEqual({ width: 3, height: 2 });
     expect(delayNode.createState).toBeDefined();
     expect(delayNode.params).toHaveLength(1);
     expect(delayNode.params![0]).toMatchObject({

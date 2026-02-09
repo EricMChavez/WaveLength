@@ -110,7 +110,7 @@ export function drawMeter(
 
   // Target overlay for output meters
   if (targetBuffer && slot.direction === 'output') {
-    drawTargetOverlay(ctx, tokens, targetBuffer, waveformRect, state.matchStatus);
+    drawTargetOverlay(ctx, tokens, targetBuffer, waveformRect, state.matchStatus, signalBuffer?.count);
   }
 
   ctx.restore();
