@@ -13,6 +13,7 @@ import { createCreativeSlotNode } from './puzzle/connection-point-nodes.ts'
 import { startSimulation } from './simulation/simulation-controller.ts'
 import { CREATIVE_SLOT_COUNT } from './store/slices/creative-slice.ts'
 import { StartScreen } from './ui/screens/index.ts'
+import { DevTools } from './dev/index.ts'
 
 /** Create a gameboard with creative slot nodes (left=input, right=output) */
 function createCreativeGameboard(): GameboardState {
@@ -105,6 +106,7 @@ function App() {
       <StartScreen />
       <ZoomTransition />
       <CompletionCeremony />
+      {import.meta.env.DEV && <DevTools />}
     </div>
   )
 }

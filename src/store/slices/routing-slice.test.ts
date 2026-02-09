@@ -73,10 +73,10 @@ describe('routing-slice', () => {
     const routed = getWires();
     expect(routed.length).toBe(1);
     expect(routed[0].path.length).toBeGreaterThan(0);
-    // Path should start near source and end near target
-    expect(routed[0].path[0].col).toBe(12 + 3); // node.col + NODE_GRID_COLS
+    // Path should start at source node's right grid line and end at target node's left grid line
+    expect(routed[0].path[0].col).toBe(12 + 3); // node.col + NODE_GRID_COLS (right grid line)
     const lastPt = routed[0].path[routed[0].path.length - 1];
-    expect(lastPt.col).toBe(25 - 1); // target node.col - 1
+    expect(lastPt.col).toBe(25); // target node.col (left grid line)
   });
 
   it('routeAllWires preserves wire id and signal buffer', () => {

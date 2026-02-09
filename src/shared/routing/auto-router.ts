@@ -24,7 +24,9 @@ import {
   DIR_S,
   DIR_W,
   DIR_N,
+  STEM_PHASES,
   getAllowedDirections,
+  isRoutable,
   isPassable,
   stateKey,
   chebyshevDistance,
@@ -191,20 +193,17 @@ export function getPortGridAnchor(
   // Get the port's offset from node's top-left
   const offset = getPortOffset(cols, rows, totalOnSide, indexOnSide, portSide);
 
-  // Compute anchor one cell outside the node on the port's side
+  // Compute anchor at the port's grid line (matching the port pixel position).
+  // getPortOffset returns col=0 for left, col=nodeWidth for right, etc.
+  // These land on the node's grid lines — the boundary between the node body
+  // and the adjacent cell. A* start/target exemptions allow routing from/to here.
   const nodeCol = node.position.col;
   const nodeRow = node.position.row;
 
-  switch (portSide) {
-    case 'left':
-      return { col: nodeCol - 1, row: nodeRow + offset.row };
-    case 'right':
-      return { col: nodeCol + cols, row: nodeRow + offset.row };
-    case 'top':
-      return { col: nodeCol + offset.col, row: nodeRow - 1 };
-    case 'bottom':
-      return { col: nodeCol + offset.col, row: nodeRow + rows };
-  }
+  return {
+    col: nodeCol + offset.col,
+    row: nodeRow + offset.row,
+  };
 }
 
 /**
@@ -256,6 +255,8 @@ interface PQEntry {
   col: number;
   row: number;
   dir: number;
+  /** Stem phase: 0 = still in forced start stem, 1 = free routing */
+  stem: number;
 }
 
 function pqPush(heap: PQEntry[], entry: PQEntry): void {
@@ -296,8 +297,10 @@ function pqPop(heap: PQEntry[]): PQEntry | undefined {
 
 /** Decode a state key back to (col, row, dir). */
 function decodeKey(key: number): { col: number; row: number; dir: number } {
-  const dir = key % DIR_COUNT;
-  const posKey = (key - dir) / DIR_COUNT;
+  // Strip stem phase bit (lowest bit)
+  const withoutStem = Math.floor(key / STEM_PHASES);
+  const dir = withoutStem % DIR_COUNT;
+  const posKey = (withoutStem - dir) / DIR_COUNT;
   const row = posKey % GRID_ROWS;
   const col = (posKey - row) / GRID_ROWS;
   return { col, row, dir };
@@ -328,14 +331,16 @@ function reconstructPath(
  * - Only H/V/45-degree moves (8 compass directions)
  * - No turns wider than 45 degrees
  * - Wire exits source in specified direction and enters target in specified direction
+ * - Forced stem: the first `stemLength` steps must travel straight in `startDir`
  * - Avoids occupied cells in the occupancy grid
- * - Only routes within the playable area (cols 6-57, rows 0-35)
+ * - Only routes within the playable area (cols 10-55, rows 0-35)
  *
  * @param source - Start grid point
  * @param target - End grid point
  * @param occupancy - Grid of occupied cells
  * @param startDir - Direction wire travels when leaving source (default: DIR_E)
  * @param endDir - Direction wire should be traveling when reaching target (default: DIR_E)
+ * @param stemLength - Number of forced straight steps from source in startDir (default: 1)
  * @returns GridPoint[] path or null if no path exists
  */
 export function findPath(
@@ -344,14 +349,16 @@ export function findPath(
   occupancy: readonly boolean[][],
   startDir: number = DIR_E,
   endDir: number = DIR_E,
+  stemLength: number = 1,
 ): GridPoint[] | null {
   // Trivial case: source and target are the same cell
   if (source.col === target.col && source.row === target.row) {
     return [{ col: source.col, row: source.row }];
   }
 
-  // Check source is passable
-  if (!isPassable(source.col, source.row, occupancy)) return null;
+  // Source may be on the node body (anchors sit on node edge), so check bounds but
+  // not occupancy — the stem will move the path off the occupied cell immediately.
+  if (!isRoutable(source.col, source.row)) return null;
   // Target may be outside the routable area (e.g. output CPs at col 56)
   // but must be within the full grid bounds
   if (target.col < 0 || target.col >= GRID_COLS || target.row < 0 || target.row >= GRID_ROWS) return null;
@@ -360,28 +367,34 @@ export function findPath(
   const gScore = new Map<number, number>();
   const parent = new Map<number, number>();
 
-  // Start: at source, traveling in specified direction
-  const startKey = stateKey(source.col, source.row, startDir);
+  // Start: at source, traveling in specified direction, in stem phase (stem=0)
+  const inStem = stemLength > 0 ? 0 : 1;
+  const startKey = stateKey(source.col, source.row, startDir, inStem);
   gScore.set(startKey, 0);
 
   const h0 = chebyshevDistance(source.col, source.row, target.col, target.row);
-  pqPush(open, { f: h0, g: 0, col: source.col, row: source.row, dir: startDir });
+  pqPush(open, { f: h0, g: 0, col: source.col, row: source.row, dir: startDir, stem: inStem });
 
   while (open.length > 0) {
     const cur = pqPop(open)!;
-    const curKey = stateKey(cur.col, cur.row, cur.dir);
+    const curKey = stateKey(cur.col, cur.row, cur.dir, cur.stem);
 
     // Skip stale entries
     const bestG = gScore.get(curKey);
     if (bestG !== undefined && cur.g > bestG) continue;
 
-    // Goal: at target, arriving in specified direction
-    if (cur.col === target.col && cur.row === target.row && cur.dir === endDir) {
+    // Goal: at target, arriving in specified direction (only reachable in free phase)
+    if (cur.col === target.col && cur.row === target.row && cur.dir === endDir && cur.stem === 1) {
       return reconstructPath(parent, curKey);
     }
 
-    // Expand neighbors (straight, +45, -45)
-    for (const nextDir of getAllowedDirections(cur.dir)) {
+    // Determine allowed directions: stem phase forces straight only
+    const directions = cur.stem === 0
+      ? [cur.dir] as const  // Forced straight in start direction
+      : getAllowedDirections(cur.dir);
+
+    // Expand neighbors
+    for (const nextDir of directions) {
       const [dc, dr] = DIR_DELTA[nextDir];
       const nc = cur.col + dc;
       const nr = cur.row + dr;
@@ -393,14 +406,21 @@ export function findPath(
       const turnCost = nextDir !== cur.dir ? TURN_PENALTY : 0;
       const tentG = cur.g + 1 + turnCost;
 
-      const nextKey = stateKey(nc, nr, nextDir);
+      // Transition stem phase: after stemLength steps from source, switch to free
+      // g tracks total steps from source; stem completes after stemLength steps
+      let nextStem = cur.stem;
+      if (cur.stem === 0 && tentG >= stemLength) {
+        nextStem = 1; // Exit stem phase
+      }
+
+      const nextKey = stateKey(nc, nr, nextDir, nextStem);
       const existing = gScore.get(nextKey);
 
       if (existing === undefined || tentG < existing) {
         gScore.set(nextKey, tentG);
         parent.set(nextKey, curKey);
         const h = chebyshevDistance(nc, nr, target.col, target.row);
-        pqPush(open, { f: tentG + h, g: tentG, col: nc, row: nr, dir: nextDir });
+        pqPush(open, { f: tentG + h, g: tentG, col: nc, row: nr, dir: nextDir, stem: nextStem });
       }
     }
   }

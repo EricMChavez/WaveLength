@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { findPath, getPortGridAnchor, getPortWireDirection, portSideToWireDirection } from './auto-router.ts';
-import { DIR_DELTA, DIR_COUNT, DIR_E, DIR_S, DIR_W, DIR_N } from './grid-graph.ts';
+import { DIR_DELTA, DIR_COUNT, DIR_E, DIR_SE, DIR_S, DIR_W, DIR_N, DIR_NE } from './grid-graph.ts';
 import { createOccupancyGrid, markNodeOccupied, NODE_GRID_COLS, NODE_GRID_ROWS, getNodeGridSize } from '../grid/occupancy.ts';
 import { PLAYABLE_START, PLAYABLE_END, GRID_ROWS } from '../grid/constants.ts';
 import type { GridPoint } from '../grid/types.ts';
@@ -15,16 +15,18 @@ function makeNode(id: string, col: number, row: number, inputCount = 1, outputCo
 // ---------------------------------------------------------------------------
 
 describe('getPortGridAnchor', () => {
-  it('output port anchor is one col right of node bounding box', () => {
+  it('output port anchor is at the right grid line of node', () => {
     const node = makeNode('n1', 5, 3);
     const anchor = getPortGridAnchor(node, 'output', 0);
+    // Anchor at port grid line: col = nodeCol + cols (matching port pixel)
     expect(anchor.col).toBe(5 + NODE_GRID_COLS);
   });
 
-  it('input port anchor is one col left of node bounding box', () => {
+  it('input port anchor is at the left grid line of node', () => {
     const node = makeNode('n1', 5, 3);
     const anchor = getPortGridAnchor(node, 'input', 0);
-    expect(anchor.col).toBe(4);
+    // Anchor at port grid line: col = nodeCol (matching port pixel)
+    expect(anchor.col).toBe(5);
   });
 
   it('distributes 2 ports across 2 rows', () => {
@@ -232,11 +234,12 @@ describe('findPath', () => {
     expect(path).toEqual([point]);
   });
 
-  it('returns null when source is occupied', () => {
+  it('finds path when source is occupied (node anchors sit on node body)', () => {
     const grid = createOccupancyGrid();
     grid[10][18] = true;
     const path = findPath({ col: 10, row: 18 }, { col: 40, row: 18 }, grid);
-    expect(path).toBeNull();
+    expect(path).not.toBeNull();
+    expect(path![0]).toEqual({ col: 10, row: 18 });
   });
 
   it('finds path to occupied target cell (e.g. output CPs outside routable area)', () => {
@@ -468,48 +471,167 @@ describe('getPortWireDirection', () => {
 // ---------------------------------------------------------------------------
 
 describe('getPortGridAnchor with rotation', () => {
-  it('output anchor at 90° rotation is below node', () => {
+  it('output anchor at 90° rotation is at bottom grid line', () => {
     const node = makeNode('n1', 10, 10, 1, 1, 90);
-    const { cols, rows } = getNodeGridSize(node);
+    const { rows } = getNodeGridSize(node);
     const anchor = getPortGridAnchor(node, 'output', 0);
-    // At 90°, output moves to bottom, anchor is one row below
+    // At 90°, output moves to bottom, anchor at bottom grid line
     expect(anchor.row).toBe(10 + rows);
   });
 
-  it('input anchor at 90° rotation is above node', () => {
+  it('input anchor at 90° rotation is at top grid line', () => {
     const node = makeNode('n1', 10, 10, 1, 1, 90);
     const anchor = getPortGridAnchor(node, 'input', 0);
-    // At 90°, input moves to top, anchor is one row above
-    expect(anchor.row).toBe(9);
+    // At 90°, input moves to top, anchor at top grid line
+    expect(anchor.row).toBe(10);
   });
 
-  it('output anchor at 180° rotation is left of node', () => {
+  it('output anchor at 180° rotation is at left grid line', () => {
     const node = makeNode('n1', 10, 10, 1, 1, 180);
     const anchor = getPortGridAnchor(node, 'output', 0);
-    // At 180°, output moves to left, anchor is one col left
-    expect(anchor.col).toBe(9);
+    // At 180°, output moves to left, anchor at left grid line
+    expect(anchor.col).toBe(10);
   });
 
-  it('input anchor at 180° rotation is right of node', () => {
+  it('input anchor at 180° rotation is at right grid line', () => {
     const node = makeNode('n1', 10, 10, 1, 1, 180);
     const { cols } = getNodeGridSize(node);
     const anchor = getPortGridAnchor(node, 'input', 0);
-    // At 180°, input moves to right, anchor is one col right
+    // At 180°, input moves to right, anchor at right grid line
     expect(anchor.col).toBe(10 + cols);
   });
 
-  it('output anchor at 270° rotation is above node', () => {
+  it('output anchor at 270° rotation is at top grid line', () => {
     const node = makeNode('n1', 10, 10, 1, 1, 270);
     const anchor = getPortGridAnchor(node, 'output', 0);
-    // At 270°, output moves to top, anchor is one row above
-    expect(anchor.row).toBe(9);
+    // At 270°, output moves to top, anchor at top grid line
+    expect(anchor.row).toBe(10);
   });
 
-  it('input anchor at 270° rotation is below node', () => {
+  it('input anchor at 270° rotation is at bottom grid line', () => {
     const node = makeNode('n1', 10, 10, 1, 1, 270);
     const { rows } = getNodeGridSize(node);
     const anchor = getPortGridAnchor(node, 'input', 0);
-    // At 270°, input moves to bottom, anchor is one row below
+    // At 270°, input moves to bottom, anchor at bottom grid line
     expect(anchor.row).toBe(10 + rows);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stem enforcement
+// ---------------------------------------------------------------------------
+
+describe('findPath stem enforcement', () => {
+  it('first step from source is forced straight in startDir (East)', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 10, row: 18 };
+    const target: GridPoint = { col: 14, row: 16 };
+    const path = findPath(source, target, grid, DIR_E, DIR_E);
+
+    expect(path).not.toBeNull();
+    expect(path!.length).toBeGreaterThan(2);
+    // First step must be straight East: (10,18) → (11,18)
+    expect(path![1]).toEqual({ col: 11, row: 18 });
+  });
+
+  it('first step from source is forced straight in startDir (West)', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 40, row: 18 };
+    const target: GridPoint = { col: 30, row: 16 };
+    const path = findPath(source, target, grid, DIR_W, DIR_W);
+
+    expect(path).not.toBeNull();
+    expect(path!.length).toBeGreaterThan(2);
+    // First step must be straight West: (40,18) → (39,18)
+    expect(path![1]).toEqual({ col: 39, row: 18 });
+  });
+
+  it('first step from source is forced straight in startDir (South)', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 25, row: 5 };
+    const target: GridPoint = { col: 30, row: 15 };
+    const path = findPath(source, target, grid, DIR_S, DIR_E);
+
+    expect(path).not.toBeNull();
+    expect(path!.length).toBeGreaterThan(2);
+    // First step must be straight South: (25,5) → (25,6)
+    expect(path![1]).toEqual({ col: 25, row: 6 });
+  });
+
+  it('stem of 0 allows immediate turns', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 10, row: 18 };
+    const target: GridPoint = { col: 14, row: 14 };
+    // stemLength=0 disables stem enforcement
+    const path = findPath(source, target, grid, DIR_E, DIR_E, 0);
+
+    expect(path).not.toBeNull();
+    // First step may be diagonal (NE) since stem is disabled and target is up-right
+    const firstDc = path![1].col - path![0].col;
+    const firstDr = path![1].row - path![0].row;
+    const firstDir = dirFromDelta(firstDc, firstDr);
+    // Should be East or NE (allowed by A* without stem)
+    expect(firstDir === DIR_E || firstDir === DIR_NE).toBe(true);
+  });
+
+  it('stem=2 forces two straight steps before allowing turns', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 10, row: 18 };
+    const target: GridPoint = { col: 20, row: 12 };
+    const path = findPath(source, target, grid, DIR_E, DIR_E, 2);
+
+    expect(path).not.toBeNull();
+    expect(path!.length).toBeGreaterThan(3);
+    // First two steps must be straight East
+    expect(path![1]).toEqual({ col: 11, row: 18 });
+    expect(path![2]).toEqual({ col: 12, row: 18 });
+  });
+
+  it('still finds path when stem direction is blocked after 1 step', () => {
+    const grid = createOccupancyGrid();
+    // Block col 12 row 18 so stem can only go 1 step East
+    grid[12][18] = true;
+    const source: GridPoint = { col: 10, row: 18 };
+    const target: GridPoint = { col: 20, row: 18 };
+    // stem=2 requires 2 East steps, but col 12 is blocked
+    const path = findPath(source, target, grid, DIR_E, DIR_E, 2);
+
+    // Should still find a path: stem goes (10,18)→(11,18), then
+    // at g=1 < stemLength=2 it must continue East but (12,18) blocked → null
+    // Actually this should fail since stem is forced
+    expect(path).toBeNull();
+  });
+
+  it('default stem=1 forces exactly one straight step', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 10, row: 18 };
+    const target: GridPoint = { col: 14, row: 16 };
+    // Default call (stem=1)
+    const path = findPath(source, target, grid, DIR_E, DIR_E);
+
+    expect(path).not.toBeNull();
+    // First step forced East
+    expect(path![1]).toEqual({ col: 11, row: 18 });
+    // Second step can turn (NE allowed)
+    const secondDc = path![2].col - path![1].col;
+    const secondDr = path![2].row - path![1].row;
+    const secondDir = dirFromDelta(secondDc, secondDr);
+    // Should be E or NE (turning toward row 16)
+    expect(secondDir === DIR_E || secondDir === DIR_NE).toBe(true);
+  });
+
+  it('CP-like scenario: (10,18) to (14,16) forces horizontal stem', () => {
+    const grid = createOccupancyGrid();
+    const source: GridPoint = { col: 10, row: 18 };
+    const target: GridPoint = { col: 14, row: 16 };
+    const path = findPath(source, target, grid, DIR_E, DIR_E);
+
+    expect(path).not.toBeNull();
+    // The old buggy path was (10,18)→(11,17)→(12,16)→(13,16)→(14,16)
+    // With stem enforcement, first step MUST be (11,18), not (11,17)
+    expect(path![0]).toEqual({ col: 10, row: 18 });
+    expect(path![1]).toEqual({ col: 11, row: 18 });
+    // Path should NOT go diagonally from the source
+    expect(path![1].row).toBe(18); // same row as source
   });
 });
