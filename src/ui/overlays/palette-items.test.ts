@@ -30,29 +30,36 @@ describe('buildPaletteItems', () => {
     expect(customBlank!.category).toBe('custom');
   });
 
-  it('filters fundamentals by allowedNodes but always includes custom-blank', () => {
+  it('excludes custom-blank when custom is not in allowedNodes', () => {
     const items = buildPaletteItems(['inverter'], new Map());
-    // 1 fundamental + 1 custom-blank
-    expect(items.length).toBe(2);
+    // 1 fundamental only (no custom-blank since 'custom' not in allowedNodes)
+    expect(items.length).toBe(1);
     expect(items[0].nodeType).toBe('inverter');
-    expect(items[1].id).toBe('custom-blank');
+    expect(items.find((i) => i.id === 'custom-blank')).toBeUndefined();
   });
 
-  it('includes utility nodes regardless of allowedNodes', () => {
+  it('includes custom-blank and utility nodes when custom is in allowedNodes', () => {
+    const utilities = new Map([['u1', makeUtilityEntry('u1', 'My Filter')]]);
+    const items = buildPaletteItems(['inverter', 'custom'], utilities);
+    // 1 fundamental + 1 custom-blank + 1 utility
+    expect(items.length).toBe(3);
+    expect(items[0].nodeType).toBe('inverter');
+    expect(items[1].id).toBe('custom-blank');
+    expect(items[2].section).toBe('utility');
+  });
+
+  it('excludes utility nodes when custom is not in allowedNodes', () => {
     const utilities = new Map([['u1', makeUtilityEntry('u1', 'My Filter')]]);
     const items = buildPaletteItems(['inverter'], utilities);
     const utilityItems = items.filter((i) => i.section === 'utility');
-    expect(utilityItems.length).toBe(1);
-    expect(utilityItems[0].label).toBe('My Filter');
+    expect(utilityItems.length).toBe(0);
   });
 
-  it('returns only custom-blank and utility nodes when allowedNodes is empty array', () => {
+  it('returns empty when allowedNodes is empty array', () => {
     const utilities = new Map([['u1', makeUtilityEntry('u1', 'My Filter')]]);
     const items = buildPaletteItems([], utilities);
-    // 1 custom-blank (fundamental) + 1 named utility
-    expect(items.length).toBe(2);
-    expect(items[0].id).toBe('custom-blank');
-    expect(items[1].section).toBe('utility');
+    // Nothing allowed
+    expect(items.length).toBe(0);
   });
 
   it('does not include utility section when no named utility nodes exist', () => {

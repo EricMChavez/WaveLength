@@ -39,7 +39,7 @@ export const delayNode = defineNode<DelayParams>({
     {
       key: 'wts',
       type: 'number',
-      default: 1,
+      default: 0,
       label: 'Delay (WTS)',
       min: 0,
       max: MAX_WTS,

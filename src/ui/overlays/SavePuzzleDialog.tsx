@@ -23,10 +23,23 @@ function SavePuzzleDialogInner() {
   const activeBoard = useGameStore((s) => s.activeBoard);
   const addCustomPuzzle = useGameStore((s) => s.addCustomPuzzle);
 
+  // Build list of all fundamental node types (including "Custom" for user-created nodes)
+  const allNodeTypes = useMemo(() => {
+    const types: Array<{ type: string; label: string }> = [];
+    for (const def of nodeRegistry.all) {
+      types.push({ type: def.type, label: getNodeLabel(def.type) });
+    }
+    // Add "Custom" as a fundamental node type that enables all user-created nodes
+    types.push({ type: 'custom', label: 'Custom' });
+    return types;
+  }, []);
+
+  const allTypeStrings = useMemo(() => allNodeTypes.map((t) => t.type), [allNodeTypes]);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
-  const [allowedNodeSet, setAllowedNodeSet] = useState<Set<string>>(() => new Set(nodeRegistry.allTypes));
+  const [allowedNodeSet, setAllowedNodeSet] = useState<Set<string>>(() => new Set(allTypeStrings));
   const [startingNodeIds, setStartingNodeIds] = useState<Set<string>>(new Set());
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +120,7 @@ function SavePuzzleDialogInner() {
     const initialWires: CustomPuzzle['initialWires'] = [];
 
     // Compute allowedNodes: null means all types allowed
-    const computedAllowed = allowedNodeSet.size === nodeRegistry.allTypes.length
+    const computedAllowed = allowedNodeSet.size === allTypeStrings.length
       ? null
       : Array.from(allowedNodeSet);
 
@@ -141,6 +154,7 @@ function SavePuzzleDialogInner() {
     closeOverlay,
     startingNodeIds,
     allowedNodeSet,
+    allTypeStrings,
   ]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -232,30 +246,30 @@ function SavePuzzleDialogInner() {
                 type="button"
                 className={styles.toggleAllButton}
                 onClick={() => {
-                  if (allowedNodeSet.size === nodeRegistry.allTypes.length) {
+                  if (allowedNodeSet.size === allTypeStrings.length) {
                     setAllowedNodeSet(new Set());
                   } else {
-                    setAllowedNodeSet(new Set(nodeRegistry.allTypes));
+                    setAllowedNodeSet(new Set(allTypeStrings));
                   }
                 }}
               >
-                {allowedNodeSet.size === nodeRegistry.allTypes.length ? 'None' : 'All'}
+                {allowedNodeSet.size === allTypeStrings.length ? 'None' : 'All'}
               </button>
             </h3>
             <div className={styles.checkboxGrid}>
-              {nodeRegistry.all.map((def) => (
-                <label key={def.type} className={styles.checkboxItem}>
+              {allNodeTypes.map((entry) => (
+                <label key={entry.type} className={styles.checkboxItem}>
                   <input
                     type="checkbox"
-                    checked={allowedNodeSet.has(def.type)}
+                    checked={allowedNodeSet.has(entry.type)}
                     onChange={(e) => {
                       const next = new Set(allowedNodeSet);
-                      if (e.target.checked) next.add(def.type);
-                      else next.delete(def.type);
+                      if (e.target.checked) next.add(entry.type);
+                      else next.delete(entry.type);
                       setAllowedNodeSet(next);
                     }}
                   />
-                  <span>{getNodeLabel(def.type)}</span>
+                  <span>{entry.label}</span>
                 </label>
               ))}
             </div>

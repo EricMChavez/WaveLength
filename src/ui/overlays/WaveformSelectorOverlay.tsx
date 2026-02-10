@@ -6,21 +6,32 @@ import { creativeSlotId } from '../../puzzle/connection-point-nodes.ts';
 import { meterKey } from '../../gameboard/meters/meter-types.ts';
 import styles from './WaveformSelectorOverlay.module.css';
 
-/** Available waveform shapes with display labels */
+/** Available waveform shapes with display labels, grouped by base shape */
 const WAVEFORM_OPTIONS: Array<{ shape: WaveformShape; label: string }> = [
-  { shape: 'sine', label: 'Sine' },
-  { shape: 'square', label: 'Square' },
-  { shape: 'triangle', label: 'Triangle' },
-  { shape: 'sawtooth', label: 'Sawtooth' },
-  { shape: 'dual-wave', label: 'Dual Wave' },
-  { shape: 'long-wave', label: 'Long Wave' },
-  { shape: 'positive-sine', label: 'Positive Sine' },
-  { shape: 'overtone', label: 'Overtone' },
-  { shape: 'rectified-sine', label: 'Rectified Sine' },
-  { shape: 'rectified-triangle', label: 'Rectified Triangle' },
-  { shape: 'clipped-sine', label: 'Clipped Sine' },
-  { shape: 'fullwave-rectified-sine', label: 'Fullwave Sine' },
-  { shape: 'fullwave-rectified-triangle', label: 'Fullwave Triangle' },
+  { shape: 'sine-full', label: 'Sine Full' },
+  { shape: 'sine-full-reduced', label: 'Sine Full Reduced' },
+  { shape: 'sine-half', label: 'Sine Half' },
+  { shape: 'sine-half-reduced', label: 'Sine Half Reduced' },
+  { shape: 'sine-quarter', label: 'Sine Quarter' },
+  { shape: 'sine-quarter-reduced', label: 'Sine Quarter Reduced' },
+  { shape: 'triangle-full', label: 'Triangle Full' },
+  { shape: 'triangle-full-reduced', label: 'Triangle Full Reduced' },
+  { shape: 'triangle-half', label: 'Triangle Half' },
+  { shape: 'triangle-half-reduced', label: 'Triangle Half Reduced' },
+  { shape: 'triangle-quarter', label: 'Triangle Quarter' },
+  { shape: 'triangle-quarter-reduced', label: 'Triangle Quarter Reduced' },
+  { shape: 'square-full', label: 'Square Full' },
+  { shape: 'square-full-reduced', label: 'Square Full Reduced' },
+  { shape: 'square-half', label: 'Square Half' },
+  { shape: 'square-half-reduced', label: 'Square Half Reduced' },
+  { shape: 'square-quarter', label: 'Square Quarter' },
+  { shape: 'square-quarter-reduced', label: 'Square Quarter Reduced' },
+  { shape: 'sawtooth-full', label: 'Sawtooth Full' },
+  { shape: 'sawtooth-full-reduced', label: 'Sawtooth Full Reduced' },
+  { shape: 'sawtooth-half', label: 'Sawtooth Half' },
+  { shape: 'sawtooth-half-reduced', label: 'Sawtooth Half Reduced' },
+  { shape: 'sawtooth-quarter', label: 'Sawtooth Quarter' },
+  { shape: 'sawtooth-quarter-reduced', label: 'Sawtooth Quarter Reduced' },
 ];
 
 /** Mini SVG preview of a waveform shape */
@@ -61,53 +72,59 @@ function WaveformIcon({ shape }: { shape: WaveformShape | 'output' | 'off' }) {
     );
   }
 
+  // Determine base shape and cycle count for the icon
+  // Full: half cycle visible (slow), Half: 1 cycle, Quarter: 2 cycles (fast)
+  // Handle reduced variants - strip suffix for base shape and period detection
+  const isReduced = shape.endsWith('-reduced');
+  const shapeWithoutReduced = isReduced ? shape.replace(/-reduced$/, '') : shape;
+  const cycles = shapeWithoutReduced.endsWith('-full') ? 0.5 : shapeWithoutReduced.endsWith('-half') ? 1 : 2;
+  const base = shapeWithoutReduced.replace(/-(?:full|half|quarter)$/, '');
+  const usable = width - 4; // 2px margin each side
+  const x0 = 2;
+  // Reduced waveforms show at 50% amplitude
+  const ampScale = isReduced ? 0.5 : 1;
+  const scaledAmp = amp * ampScale;
+
   let path = '';
-  switch (shape) {
-    case 'sine':
-      path = `M2,${mid} Q${width / 4},${mid - amp} ${width / 2},${mid} Q${(3 * width) / 4},${mid + amp} ${width - 2},${mid}`;
-      break;
-    case 'square':
-      path = `M2,${mid - amp} H${width / 2} V${mid + amp} H${width - 2}`;
-      break;
-    case 'triangle':
-      path = `M2,${mid + amp} L${width / 2},${mid - amp} L${width - 2},${mid + amp}`;
-      break;
-    case 'sawtooth':
-      path = `M2,${mid + amp} L${width / 2},${mid - amp} L${width / 2},${mid + amp} L${width - 2},${mid - amp}`;
-      break;
-    case 'dual-wave':
-      // Triangle hump then flat negative
-      path = `M2,${mid} L${width / 4},${mid - amp} L${width / 2},${mid} V${mid + amp} H${width - 2}`;
-      break;
-    case 'long-wave':
-      // Gentle sine curve (quarter cycle visible)
-      path = `M2,${mid} Q${width / 2},${mid - amp * 1.5} ${width - 2},${mid}`;
-      break;
-    case 'positive-sine':
-      // Sine shifted up (all above center)
-      path = `M2,${mid} Q${width / 4},${mid - amp * 2} ${width / 2},${mid} Q${(3 * width) / 4},${mid} ${width - 2},${mid}`;
-      break;
-    case 'overtone':
-      // Fundamental + harmonic (wobbly sine)
-      path = `M2,${mid} Q${width / 8},${mid - amp * 0.6} ${width / 4},${mid - amp} Q${(3 * width) / 8},${mid - amp * 0.4} ${width / 2},${mid} Q${(5 * width) / 8},${mid + amp * 0.4} ${(3 * width) / 4},${mid + amp} Q${(7 * width) / 8},${mid + amp * 0.6} ${width - 2},${mid}`;
-      break;
-    case 'rectified-sine':
-      path = `M2,${mid} Q${width / 4},${mid - amp} ${width / 2},${mid} H${width - 2}`;
-      break;
-    case 'rectified-triangle':
-      path = `M2,${mid} L${width / 4},${mid - amp} L${width / 2},${mid} H${width - 2}`;
-      break;
-    case 'clipped-sine':
-      path = `M2,${mid} L5,${mid - amp} H${width / 2 - 3} L${width / 2},${mid} L${width / 2 + 3},${mid + amp} H${width - 5} L${width - 2},${mid}`;
-      break;
-    case 'fullwave-rectified-sine':
-      path = `M2,${mid} Q${width / 4},${mid - amp} ${width / 2},${mid} Q${(3 * width) / 4},${mid - amp} ${width - 2},${mid}`;
-      break;
-    case 'fullwave-rectified-triangle':
-      path = `M2,${mid} L${width / 4},${mid - amp} L${width / 2},${mid} L${(3 * width) / 4},${mid - amp} L${width - 2},${mid}`;
-      break;
-    default:
-      path = `M2,${mid} H${width - 2}`;
+  if (base === 'sine') {
+    // Generate sine curve with cubic bezier approximation per half-cycle
+    const parts: string[] = [`M${x0},${mid}`];
+    const segW = usable / (cycles * 2); // width per half-cycle
+    for (let i = 0; i < cycles * 2; i++) {
+      const sx = x0 + i * segW;
+      const ex = sx + segW;
+      const dir = i % 2 === 0 ? -1 : 1; // up first, then down
+      const cp = mid + dir * scaledAmp * 1.5;
+      parts.push(`Q${(sx + ex) / 2},${cp} ${ex},${mid}`);
+    }
+    path = parts.join(' ');
+  } else if (base === 'square') {
+    const segW = usable / cycles;
+    const parts: string[] = [`M${x0},${mid - scaledAmp}`];
+    for (let i = 0; i < cycles; i++) {
+      const sx = x0 + i * segW;
+      parts.push(`H${sx + segW / 2} V${mid + scaledAmp} H${sx + segW} V${mid - scaledAmp}`);
+    }
+    path = parts.join(' ');
+  } else if (base === 'triangle') {
+    const segW = usable / cycles;
+    const parts: string[] = [`M${x0},${mid + scaledAmp}`];
+    for (let i = 0; i < cycles; i++) {
+      const sx = x0 + i * segW;
+      parts.push(`L${sx + segW / 2},${mid - scaledAmp} L${sx + segW},${mid + scaledAmp}`);
+    }
+    path = parts.join(' ');
+  } else if (base === 'sawtooth') {
+    const segW = usable / cycles;
+    const parts: string[] = [`M${x0},${mid + scaledAmp}`];
+    for (let i = 0; i < cycles; i++) {
+      const sx = x0 + i * segW;
+      parts.push(`L${sx + segW},${mid - scaledAmp}`);
+      if (i < cycles - 1) parts.push(`L${sx + segW},${mid + scaledAmp}`);
+    }
+    path = parts.join(' ');
+  } else {
+    path = `M${x0},${mid} H${width - 2}`;
   }
 
   return (
@@ -151,7 +168,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
 
   const slot = creativeSlots[slotIndex];
   const currentDirection = slot?.direction ?? 'output';
-  const currentShape = slot?.waveform?.shape ?? 'sine';
+  const currentShape = slot?.waveform?.shape ?? 'sine-quarter';
   const { side, index } = slotToMeterInfo(slotIndex);
   const listRef = useRef<HTMLDivElement>(null);
 

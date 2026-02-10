@@ -35,23 +35,28 @@ export function buildPaletteItems(
     });
   }
 
-  // Permanent "Custom" item — places a blank custom node on the board
-  items.push({
-    id: 'custom-blank',
-    nodeType: 'custom-blank',
-    label: 'Custom',
-    section: 'fundamental',
-    category: 'custom',
-  });
+  // "Custom" item and utility nodes — only available if 'custom' is in allowedNodes (or no restrictions)
+  const customAllowed = !allowedNodes || allowedNodes.includes('custom');
 
-  // Named utility nodes (always available)
-  for (const entry of utilityNodes.values()) {
+  if (customAllowed) {
+    // Permanent "Custom" item — places a blank custom node on the board
     items.push({
-      id: `utility:${entry.utilityId}`,
-      nodeType: `utility:${entry.utilityId}`,
-      label: entry.title,
-      section: 'utility',
+      id: 'custom-blank',
+      nodeType: 'custom-blank',
+      label: 'Custom',
+      section: 'fundamental',
+      category: 'custom',
     });
+
+    // Named utility nodes
+    for (const entry of utilityNodes.values()) {
+      items.push({
+        id: `utility:${entry.utilityId}`,
+        nodeType: `utility:${entry.utilityId}`,
+        label: entry.title,
+        section: 'utility',
+      });
+    }
   }
 
   return items;

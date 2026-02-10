@@ -1,8 +1,14 @@
-/** Supported waveform shapes for puzzle inputs/outputs */
-export type WaveformShape = 'sine' | 'square' | 'triangle' | 'sawtooth'
-  | 'rectified-sine' | 'rectified-triangle' | 'clipped-sine'
-  | 'fullwave-rectified-sine' | 'fullwave-rectified-triangle'
-  | 'dual-wave' | 'long-wave' | 'positive-sine' | 'overtone'
+/** Supported waveform shapes for puzzle inputs/outputs.
+ *  Full = 16 WTS (256 ticks), Half = 8 WTS (128 ticks), Quarter = 4 WTS (64 ticks). */
+export type WaveformShape =
+  | 'sine-full' | 'sine-half' | 'sine-quarter'
+  | 'sine-full-reduced' | 'sine-half-reduced' | 'sine-quarter-reduced'
+  | 'triangle-full' | 'triangle-half' | 'triangle-quarter'
+  | 'triangle-full-reduced' | 'triangle-half-reduced' | 'triangle-quarter-reduced'
+  | 'square-full' | 'square-half' | 'square-quarter'
+  | 'square-full-reduced' | 'square-half-reduced' | 'square-quarter-reduced'
+  | 'sawtooth-full' | 'sawtooth-half' | 'sawtooth-quarter'
+  | 'sawtooth-full-reduced' | 'sawtooth-half-reduced' | 'sawtooth-quarter-reduced'
   | 'samples';
 
 /** Definition of a single waveform signal */
@@ -90,6 +96,23 @@ export function buildCustomNodeConnectionPointConfig(): ConnectionPointConfig {
   };
 }
 
+/** Serialized node for initial puzzle state */
+export interface InitialNodeDef {
+  id: string;
+  type: string;
+  position: { col: number; row: number };
+  params: Record<string, unknown>;
+  inputCount: number;
+  outputCount: number;
+  rotation?: 0 | 90 | 180 | 270;
+}
+
+/** Serialized wire for initial puzzle state */
+export interface InitialWireDef {
+  source: { nodeId: string; portIndex: number };
+  target: { nodeId: string; portIndex: number };
+}
+
 /** Complete definition of a puzzle level */
 export interface PuzzleDefinition {
   id: string;
@@ -105,4 +128,8 @@ export interface PuzzleDefinition {
   testCases: PuzzleTestCase[];
   /** Connection point configuration (derived from activeInputs/activeOutputs if not set) */
   connectionPoints?: ConnectionPointConfig;
+  /** Nodes pre-placed on the board when the puzzle starts */
+  initialNodes?: InitialNodeDef[];
+  /** Wires pre-connected when the puzzle starts */
+  initialWires?: InitialWireDef[];
 }

@@ -125,38 +125,35 @@ function createMockCtx() {
 }
 
 describe('getNodePixelRect', () => {
-  it('returns body extending 0.5 beyond port span for fundamental node', () => {
+  it('returns body covering full grid footprint for fundamental node', () => {
     const node = makeNode('n1', 'invert', 5, 3);
     const cellSize = 40;
     const rect = getNodePixelRect(node, cellSize);
-    // Single port centered at row 1 (floor(2/2)), port span = 1
-    // Body height = 1 cell (single port span)
-    // Body y = (3 + 1 - 0.5) * 40 = 3.5 * 40 = 140
+    // Single port at row 1, but grid is 2 rows tall → body covers full grid
+    // bodyTop = min(0.5, -0.5) = -0.5, bodyBottom = max(1.5, 1.5) = 1.5, height = 2 cells
     expect(rect.width).toBe(FUNDAMENTAL_GRID_COLS * cellSize);
-    expect(rect.height).toBe(1 * cellSize);
+    expect(rect.height).toBe(FUNDAMENTAL_GRID_ROWS * cellSize);
     expect(rect.x).toBe(5 * cellSize);
-    expect(rect.y).toBe((3 + 1 - 0.5) * cellSize);
+    expect(rect.y).toBe((3 - 0.5) * cellSize);
   });
 
-  it('returns body extending 0.5 beyond port span for utility node', () => {
+  it('returns body covering full grid footprint for utility node', () => {
     const node = makeNode('u1', 'utility:foo', 4, 2);
     const cellSize = 50;
     const rect = getNodePixelRect(node, cellSize);
-    // Single port centered at row 1 (floor(3/2)), port span = 1
-    // Body height = 1 cell
+    // Single port at row 1, but grid is 3 rows tall → body covers full grid
     expect(rect.width).toBe(UTILITY_GRID_COLS * cellSize);
-    expect(rect.height).toBe(1 * cellSize);
+    expect(rect.height).toBe(UTILITY_GRID_ROWS * cellSize);
   });
 
-  it('returns body based on port span for puzzle node', () => {
+  it('returns body covering full grid footprint for puzzle node', () => {
     // 4 inputs → max(2, 4+1) = 5 rows
-    // Ports at rows 0, 1, 2, 3 (floor(i * 5 / 4))
-    // Port span = 3 - 0 + 1 = 4
+    // Ports at rows 0..3, port span = 4, but grid is 5 rows → body covers full grid
     const node = makeNode('p1', 'puzzle:abc', 3, 1, 4, 1);
     const cellSize = 40;
     const rect = getNodePixelRect(node, cellSize);
     expect(rect.width).toBe(PUZZLE_GRID_COLS * cellSize);
-    expect(rect.height).toBe(4 * cellSize); // port span of 4
+    expect(rect.height).toBe(5 * cellSize); // full grid height
   });
 });
 

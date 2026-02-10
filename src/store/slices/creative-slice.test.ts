@@ -31,13 +31,13 @@ describe('creative-slice', () => {
     it('resets creative slots to default (left=input, right=output)', () => {
       useGameStore.getState().enterCreativeMode();
       useGameStore.getState().setCreativeSlotDirection(0, 'output'); // Change from default
-      useGameStore.getState().setCreativeSlotWaveformShape(0, 'square');
+      useGameStore.getState().setCreativeSlotWaveformShape(0, 'square-quarter');
 
       useGameStore.getState().exitCreativeMode();
 
       const slots = useGameStore.getState().creativeSlots;
       expect(slots[0].direction).toBe('input'); // Reset to default
-      expect(slots[0].waveform.shape).toBe('sine'); // Default waveform
+      expect(slots[0].waveform.shape).toBe('sine-quarter'); // Default waveform
     });
   });
 
@@ -59,10 +59,10 @@ describe('creative-slice', () => {
       expect(slots[5].direction).toBe('output');
     });
 
-    it('all slots have default sine waveform', () => {
+    it('all slots have default sine-quarter waveform', () => {
       const slots = useGameStore.getState().creativeSlots;
       for (let i = 0; i < slots.length; i++) {
-        expect(slots[i].waveform.shape).toBe('sine');
+        expect(slots[i].waveform.shape).toBe('sine-quarter');
         expect(slots[i].waveform.amplitude).toBe(100);
         expect(slots[i].waveform.period).toBe(64);
       }
@@ -92,13 +92,13 @@ describe('creative-slice', () => {
     it('resets waveform to default when switching to input', () => {
       // Start from output direction
       useGameStore.getState().setCreativeSlotDirection(3, 'input'); // Slot 3 defaults to output
-      useGameStore.getState().setCreativeSlotWaveformShape(3, 'square');
-      expect(useGameStore.getState().creativeSlots[3].waveform.shape).toBe('square');
+      useGameStore.getState().setCreativeSlotWaveformShape(3, 'square-quarter');
+      expect(useGameStore.getState().creativeSlots[3].waveform.shape).toBe('square-quarter');
 
       useGameStore.getState().setCreativeSlotDirection(3, 'output');
       useGameStore.getState().setCreativeSlotDirection(3, 'input');
 
-      expect(useGameStore.getState().creativeSlots[3].waveform.shape).toBe('sine');
+      expect(useGameStore.getState().creativeSlots[3].waveform.shape).toBe('sine-quarter');
     });
 
     it('ignores invalid indices', () => {
@@ -112,31 +112,30 @@ describe('creative-slice', () => {
 
   describe('setCreativeSlotWaveformShape', () => {
     it('updates the shape of a specific slot waveform', () => {
-      useGameStore.getState().setCreativeSlotWaveformShape(0, 'sawtooth');
+      useGameStore.getState().setCreativeSlotWaveformShape(0, 'sawtooth-quarter');
 
       const slots = useGameStore.getState().creativeSlots;
-      expect(slots[0].waveform.shape).toBe('sawtooth');
+      expect(slots[0].waveform.shape).toBe('sawtooth-quarter');
       // Other slots unchanged
-      expect(slots[1].waveform.shape).toBe('sine');
+      expect(slots[1].waveform.shape).toBe('sine-quarter');
     });
 
-    it('preserves other waveform properties when changing shape', () => {
+    it('preserves amplitude and updates period based on shape', () => {
       const originalAmplitude = useGameStore.getState().creativeSlots[0].waveform.amplitude;
-      const originalPeriod = useGameStore.getState().creativeSlots[0].waveform.period;
 
-      useGameStore.getState().setCreativeSlotWaveformShape(0, 'overtone');
+      useGameStore.getState().setCreativeSlotWaveformShape(0, 'sine-full');
 
       const slot = useGameStore.getState().creativeSlots[0];
-      expect(slot.waveform.shape).toBe('overtone');
+      expect(slot.waveform.shape).toBe('sine-full');
       expect(slot.waveform.amplitude).toBe(originalAmplitude);
-      expect(slot.waveform.period).toBe(originalPeriod);
+      expect(slot.waveform.period).toBe(256); // full = 16 WTS
     });
 
     it('ignores invalid indices', () => {
       const originalSlots = [...useGameStore.getState().creativeSlots];
 
-      useGameStore.getState().setCreativeSlotWaveformShape(-1, 'sawtooth');
-      useGameStore.getState().setCreativeSlotWaveformShape(6, 'sawtooth');
+      useGameStore.getState().setCreativeSlotWaveformShape(-1, 'sawtooth-quarter');
+      useGameStore.getState().setCreativeSlotWaveformShape(6, 'sawtooth-quarter');
 
       const newSlots = useGameStore.getState().creativeSlots;
       for (let i = 0; i < newSlots.length; i++) {
@@ -148,9 +147,9 @@ describe('creative-slice', () => {
   describe('setCreativeSlotWaveform', () => {
     it('replaces the entire waveform definition', () => {
       const newWaveform = {
-        shape: 'clipped-sine' as const,
+        shape: 'triangle-half' as const,
         amplitude: 75,
-        period: 32,
+        period: 128,
         phase: 4,
         offset: 10,
       };
@@ -160,14 +159,14 @@ describe('creative-slice', () => {
       const slot = useGameStore.getState().creativeSlots[1];
       expect(slot.waveform).toEqual(newWaveform);
       // Other slots unchanged
-      expect(useGameStore.getState().creativeSlots[0].waveform.shape).toBe('sine');
+      expect(useGameStore.getState().creativeSlots[0].waveform.shape).toBe('sine-quarter');
     });
 
     it('ignores invalid indices', () => {
       const originalSlots = [...useGameStore.getState().creativeSlots];
 
-      useGameStore.getState().setCreativeSlotWaveform(-1, { shape: 'sawtooth', amplitude: 100, period: 8, phase: 0, offset: 0 });
-      useGameStore.getState().setCreativeSlotWaveform(6, { shape: 'sawtooth', amplitude: 100, period: 8, phase: 0, offset: 0 });
+      useGameStore.getState().setCreativeSlotWaveform(-1, { shape: 'sawtooth-quarter', amplitude: 100, period: 64, phase: 0, offset: 0 });
+      useGameStore.getState().setCreativeSlotWaveform(6, { shape: 'sawtooth-quarter', amplitude: 100, period: 64, phase: 0, offset: 0 });
 
       const newSlots = useGameStore.getState().creativeSlots;
       for (let i = 0; i < newSlots.length; i++) {

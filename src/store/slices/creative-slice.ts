@@ -1,12 +1,13 @@
 import type { StateCreator } from 'zustand';
 import type { WaveformDef, WaveformShape } from '../../puzzle/types.ts';
+import { getShapePeriod } from '../../puzzle/waveform-generators.ts';
 
 /** Number of creative mode slots (3 left + 3 right) */
 export const CREATIVE_SLOT_COUNT = 6;
 
 /** Default waveform when a slot becomes an input */
 const DEFAULT_INPUT_WAVEFORM: WaveformDef = {
-  shape: 'sine',
+  shape: 'sine-quarter',
   amplitude: 100,
   period: 64,
   phase: 0,
@@ -104,7 +105,7 @@ export const createCreativeSlice: StateCreator<CreativeSlice> = (set, get) => ({
       const newSlots = [...state.creativeSlots];
       newSlots[slotIndex] = {
         ...newSlots[slotIndex],
-        waveform: { ...newSlots[slotIndex].waveform, shape },
+        waveform: { ...newSlots[slotIndex].waveform, shape, period: getShapePeriod(shape) },
       };
       return { creativeSlots: newSlots };
     }),

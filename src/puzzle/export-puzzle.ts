@@ -133,6 +133,11 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
     }
   }
 
+  // Format allowedNodes value
+  const allowedNodesStr = puzzle.allowedNodes === null
+    ? 'null'
+    : `[${puzzle.allowedNodes.map((n) => `'${n}'`).join(', ')}]`;
+
   // Build the source
   const lines: string[] = [
     `import type { PuzzleDefinition } from '../types.ts';`,
@@ -143,7 +148,7 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
     `  description: '${puzzle.description.replace(/'/g, "\\'")}',`,
     `  activeInputs: ${activeInputs},`,
     `  activeOutputs: ${activeOutputs},`,
-    `  allowedNodes: null,`,
+    `  allowedNodes: ${allowedNodesStr},`,
     `  testCases: [`,
     `    {`,
     `      name: '${puzzle.title.replace(/'/g, "\\'")}',`,
@@ -159,6 +164,28 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
 
   // Always include connectionPoints to preserve meter layout
   lines.push(formatConnectionPoints(puzzle.slots, '  '));
+
+  // Include initialNodes if any are defined
+  if (puzzle.initialNodes && puzzle.initialNodes.length > 0) {
+    lines.push(`  initialNodes: [`);
+    for (const node of puzzle.initialNodes) {
+      const paramsStr = Object.keys(node.params).length > 0
+        ? JSON.stringify(node.params)
+        : '{}';
+      const rotationStr = node.rotation ? `, rotation: ${node.rotation}` : '';
+      lines.push(`    { id: '${node.id}', type: '${node.type}', position: { col: ${node.position.col}, row: ${node.position.row} }, params: ${paramsStr}, inputCount: ${node.inputCount}, outputCount: ${node.outputCount}${rotationStr} },`);
+    }
+    lines.push(`  ],`);
+  }
+
+  // Include initialWires if any are defined
+  if (puzzle.initialWires && puzzle.initialWires.length > 0) {
+    lines.push(`  initialWires: [`);
+    for (const wire of puzzle.initialWires) {
+      lines.push(`    { source: { nodeId: '${wire.source.nodeId}', portIndex: ${wire.source.portIndex} }, target: { nodeId: '${wire.target.nodeId}', portIndex: ${wire.target.portIndex} } },`);
+    }
+    lines.push(`  ],`);
+  }
 
   lines.push(`};`);
   lines.push(``);

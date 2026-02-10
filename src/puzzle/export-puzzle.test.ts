@@ -9,7 +9,7 @@ function makeCustomPuzzle(overrides: Partial<CustomPuzzle> = {}): CustomPuzzle {
     description: 'Doubles the input signal',
     createdAt: Date.now(),
     slots: [
-      { direction: 'input', waveform: { shape: 'sine', amplitude: 100, period: 256, phase: 0, offset: 0 } },
+      { direction: 'input', waveform: { shape: 'sine-full', amplitude: 100, period: 256, phase: 0, offset: 0 } },
       { direction: 'off' },
       { direction: 'off' },
       { direction: 'output' },
@@ -19,6 +19,7 @@ function makeCustomPuzzle(overrides: Partial<CustomPuzzle> = {}): CustomPuzzle {
     targetSamples: new Map([[3, [0, 50, 100, 50, 0, -50, -100, -50]]]),
     initialNodes: [],
     initialWires: [],
+    allowedNodes: null,
     ...overrides,
   };
 }
@@ -47,7 +48,7 @@ describe('exportCustomPuzzleAsSource', () => {
 
   it('includes input waveform definitions', () => {
     const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
-    expect(result).toContain("shape: 'sine'");
+    expect(result).toContain("shape: 'sine-full'");
     expect(result).toContain('amplitude: 100');
     expect(result).toContain('period: 256');
   });
@@ -58,9 +59,56 @@ describe('exportCustomPuzzleAsSource', () => {
     expect(result).toContain('samples: [0, 50, 100, 50, 0, -50, -100, -50]');
   });
 
-  it('sets allowedNodes to null', () => {
+  it('exports allowedNodes as null when not set', () => {
     const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
     expect(result).toContain('allowedNodes: null');
+  });
+
+  it('exports allowedNodes array when set', () => {
+    const puzzle = makeCustomPuzzle({
+      allowedNodes: ['invert', 'mix'],
+    });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain("allowedNodes: ['invert', 'mix']");
+  });
+
+  it('exports initialNodes when present', () => {
+    const puzzle = makeCustomPuzzle({
+      initialNodes: [
+        { id: 'node-1', type: 'invert', position: { col: 20, row: 10 }, params: {}, inputCount: 1, outputCount: 1 },
+        { id: 'node-2', type: 'mix', position: { col: 30, row: 15 }, params: { mode: 'add' }, inputCount: 2, outputCount: 1, rotation: 90 },
+      ],
+    });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain('initialNodes: [');
+    expect(result).toContain("id: 'node-1'");
+    expect(result).toContain("type: 'invert'");
+    expect(result).toContain('position: { col: 20, row: 10 }');
+    expect(result).toContain("id: 'node-2'");
+    expect(result).toContain('rotation: 90');
+    expect(result).toContain('"mode":"add"');
+  });
+
+  it('exports initialWires when present', () => {
+    const puzzle = makeCustomPuzzle({
+      initialWires: [
+        { source: { nodeId: 'node-1', portIndex: 0 }, target: { nodeId: 'node-2', portIndex: 0 } },
+      ],
+    });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain('initialWires: [');
+    expect(result).toContain("nodeId: 'node-1'");
+    expect(result).toContain("nodeId: 'node-2'");
+  });
+
+  it('omits initialNodes when empty', () => {
+    const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
+    expect(result).not.toContain('initialNodes');
+  });
+
+  it('omits initialWires when empty', () => {
+    const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
+    expect(result).not.toContain('initialWires');
   });
 
   it('uses puzzle title as test case name', () => {
@@ -84,7 +132,7 @@ describe('exportCustomPuzzleAsSource', () => {
         { direction: 'output' },  // output on left = non-standard
         { direction: 'off' },
         { direction: 'off' },
-        { direction: 'input', waveform: { shape: 'sine', amplitude: 100, period: 256, phase: 0, offset: 0 } },
+        { direction: 'input', waveform: { shape: 'sine-full', amplitude: 100, period: 256, phase: 0, offset: 0 } },
         { direction: 'off' },
         { direction: 'off' },
       ],
@@ -101,10 +149,10 @@ describe('exportCustomPuzzleAsSource', () => {
   it('assigns correct cpIndex values for mixed layout', () => {
     const puzzle = makeCustomPuzzle({
       slots: [
-        { direction: 'input', waveform: { shape: 'sine', amplitude: 100, period: 256, phase: 0, offset: 0 } },
+        { direction: 'input', waveform: { shape: 'sine-full', amplitude: 100, period: 256, phase: 0, offset: 0 } },
         { direction: 'output' },
         { direction: 'off' },
-        { direction: 'input', waveform: { shape: 'positive-sine', amplitude: 50, period: 16, phase: 0, offset: 0 } },
+        { direction: 'input', waveform: { shape: 'triangle-half', amplitude: 50, period: 128, phase: 0, offset: 0 } },
         { direction: 'output' },
         { direction: 'off' },
       ],
@@ -124,8 +172,8 @@ describe('exportCustomPuzzleAsSource', () => {
   it('handles multiple inputs and outputs', () => {
     const puzzle = makeCustomPuzzle({
       slots: [
-        { direction: 'input', waveform: { shape: 'sine', amplitude: 100, period: 256, phase: 0, offset: 0 } },
-        { direction: 'input', waveform: { shape: 'square', amplitude: 80, period: 128, phase: 0, offset: 0 } },
+        { direction: 'input', waveform: { shape: 'sine-full', amplitude: 100, period: 256, phase: 0, offset: 0 } },
+        { direction: 'input', waveform: { shape: 'square-half', amplitude: 80, period: 128, phase: 0, offset: 0 } },
         { direction: 'off' },
         { direction: 'output' },
         { direction: 'output' },
@@ -139,8 +187,8 @@ describe('exportCustomPuzzleAsSource', () => {
     const result = exportCustomPuzzleAsSource(puzzle);
     expect(result).toContain('activeInputs: 2');
     expect(result).toContain('activeOutputs: 2');
-    expect(result).toContain("shape: 'sine'");
-    expect(result).toContain("shape: 'square'");
+    expect(result).toContain("shape: 'sine-full'");
+    expect(result).toContain("shape: 'square-half'");
     // Both output sample arrays should be present
     expect(result).toContain('samples: [0, 50, 100]');
     expect(result).toContain('samples: [10, 20, 30]');

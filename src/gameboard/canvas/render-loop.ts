@@ -337,11 +337,9 @@ function handleCeremonyCompletion(state: ReturnType<typeof useGameStore.getState
     return;
   }
 
-  // Mark level as completed
+  // Mark level as completed — ceremony stays active for the React overlay
+  // (CompletionCeremony.tsx will call dismissCeremony when user clicks a button)
   state.completeLevel(ceremonyPuzzle.id);
-
-  // Clear ceremony data
-  state.dismissCeremony();
 }
 
 /**

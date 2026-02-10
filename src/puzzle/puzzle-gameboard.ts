@@ -1,4 +1,5 @@
-import type { GameboardState, NodeState } from '../shared/types/index.ts';
+import type { GameboardState, NodeState, Wire } from '../shared/types/index.ts';
+import { createWire } from '../shared/types/index.ts';
 import type { PuzzleDefinition } from './types.ts';
 import { createConnectionPointNode } from './connection-point-nodes.ts';
 
@@ -36,5 +37,36 @@ export function createPuzzleGameboard(puzzle: PuzzleDefinition): GameboardState 
     }
   }
 
-  return { id: `puzzle-${puzzle.id}`, nodes, wires: [] };
+  // Add initial nodes from puzzle definition
+  if (puzzle.initialNodes) {
+    for (const nodeDef of puzzle.initialNodes) {
+      const node: NodeState = {
+        id: nodeDef.id,
+        type: nodeDef.type,
+        position: { col: nodeDef.position.col, row: nodeDef.position.row },
+        params: { ...nodeDef.params },
+        inputCount: nodeDef.inputCount,
+        outputCount: nodeDef.outputCount,
+        rotation: nodeDef.rotation ?? 0,
+        locked: true, // Initial nodes are locked (player cannot move/delete)
+      };
+      nodes.set(node.id, node);
+    }
+  }
+
+  // Add initial wires from puzzle definition
+  const wires: Wire[] = [];
+  if (puzzle.initialWires) {
+    for (const wireDef of puzzle.initialWires) {
+      const wireId = `wire-${wireDef.source.nodeId}-${wireDef.source.portIndex}-${wireDef.target.nodeId}-${wireDef.target.portIndex}`;
+      const wire = createWire(
+        wireId,
+        { nodeId: wireDef.source.nodeId, portIndex: wireDef.source.portIndex, side: 'output' },
+        { nodeId: wireDef.target.nodeId, portIndex: wireDef.target.portIndex, side: 'input' },
+      );
+      wires.push(wire);
+    }
+  }
+
+  return { id: `puzzle-${puzzle.id}`, nodes, wires };
 }

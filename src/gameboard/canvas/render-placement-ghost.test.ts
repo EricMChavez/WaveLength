@@ -4,35 +4,63 @@ import type { RenderPlacementGhostState } from './render-placement-ghost.ts';
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import { GRID_COLS, GRID_ROWS, PLAYABLE_START, PLAYABLE_END } from '../../shared/grid/index.ts';
 
-// Minimal mock tokens
+// Mock tokens covering all properties used by drawNodeBody/drawNodePorts
 const tokens = {
   surfaceNode: '#44484e',
+  surfaceNodeBottom: '#33363b',
   textPrimary: '#e0e0f0',
   textSecondary: '#9090b0',
+  depthRaised: 'rgba(0,0,0,0.3)',
+  colorError: '#ff4444',
+  colorSelection: '#4488ff',
+  colorNeutral: '#888888',
+  signalPositive: '#F5AF28',
+  signalNegative: '#1ED2C3',
+  meterNeedle: '#E03838',
 } as ThemeTokens;
 
 const cellSize = 40;
 
 function makeCtx() {
+  const gradientStub = { addColorStop: vi.fn() };
   return {
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
     fill: vi.fn(),
+    stroke: vi.fn(),
+    arc: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
     fillText: vi.fn(),
     roundRect: vi.fn(),
     translate: vi.fn(),
     rotate: vi.fn(),
-    set globalAlpha(v: number) { /* noop */ },
+    createLinearGradient: vi.fn(() => gradientStub),
+    set globalAlpha(_v: number) { /* noop */ },
     get globalAlpha() { return 1; },
-    set fillStyle(v: string) { /* noop */ },
+    set fillStyle(_v: string) { /* noop */ },
     get fillStyle() { return ''; },
-    set font(v: string) { /* noop */ },
+    set strokeStyle(_v: string) { /* noop */ },
+    get strokeStyle() { return ''; },
+    set font(_v: string) { /* noop */ },
     get font() { return ''; },
-    set textAlign(v: string) { /* noop */ },
+    set textAlign(_v: string) { /* noop */ },
     get textAlign() { return 'start'; },
-    set textBaseline(v: string) { /* noop */ },
+    set textBaseline(_v: string) { /* noop */ },
     get textBaseline() { return 'alphabetic'; },
+    set lineWidth(_v: number) { /* noop */ },
+    get lineWidth() { return 1; },
+    set lineCap(_v: string) { /* noop */ },
+    get lineCap() { return 'butt'; },
+    set shadowColor(_v: string) { /* noop */ },
+    get shadowColor() { return ''; },
+    set shadowBlur(_v: number) { /* noop */ },
+    get shadowBlur() { return 0; },
+    set shadowOffsetX(_v: number) { /* noop */ },
+    get shadowOffsetX() { return 0; },
+    set shadowOffsetY(_v: number) { /* noop */ },
+    get shadowOffsetY() { return 0; },
   } as unknown as CanvasRenderingContext2D;
 }
 
@@ -69,30 +97,29 @@ describe('renderPlacementGhost', () => {
     expect(ctx.save).not.toHaveBeenCalled();
   });
 
-  it('draws ghost rect when placing node', () => {
+  it('draws ghost using real node renderer when placing node', () => {
     const ctx = makeCtx();
     const state = makeState();
     renderPlacementGhost(ctx, tokens, state, cellSize);
+    // Real renderer uses save/restore, gradient fill, roundRect, fillText, arc (ports)
     expect(ctx.save).toHaveBeenCalled();
+    expect(ctx.createLinearGradient).toHaveBeenCalled();
     expect(ctx.roundRect).toHaveBeenCalled();
     expect(ctx.fill).toHaveBeenCalled();
     expect(ctx.fillText).toHaveBeenCalled();
+    expect(ctx.arc).toHaveBeenCalled(); // ports
     expect(ctx.restore).toHaveBeenCalled();
   });
 
-  it('snaps position to grid with port-span-based body', () => {
+  it('snaps position to grid and renders at correct location', () => {
     const ctx = makeCtx();
     // Mouse at pixel (480, 365) → grid (12, 9) at cellSize 40
-    // col 12 is within padded bounds [11, 52] for 3-wide
     const state = makeState({ mousePosition: { x: 480, y: 365 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    // multiply node: 1 input, 1 output, 3 cols x 2 rows
-    // Port centered at row 1 (floor(2/2)), port span = 1
-    // Body x = col * cellSize = 12 * 40 = 480
-    // Body y = (row + portRow - 0.5) * cellSize = (9 + 1 - 0.5) * 40 = 380
-    // Body width = 3 * 40 = 120, height = 1 * 40 = 40
+    // multiply node: 3 cols x 2 rows, rotation 0
+    // getNodeBodyPixelRect: bodyTop=-0.5, bodyBottom=1.5 → y=(9-0.5)*40=340, h=80
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      480, 380, 120, 40, expect.any(Number),
+      480, 340, 120, 80, expect.any(Number),
     );
   });
 
@@ -101,11 +128,9 @@ describe('renderPlacementGhost', () => {
     // Mouse at col 2 (inside meter zone) → should clamp to PLAYABLE_START + 1 (11)
     const state = makeState({ mousePosition: { x: 2 * cellSize + 5, y: 400 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    // Should snap to col PLAYABLE_START + 1 → pixel x = (PLAYABLE_START + 1) * cellSize
-    // multiply: 3 cols x 2 rows, single port at row 1, port span = 1
-    // Body width = 3 * cellSize = 120, height = 1 * cellSize = 40
+    // Node at col 11: body x = 11 * 40 = 440, height = 80 (full 2-row body)
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      (PLAYABLE_START + 1) * cellSize, expect.any(Number), 120, 40, expect.any(Number),
+      (PLAYABLE_START + 1) * cellSize, expect.any(Number), 120, 80, expect.any(Number),
     );
   });
 
@@ -114,15 +139,13 @@ describe('renderPlacementGhost', () => {
     // Mouse at col 60 → 3-wide node clamps to (PLAYABLE_END - 3) = 52
     const state = makeState({ mousePosition: { x: 60 * cellSize + 5, y: 400 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    const maxStartCol = PLAYABLE_END - 3; // 55 - 3 = 52
-    // multiply: 3 cols x 2 rows, single port at row 1, port span = 1
-    // Body width = 3 * cellSize = 120, height = 1 * cellSize = 40
+    const maxStartCol = PLAYABLE_END - 3;
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      maxStartCol * cellSize, expect.any(Number), 120, 40, expect.any(Number),
+      maxStartCol * cellSize, expect.any(Number), 120, 80, expect.any(Number),
     );
   });
 
-  it('draws label centered in ghost rect', () => {
+  it('draws label centered in ghost', () => {
     const ctx = makeCtx();
     const state = makeState();
     renderPlacementGhost(ctx, tokens, state, cellSize);

@@ -314,6 +314,18 @@ function drawPort(
   ctx.stroke();
 }
 
+/** Draw a single node (body + ports) without selection highlight. Used by ghost preview. */
+export function drawSingleNode(
+  ctx: CanvasRenderingContext2D,
+  tokens: ThemeTokens,
+  node: NodeState,
+  state: RenderNodesState,
+  cellSize: number,
+): void {
+  drawNodeBody(ctx, tokens, state, node, cellSize);
+  drawNodePorts(ctx, tokens, node, cellSize, state.portSignals);
+}
+
 function drawSelectionHighlight(
   ctx: CanvasRenderingContext2D,
   tokens: ThemeTokens,

@@ -87,15 +87,19 @@ export function PalettePanel() {
         })}
       </div>
 
-      <button className={`${styles.item} ${styles.createCustomBtn}`} onClick={handleCreateCustom}>
-        + Create Custom Node
-      </button>
-
-      {utilityNodes.size > 0 && (
+      {/* Custom node creation and user nodes - only shown when 'custom' is allowed */}
+      {(!allowedNodes || allowedNodes.includes('custom')) && (
         <>
-          <h3 className={styles.title}>Custom</h3>
-          <div className={styles.list}>
-            {Array.from(utilityNodes.values()).map((entry) => {
+          <button className={`${styles.item} ${styles.createCustomBtn}`} onClick={handleCreateCustom}>
+            + Create Custom Node
+          </button>
+
+          {utilityNodes.size > 0 && (
+            <>
+              <h3 className={styles.title}>Custom</h3>
+              <div className={styles.list}>
+                {Array.from(utilityNodes.values())
+            .map((entry) => {
               const nodeType = `utility:${entry.utilityId}`;
               const isActive =
                 interactionMode.type === 'placing-node' &&
@@ -134,7 +138,9 @@ export function PalettePanel() {
                 </div>
               );
             })}
-          </div>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
