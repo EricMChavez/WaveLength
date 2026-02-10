@@ -20,6 +20,7 @@ interface ParamEntry {
   max: string;
   step: string;
   options: string; // comma-separated for string enums
+  linkedInput: string; // input port name this param is delivered through ('' = direct param)
 }
 
 type ActiveTab = 'form' | 'preview';
@@ -31,7 +32,7 @@ function makePort(): PortEntry {
 }
 
 function makeParam(): ParamEntry {
-  return { key: '', type: 'number', default: '0', label: '', min: '', max: '', step: '', options: '' };
+  return { key: '', type: 'number', default: '0', label: '', min: '', max: '', step: '', options: '', linkedInput: '' };
 }
 
 function toKebab(s: string): string {
@@ -191,10 +192,34 @@ function generateCode(
     lines.push(`  createState: create${pascal}State,`);
   }
 
+  // Determine which params are linked vs direct
+  const linkedParams = params.filter((p) => p.linkedInput);
+  const directParams = params.filter((p) => !p.linkedInput);
+  const needsParamsInEval = directParams.length > 0;
+
   // Evaluate
   lines.push('');
-  const evalBody = evaluateBody.trim() || `// TODO: implement\n    return [${outputs.map(() => '0').join(', ')}];`;
-  lines.push(`  evaluate: (${isStateful ? '{ inputs, params, state }' : hasParams ? '{ inputs, params }' : '{ inputs }'}) => {`);
+  let evalBody = evaluateBody.trim();
+  if (!evalBody) {
+    // Generate a helpful TODO body with linked-param hints
+    const todoLines: string[] = [];
+    if (linkedParams.length > 0) {
+      for (const lp of linkedParams) {
+        const portIndex = inputs.findIndex((inp) => inp.name === lp.linkedInput);
+        todoLines.push(`// '${lp.key}' knob value delivered via inputs[${portIndex}] (port '${lp.linkedInput}')`);
+      }
+    }
+    todoLines.push(`// TODO: implement`);
+    todoLines.push(`return [${outputs.map(() => '0').join(', ')}];`);
+    evalBody = todoLines.join('\n    ');
+  }
+
+  const evalDestructure = isStateful
+    ? '{ inputs, params, state }'
+    : needsParamsInEval
+      ? '{ inputs, params }'
+      : '{ inputs }';
+  lines.push(`  evaluate: (${evalDestructure}) => {`);
   lines.push(indent(evalBody, 4));
   lines.push('  },');
 
@@ -203,6 +228,46 @@ function generateCode(
   lines.push(`  size: { width: ${width}, height: ${height} },`);
 
   lines.push('});');
+
+  // Registration instructions
+  lines.push('');
+  lines.push('// ─── Registration ────────────────────────────────────────────────────────');
+  lines.push(`// 1. Save as: src/engine/nodes/definitions/${kebab}.ts`);
+  lines.push('// 2. Barrel export in src/engine/nodes/definitions/index.ts:');
+  if (hasParams) {
+    lines.push(`//      export { ${constName}, type ${pascal}Params } from './${kebab}';`);
+  } else {
+    lines.push(`//      export { ${constName} } from './${kebab}';`);
+  }
+  lines.push('// 3. Registry in src/engine/nodes/registry.ts — add to NODE_DEFINITIONS:');
+  lines.push(`//      ${constName} as NodeDefinition<Record<string, ParamValue>>,`);
+
+  // ParameterPopover skeleton for linked params
+  if (linkedParams.length > 0) {
+    lines.push('//');
+    lines.push('// 4. ParameterPopover controls (src/ui/overlays/ParameterPopover.tsx):');
+    lines.push(`//    The knob for linked params must call BOTH updateNodeParams() AND`);
+    lines.push(`//    setPortConstant() so the value feeds through the input port.`);
+    lines.push('//');
+    lines.push(`//    function ${pascal}Controls({ node, updateNodeParams }: ControlProps) {`);
+    lines.push(`//      const setPortConstant = useGameStore((s) => s.setPortConstant);`);
+    for (const lp of linkedParams) {
+      const portIndex = inputs.findIndex((inp) => inp.name === lp.linkedInput);
+      lines.push(`//      // '${lp.key}' → port ${portIndex} ('${lp.linkedInput}')`);
+    }
+    lines.push('//      return (');
+    lines.push('//        <div>');
+    for (const lp of linkedParams) {
+      const portIndex = inputs.findIndex((inp) => inp.name === lp.linkedInput);
+      lines.push(`//          <button onClick={() => {`);
+      lines.push(`//            updateNodeParams(node.id, { ${lp.key}: value });`);
+      lines.push(`//            setPortConstant(node.id, ${portIndex}, value);`);
+      lines.push(`//          }}>{/* ${lp.label || lp.key} knob */}</button>`);
+    }
+    lines.push('//        </div>');
+    lines.push('//      );');
+    lines.push('//    }');
+  }
 
   return lines.join('\n');
 }
@@ -433,7 +498,7 @@ function NodeCreationFormInner() {
   // ─── Param row renderer ─────────────────────────────────────────────────
 
   const renderParamRow = (param: ParamEntry, index: number) => (
-    <div className={styles.listItem} key={index}>
+    <div className={styles.listItem} key={index} style={{ flexWrap: 'wrap' }}>
       <div className={styles.listItemFieldGrow}>
         <label className={styles.label}>Key</label>
         <input
@@ -478,6 +543,19 @@ function NodeCreationFormInner() {
           placeholder="Gain"
           maxLength={30}
         />
+      </div>
+      <div className={styles.listItemFieldMed}>
+        <label className={styles.label}>Linked Input</label>
+        <select
+          className={styles.select}
+          value={param.linkedInput}
+          onChange={(e) => updateParam(index, 'linkedInput', e.target.value)}
+        >
+          <option value="">None (direct)</option>
+          {inputs.map((inp, i) => (
+            <option key={i} value={inp.name}>{inp.name || `Input ${i}`}</option>
+          ))}
+        </select>
       </div>
       {param.type === 'number' && (
         <>
@@ -715,6 +793,8 @@ function NodeCreationFormInner() {
                   Available: inputs (Signal[]), params (your params type)
                   {isStateful ? ', state (cast to your State type)' : ''}.
                   Must return Signal[] matching output count. Always clamp() results.
+                  {params.some((p) => p.linkedInput) &&
+                    ' Linked params are delivered via inputs[] — read from the input index, not params.'}
                 </span>
               </div>
 
