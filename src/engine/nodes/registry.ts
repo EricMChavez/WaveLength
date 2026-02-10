@@ -15,6 +15,8 @@ import {
   diverterNode,
   polarizerNode,
   shifterNode,
+  splitterNode,
+  mergerNode,
 } from './definitions';
 
 // =============================================================================
@@ -33,6 +35,8 @@ const NODE_DEFINITIONS: readonly NodeDefinition<Record<string, ParamValue>>[] = 
   diverterNode as NodeDefinition<Record<string, ParamValue>>,
   polarizerNode,
   shifterNode as NodeDefinition<Record<string, ParamValue>>,
+  splitterNode as NodeDefinition<Record<string, ParamValue>>, 
+  mergerNode as NodeDefinition<Record<string, ParamValue>>,
 ] as const;
 
 // =============================================================================
