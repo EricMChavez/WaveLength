@@ -86,12 +86,13 @@ describe('drawMeter', () => {
     const state: RenderMeterState = { slot, signalValues: null, targetValues: null, playpoint: 0 };
     drawMeter(ctx, mockTokens, state, testRect);
 
-    // Should have fillRect calls for housing + interior + dimmed overlay
+    // Housing + interior use roundRect+fill; dimmed overlay uses fillRect
     const fillRectCalls = ctx._calls.filter((c) => c.startsWith('fillRect'));
-    expect(fillRectCalls.length).toBe(3); // housing + interior + dimmed overlay
-    // Interior drawing uses beginPath for cutout clipping
+    expect(fillRectCalls.length).toBe(1); // dimmed overlay only
+    const roundRectCalls = ctx._calls.filter((c) => c.startsWith('roundRect'));
+    expect(roundRectCalls.length).toBe(2); // housing + interior
     const beginPathCalls = ctx._calls.filter((c) => c.startsWith('beginPath'));
-    expect(beginPathCalls).toHaveLength(1); // interior cutout clip path only
+    expect(beginPathCalls.length).toBeGreaterThanOrEqual(3); // housing + interior cutout clip + interior fill
   });
 
   it('active state draws interior, centerline, and channels', () => {
@@ -100,11 +101,13 @@ describe('drawMeter', () => {
     const state: RenderMeterState = { slot, signalValues: [50, -30], targetValues: null, playpoint: 0 };
     drawMeter(ctx, mockTokens, state, testRect);
 
-    // Should have housing + interior fill + channel draws
+    // Housing + interior use roundRect+fill; level bar uses fillRect
     const fillRectCalls = ctx._calls.filter((c) => c.startsWith('fillRect'));
-    expect(fillRectCalls.length).toBeGreaterThanOrEqual(3); // housing + interior + level bar fill
+    expect(fillRectCalls.length).toBeGreaterThanOrEqual(1); // level bar fill
+    const roundRectCalls = ctx._calls.filter((c) => c.startsWith('roundRect'));
+    expect(roundRectCalls.length).toBeGreaterThanOrEqual(2); // housing + interior
     const beginPathCalls = ctx._calls.filter((c) => c.startsWith('beginPath'));
-    expect(beginPathCalls.length).toBeGreaterThanOrEqual(1); // interior cutout + centerline + needle + waveform
+    expect(beginPathCalls.length).toBeGreaterThanOrEqual(3); // housing + interior cutout + interior fill + channels
   });
 
   it('does not import useGameStore or COLORS', async () => {

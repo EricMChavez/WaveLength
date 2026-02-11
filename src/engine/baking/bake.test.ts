@@ -157,10 +157,10 @@ describe('cycle-based evaluation', () => {
     expect(output[0]).toBe(-60);
   });
 
-  it('two-input Shifter', () => {
+  it('two-input Offset', () => {
     const { nodes, wires } = buildGraph(
       2, 1,
-      [makeNode('shft1', 'shifter', 2, 1)],
+      [makeNode('shft1', 'offset', 2, 1)],
       [
         { from: cpInputId(0), fromPort: 0, to: 'shft1', toPort: 0 },
         { from: cpInputId(1), fromPort: 0, to: 'shft1', toPort: 1 },
@@ -262,15 +262,15 @@ describe('cycle-based evaluation', () => {
   });
 
   it('all node types in one graph', () => {
-    // CP0 → Inverter → Shifter(port0)
-    // CP1 → Amp(port0), CP2 → Amp(port1) → Shifter(port1)
-    // Shifter → Polarizer → Out0
+    // CP0 → Inverter → Offset(port0)
+    // CP1 → Amp(port0), CP2 → Amp(port1) → Offset(port1)
+    // Offset → Polarizer → Out0
     const { nodes, wires } = buildGraph(
       3, 1,
       [
         makeNode('inv', 'inverter', 1, 1),
         makeNode('amp1', 'amp', 2, 1),
-        makeNode('shft', 'shifter', 2, 1),
+        makeNode('shft', 'offset', 2, 1),
         makeNode('pol', 'polarizer', 1, 1),
       ],
       [
@@ -293,7 +293,7 @@ describe('cycle-based evaluation', () => {
 
     // Inverter(40) = -40
     // Amp(20, 50) = 20 * (1 + 50/100) = 20 * 1.5 = 30
-    // Shifter(-40, 30) = -10
+    // Offset(-40, 30) = -10
     // Polarizer(-10) = -100 (negative input → -100)
     expect(output[0]).toBe(-100);
   });
@@ -307,7 +307,7 @@ describe('metadata serialization roundtrip', () => {
       2, 1,
       [
         makeNode('inv', 'inverter', 1, 1),
-        makeNode('shft1', 'shifter', 2, 1),
+        makeNode('shft1', 'offset', 2, 1),
       ],
       [
         { from: cpInputId(0), fromPort: 0, to: 'inv', toPort: 0 },
@@ -371,7 +371,7 @@ describe('edge cases', () => {
   it('unconnected input ports default to 0', () => {
     const { nodes, wires } = buildGraph(
       1, 1,
-      [makeNode('shft1', 'shifter', 2, 1)],
+      [makeNode('shft1', 'offset', 2, 1)],
       [
         { from: cpInputId(0), fromPort: 0, to: 'shft1', toPort: 0 },
         { from: 'shft1', fromPort: 0, to: cpOutputId(0), toPort: 0 },
@@ -440,10 +440,10 @@ describe('edge cases', () => {
     expect(output[1]).toBe(40);
   });
 
-  it('clamping: Shifter with values exceeding range', () => {
+  it('clamping: Offset with values exceeding range', () => {
     const { nodes, wires } = buildGraph(
       2, 1,
-      [makeNode('shft1', 'shifter', 2, 1)],
+      [makeNode('shft1', 'offset', 2, 1)],
       [
         { from: cpInputId(0), fromPort: 0, to: 'shft1', toPort: 0 },
         { from: cpInputId(1), fromPort: 0, to: 'shft1', toPort: 1 },
@@ -456,7 +456,7 @@ describe('edge cases', () => {
     if (!result.ok) return;
 
     const output = result.value.evaluate([80, 80]);
-    // Shifter: 80 + 80 = 160, clamped to 100
+    // Offset: 80 + 80 = 160, clamped to 100
     expect(output[0]).toBe(100);
   });
 });

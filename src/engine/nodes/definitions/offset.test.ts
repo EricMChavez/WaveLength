@@ -1,26 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { shifterNode } from './shifter';
+import { offsetNode } from './offset';
 
-describe('Shifter node', () => {
+describe('Offset node', () => {
   const evaluate = (a: number, x: number) =>
-    shifterNode.evaluate({
+    offsetNode.evaluate({
       inputs: [a, x],
-      params: { shift: 0 },
+      params: { offset: 0 },
       state: undefined,
       tickIndex: 0,
     });
 
   it('has correct metadata', () => {
-    expect(shifterNode.type).toBe('shifter');
-    expect(shifterNode.category).toBe('math');
-    expect(shifterNode.inputs).toHaveLength(2);
-    expect(shifterNode.outputs).toHaveLength(1);
-    expect(shifterNode.size).toEqual({ width: 4, height: 3 });
+    expect(offsetNode.type).toBe('offset');
+    expect(offsetNode.category).toBe('math');
+    expect(offsetNode.inputs).toHaveLength(2);
+    expect(offsetNode.outputs).toHaveLength(1);
+    expect(offsetNode.size).toEqual({ width: 4, height: 3 });
   });
 
   it('has X input with bottom side override', () => {
-    expect(shifterNode.inputs[1].name).toBe('X');
-    expect(shifterNode.inputs[1].side).toBe('bottom');
+    expect(offsetNode.inputs[1].name).toBe('X');
+    expect(offsetNode.inputs[1].side).toBe('bottom');
   });
 
   it('adds A + X', () => {
@@ -66,10 +66,10 @@ describe('Shifter node', () => {
     expect(evaluate(a, 100)).toEqual([100]); // clamped from 140
   });
 
-  it('has shift parameter with correct config', () => {
-    expect(shifterNode.params).toHaveLength(1);
-    const param = shifterNode.params![0];
-    expect(param.key).toBe('shift');
+  it('has offset parameter with correct config', () => {
+    expect(offsetNode.params).toHaveLength(1);
+    const param = offsetNode.params![0];
+    expect(param.key).toBe('offset');
     expect(param.default).toBe(0);
     expect(param.min).toBe(-100);
     expect(param.max).toBe(100);

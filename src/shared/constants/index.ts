@@ -69,7 +69,7 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
   amp: 'Amp',
   diverter: 'Diverter',
   polarizer: 'Polarizer',
-  shifter: 'Shifter',
+  offset: 'Offset',
   memory: 'Memory',
   // Custom blank (unsaved utility node)
   'custom-blank': 'Custom',
@@ -85,5 +85,5 @@ export const KNOB_NODES: Record<string, { portIndex: number; paramKey: string }>
   mixer: { portIndex: 2, paramKey: 'mix' },
   amp: { portIndex: 1, paramKey: 'gain' },
   diverter: { portIndex: 1, paramKey: 'fade' },
-  shifter: { portIndex: 1, paramKey: 'shift' },
+  offset: { portIndex: 1, paramKey: 'offset' },
 };

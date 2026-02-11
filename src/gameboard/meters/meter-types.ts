@@ -49,7 +49,7 @@ export function meterKey(side: MeterSide, index: number): MeterKey {
  */
 export const CHANNEL_RATIOS = {
   waveform: 0.754,
-  gapA: 0.006,
+  gapA: 0.00,
   levelBar: 0.18,
   gapB: 0.00,
   needle: 0.06,

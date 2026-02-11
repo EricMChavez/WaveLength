@@ -4,10 +4,13 @@ import type { MeterSlotState } from './meter-types.ts';
 import { CHANNEL_RATIOS, VERTICAL_HEIGHT_RATIO, METER_BUFFER_CAPACITY } from './meter-types.ts';
 import { drawWaveformChannel } from './render-waveform-channel.ts';
 import { drawLevelBar, type LevelBarCutout } from './render-level-bar.ts';
-import { drawNeedle } from './render-needle.ts';
+import { drawNeedle, type NeedleTip } from './render-needle.ts';
 import { drawTargetOverlay } from './render-target-overlay.ts';
 
 import { getDevOverrides } from '../../dev/index.ts';
+
+/** Ratio of border radius to drawn meter height for outside corners */
+const OUTSIDE_CORNER_RADIUS_RATIO = 0.06;
 
 /** Data needed to render a single meter, assembled by the render loop */
 export interface RenderMeterState {
@@ -57,13 +60,13 @@ export function drawMeter(
   const housingColor = devOverrides.enabled
     ? devOverrides.colors.meterInterior
     : tokens.meterHousing;
-  drawMeterHousing(ctx, housingColor, waveformRect, levelBarRect);
+  drawMeterHousing(ctx, housingColor, waveformRect, levelBarRect, slot.side);
 
   // Draw meter interior background (behind waveform + levelBar, respecting cutout)
   const meterInteriorColor = devOverrides.enabled
     ? devOverrides.colors.meterInterior
     : tokens.meterInterior;
-  drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout);
+  drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout, slot.side);
 
   if (slot.visualState === 'dimmed') {
     // Dimmed: draw a semi-transparent overlay and return
@@ -107,7 +110,7 @@ export function drawMeter(
   }
 
   drawLevelBar(ctx, tokens, currentValue, levelBarRect, cutout);
-  drawNeedle(ctx, tokens, currentValue, needleRect, slot.side);
+  const needleTip = drawNeedle(ctx, tokens, currentValue, needleRect, slot.side);
 
   // Target overlay for output meters
   if (targetValues && slot.direction === 'output') {
@@ -115,6 +118,7 @@ export function drawMeter(
   }
 
   // Playpoint indicator line (vertical line at current cycle position)
+  // and connector line from needle tip to playpoint indicator
   if (signalValues && signalValues.length > 0) {
     const wfCenterY = rect.y + rect.height / 2;
     const halfHeight = (waveformRect.height * VERTICAL_HEIGHT_RATIO) / 2;
@@ -128,6 +132,9 @@ export function drawMeter(
     ctx.lineTo(indicatorX, wfCenterY + halfHeight);
     ctx.stroke();
     ctx.restore();
+
+    // Faint horizontal connector from needle tip to playpoint indicator
+    drawNeedleConnector(ctx, needleTip, indicatorX, slot.side);
   }
 
   ctx.restore();
@@ -162,21 +169,29 @@ function drawMeterBorder(
   const top = centerY - halfHeight;
   const height = halfHeight * 2;
 
+  const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
+
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
 
   if (side === 'left') {
     // Draw top, left, bottom (skip right edge facing gameboard)
+    // Outside corners: top-left, bottom-left
     ctx.moveTo(left + width, top);
-    ctx.lineTo(left, top);
-    ctx.lineTo(left, top + height);
+    ctx.lineTo(left + r, top);
+    ctx.arcTo(left, top, left, top + r, r);
+    ctx.lineTo(left, top + height - r);
+    ctx.arcTo(left, top + height, left + r, top + height, r);
     ctx.lineTo(left + width, top + height);
   } else {
     // Draw top, right, bottom (skip left edge facing gameboard)
+    // Outside corners: top-right, bottom-right
     ctx.moveTo(left, top);
-    ctx.lineTo(left + width, top);
-    ctx.lineTo(left + width, top + height);
+    ctx.lineTo(left + width - r, top);
+    ctx.arcTo(left + width, top, left + width, top + r, r);
+    ctx.lineTo(left + width, top + height - r);
+    ctx.arcTo(left + width, top + height, left + width - r, top + height, r);
     ctx.lineTo(left, top + height);
   }
 
@@ -271,6 +286,7 @@ function drawMeterInterior(
   waveformRect: PixelRect,
   levelBarRect: PixelRect,
   cutout: LevelBarCutout,
+  side: 'left' | 'right',
 ): void {
   const verticalHeightRatio = VERTICAL_HEIGHT_RATIO;
 
@@ -310,9 +326,13 @@ function drawMeterInterior(
   ctx.arc(cutout.centerX, cutout.centerY, cutout.radius, 0, Math.PI * 2, true);
   ctx.clip('evenodd');
 
-  // Fill the interior
+  // Fill the interior with rounded outside corners
+  const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
+  const radii: [number, number, number, number] = side === 'left' ? [r, 0, 0, r] : [0, r, r, 0];
   ctx.fillStyle = color;
-  ctx.fillRect(left, top, width, height);
+  ctx.beginPath();
+  ctx.roundRect(left, top, width, height, radii);
+  ctx.fill();
 
   ctx.restore();
 }
@@ -326,6 +346,7 @@ function drawMeterHousing(
   color: string,
   waveformRect: PixelRect,
   levelBarRect: PixelRect,
+  side: 'left' | 'right',
 ): void {
   const left = Math.min(waveformRect.x, levelBarRect.x);
   const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
@@ -335,6 +356,38 @@ function drawMeterHousing(
   const top = centerY - halfHeight;
   const height = halfHeight * 2;
 
+  const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
+  // [topLeft, topRight, bottomRight, bottomLeft]
+  const radii: [number, number, number, number] = side === 'left' ? [r, 0, 0, r] : [0, r, r, 0];
+
   ctx.fillStyle = color;
-  ctx.fillRect(left, top, width, height);
+  ctx.beginPath();
+  ctx.roundRect(left, top, width, height, radii);
+  ctx.fill();
+}
+
+/**
+ * Draw a faint white horizontal line from the needle tip to the playpoint indicator.
+ * Provides a visual link between the current value (needle) and the waveform position.
+ */
+function drawNeedleConnector(
+  ctx: CanvasRenderingContext2D,
+  needleTip: NeedleTip,
+  indicatorX: number,
+  side: 'left' | 'right',
+): void {
+  // For left meters the indicator is to the left of the needle tip;
+  // for right meters it's to the right.
+  const fromX = side === 'left' ? indicatorX : needleTip.tipX;
+  const toX = side === 'left' ? needleTip.tipX : indicatorX;
+
+  ctx.save();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.15;
+  ctx.beginPath();
+  ctx.moveTo(fromX, needleTip.tipY);
+  ctx.lineTo(toX, needleTip.tipY);
+  ctx.stroke();
+  ctx.restore();
 }

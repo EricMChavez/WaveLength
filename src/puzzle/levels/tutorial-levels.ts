@@ -206,16 +206,16 @@ export const AMP: PuzzleDefinition = {
   ],
 };
 
-export const SHIFTER: PuzzleDefinition = {
-  id: 'shifter',
-  title: 'Shifter',
-  description: 'Reduce the amplitude of the input waveform then shift to positive polarity',
+export const OFFSET: PuzzleDefinition = {
+  id: 'offset',
+  title: 'Offset',
+  description: 'Reduce the amplitude of the input waveform then offset to positive polarity',
   activeInputs: 1,
   activeOutputs: 1,
   allowedNodes: ['inverter', 'polarizer', 'amp', 'mixer'],
   testCases: [
     {
-      name: 'Shifter',
+      name: 'Offset',
       inputs: [
         {
           shape: 'sine-quarter',
@@ -250,7 +250,7 @@ export const SHIFTER: PuzzleDefinition = {
     ],
   },
   initialNodes: [
-    { id: '5a680db7-3357-482c-8463-80f5bbd46ae2', type: 'shifter', position: { col: 30, row: 10 }, params: {"shift":0}, inputCount: 2, outputCount: 1 },
+    { id: '5a680db7-3357-482c-8463-80f5bbd46ae2', type: 'offset', position: { col: 30, row: 10 }, params: {"offset":0}, inputCount: 2, outputCount: 1 },
   ],
 };
 
@@ -261,7 +261,7 @@ export const DIVERTER: PuzzleDefinition = {
   description: 'Clip(amplify) the input waveform then diverter into two outputs',
   activeInputs: 1,
   activeOutputs: 2,
-  allowedNodes: ['inverter', 'polarizer', 'mixer', 'amp', 'shifter'],
+  allowedNodes: ['inverter', 'polarizer', 'mixer', 'amp', 'offset'],
   testCases: [
     {
       name: 'Diverter',
@@ -317,7 +317,7 @@ export const DELAY: PuzzleDefinition = {
   description: 'Use the square wave to control the diverter, use delay to line up the waveforms.',
   activeInputs: 2,
   activeOutputs: 2,
-  allowedNodes: ['inverter', 'mixer', 'amp', 'diverter', 'polarizer', 'shifter'],
+  allowedNodes: ['inverter', 'mixer', 'amp', 'diverter', 'polarizer', 'offset'],
   testCases: [
     {
       name: 'Delay',

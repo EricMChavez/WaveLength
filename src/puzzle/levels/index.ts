@@ -5,7 +5,7 @@ import type { PuzzleDefinition } from '../types.ts';
 // import { SIGNAL_EXAMPLE } from './signal-shaping-levels.ts';
 // import { TIMING_EXAMPLE } from './timing-levels.ts';
 // import { ADVANCED_EXAMPLE } from './advanced-levels.ts';
-import { INVERTER, POLARIZER, MIXER, AMP, SHIFTER, DIVERTER, DELAY, LEVEL_1 } from './tutorial-levels.ts';
+import { INVERTER, POLARIZER, MIXER, AMP, OFFSET, DIVERTER, DELAY, LEVEL_1 } from './tutorial-levels.ts';
 /** All available puzzle levels in order */
 export const PUZZLE_LEVELS: PuzzleDefinition[] = [
   // Add levels here in play order as they're created
@@ -13,7 +13,7 @@ export const PUZZLE_LEVELS: PuzzleDefinition[] = [
   POLARIZER,
   MIXER,
   AMP,
-  SHIFTER,
+  OFFSET,
   DIVERTER,
   DELAY,
   LEVEL_1

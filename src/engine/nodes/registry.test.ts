@@ -17,7 +17,7 @@ describe('Node Registry', () => {
       expect(nodeRegistry.allTypes).toContain('amp');
       expect(nodeRegistry.allTypes).toContain('diverter');
       expect(nodeRegistry.allTypes).toContain('polarizer');
-      expect(nodeRegistry.allTypes).toContain('shifter');
+      expect(nodeRegistry.allTypes).toContain('offset');
     });
 
     it('has correct count', () => {
@@ -30,7 +30,7 @@ describe('Node Registry', () => {
     });
 
     it('has byCategory lookup', () => {
-      expect(nodeRegistry.byCategory.math).toHaveLength(4); // inverter, amp, polarizer, shifter
+      expect(nodeRegistry.byCategory.math).toHaveLength(4); // inverter, amp, polarizer, offset
       expect(nodeRegistry.byCategory.routing).toHaveLength(4); // mixer, diverter, splitter, merger
       expect(nodeRegistry.byCategory.timing).toHaveLength(1); // memory
     });

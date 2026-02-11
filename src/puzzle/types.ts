@@ -96,6 +96,13 @@ export function buildCustomNodeConnectionPointConfig(): ConnectionPointConfig {
   };
 }
 
+/** A user-defined waveform entry (paste into custom-waveforms.ts). */
+export interface CustomWaveformEntry {
+  id: string;
+  name: string;
+  samples: number[]; // 256 values, each [-100, +100]
+}
+
 /** Serialized node for initial puzzle state */
 export interface InitialNodeDef {
   id: string;

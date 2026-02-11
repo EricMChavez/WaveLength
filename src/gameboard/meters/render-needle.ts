@@ -25,13 +25,18 @@ const EYE_RADIUS = 3;
  * The needle tip tracks the edge of the bar level - it rotates to place
  * its tip inline with the top/bottom of the filled bar area.
  */
+export interface NeedleTip {
+  tipX: number;
+  tipY: number;
+}
+
 export function drawNeedle(
   ctx: CanvasRenderingContext2D,
   tokens: ThemeTokens,
   currentValue: number,
   rect: PixelRect,
   side: 'left' | 'right',
-): void {
+): NeedleTip {
   const clamped = Math.max(-100, Math.min(100, currentValue));
   const normalized = clamped / 100; // -1..+1
 
@@ -95,4 +100,6 @@ export function drawNeedle(
   ctx.fill();
 
   ctx.restore();
+
+  return { tipX, tipY };
 }

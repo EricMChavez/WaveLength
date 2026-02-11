@@ -25,6 +25,33 @@
   border-bottom: 1px solid #3a3a5a;
 }
 
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backButton {
+  background: none;
+  border: 1px solid #4a4a6a;
+  border-radius: 4px;
+  color: #9090b0;
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.backButton:hover {
+  background: #3a3a5e;
+  color: #e0e0f0;
+}
+
 .title {
   color: #e0e0f0;
   font-size: 14px;
@@ -35,7 +62,29 @@
 .subtitle {
   color: #9090b0;
   font-size: 11px;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+
+.stepIndicator {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  justify-content: center;
+}
+
+.stepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3a3a5a;
+}
+
+.stepDot.active {
+  background: #3a7bd5;
+}
+
+.stepDot.completed {
+  background: #5a9bf5;
 }
 
 .list {
@@ -103,4 +152,45 @@
 .offItem.active {
   background: #4a4a6a;
   color: #e0e0f0;
+}
+
+.exportButton {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 4px 12px 4px;
+  padding: 6px 12px;
+  background: #2e3d5a;
+  border: 1px solid #4a5a7a;
+  border-radius: 4px;
+  color: #9090b0;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.exportButton:hover {
+  background: #3a4d6a;
+  color: #e0e0f0;
+}
+
+.copiedFeedback {
+  color: #5af5a0;
+}
+
+.sectionHeader {
+  color: #7070a0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+}
+
+.emptyMessage {
+  color: #606080;
+  font-size: 12px;
+  padding: 8px 12px;
+  font-style: italic;
+  line-height: 1.4;
 }

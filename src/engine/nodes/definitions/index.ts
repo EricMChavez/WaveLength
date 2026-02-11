@@ -4,7 +4,7 @@ export { mixerNode, type MixerParams } from './mixer';
 export { ampNode, type AmpParams } from './amp';
 export { diverterNode, type DiverterParams } from './diverter';
 export { polarizerNode } from './polarizer';
-export { shifterNode, type ShifterParams } from './shifter';
+export { offsetNode, type OffsetParams } from './offset';
 export { splitterNode } from './splitter';
 export { mergerNode } from './merger';
 export { memoryNode, createMemoryState, type MemoryState } from './memory';

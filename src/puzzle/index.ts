@@ -1,4 +1,4 @@
-export type { WaveformShape, WaveformDef, PuzzleTestCase, PuzzleDefinition } from './types.ts';
+export type { WaveformShape, WaveformDef, PuzzleTestCase, PuzzleDefinition, CustomWaveformEntry } from './types.ts';
 export { generateWaveformValue } from './waveform-generators.ts';
 export {
   cpInputId,
@@ -10,3 +10,5 @@ export {
   createConnectionPointNode,
 } from './connection-point-nodes.ts';
 export { PUZZLE_LEVELS, getPuzzleById } from './levels/index.ts';
+export { CUSTOM_WAVEFORMS } from './custom-waveforms.ts';
+export { extractOutputSamples, formatCustomWaveformEntry } from './export-waveform.ts';

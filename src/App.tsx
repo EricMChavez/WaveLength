@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { GameboardCanvas } from './gameboard/canvas/index.ts'
 import { SimulationControls } from './ui/controls/SimulationControls.tsx'
 import { NavigationBar } from './ui/controls/NavigationBar.tsx'
-import { PuzzleInfoBar } from './ui/puzzle/PuzzleInfoBar.tsx'
 import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
 import { ZoomTransition } from './ui/puzzle/ZoomTransition.tsx'
 import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, LevelSelectOverlay, SavePuzzleDialog, NodeCreationForm } from './ui/overlays/index.ts'
@@ -100,7 +99,6 @@ function App() {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <GameboardCanvas />
       <NavigationBar />
-      <PuzzleInfoBar />
       <SimulationControls />
       <PortConstantInput />
       <PaletteModal />
