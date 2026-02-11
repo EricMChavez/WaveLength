@@ -1,12 +1,10 @@
 import type { NodeId, NodeState, Wire } from '../../shared/types/index.ts';
-import { createWire, WIRE_BUFFER_SIZE } from '../../shared/types/index.ts';
+import { createWire } from '../../shared/types/index.ts';
 import type { Result } from '../../shared/result/index.ts';
 import { ok, err } from '../../shared/result/index.ts';
 import { topologicalSort } from '../graph/topological-sort.ts';
 import { getNodeDefinition } from '../nodes/registry.ts';
 import type { NodeRuntimeState } from '../nodes/framework.ts';
-import { analyzeDelays } from './delay-calculator.ts';
-import type { PortSource, OutputMapping } from './delay-calculator.ts';
 import {
   isConnectionPointNode,
   isConnectionInputNode,
@@ -14,7 +12,6 @@ import {
   getConnectionPointIndex,
   createConnectionPointNode,
   isBidirectionalCpNode,
-  getBidirectionalCpIndex,
   cpInputId,
   cpOutputId,
 } from '../../puzzle/connection-point-nodes.ts';
@@ -23,16 +20,17 @@ import type { BakeMetadata, BakeResult, BakeError, BakedEdge, BakedNodeConfig } 
 
 const log = createLogger('Bake');
 
-/** Circular buffer for input CP values. */
-interface CircularBuffer {
-  data: number[];
-  writeIndex: number;
-  capacity: number;
-}
+/** Where a node input port gets its value from. */
+type PortSource =
+  | { kind: 'cp'; cpIndex: number }
+  | { kind: 'node'; sourceNodeId: NodeId; sourcePort: number }
+  | { kind: 'none' };
 
-/** Pre-computed spec for one input port of a node in the closure. */
-interface InputSpec {
-  source: PortSource;
+/** Mapping from an output CP to the node/port that feeds it. */
+interface OutputMapping {
+  cpIndex: number;
+  sourceNodeId: NodeId;
+  sourcePort: number;
 }
 
 /** Pre-computed spec for one node in the closure. */
@@ -40,7 +38,7 @@ interface NodeSpec {
   id: NodeId;
   type: string;
   params: Record<string, number | string | boolean>;
-  inputSpecs: InputSpec[];
+  inputSpecs: PortSource[];
   outputCount: number;
 }
 
@@ -70,9 +68,9 @@ function classifyBidirectionalCps(
     if (hasOutgoing && hasIncoming) {
       return err({ message: `Bidirectional CP ${i} has both incoming and outgoing wires` });
     } else if (hasOutgoing) {
-      layout.push('input');  // CP emits signal into the board → acts as input
+      layout.push('input');
     } else if (hasIncoming) {
-      layout.push('output'); // CP receives signal from the board → acts as output
+      layout.push('output');
     } else {
       layout.push('off');
     }
@@ -83,7 +81,6 @@ function classifyBidirectionalCps(
 
 /**
  * Transform bidirectional CPs into standard input/output CPs for baking.
- * Returns new nodes map and wires array with bidir CPs replaced.
  */
 function transformBidirToStandard(
   nodes: ReadonlyMap<NodeId, NodeState>,
@@ -94,7 +91,6 @@ function transformBidirToStandard(
   let inputIndex = 0;
   let outputIndex = 0;
 
-  // Map from bidir node ID to new standard CP node ID
   const idMap = new Map<string, string>();
 
   for (let i = 0; i < 6; i++) {
@@ -112,20 +108,16 @@ function transformBidirToStandard(
       newNodes.set(newId, createConnectionPointNode('output', outputIndex));
       outputIndex++;
     }
-    // 'off' CPs are dropped entirely
   }
 
-  // Copy non-bidir nodes
   for (const [id, node] of nodes) {
     if (!isBidirectionalCpNode(id)) {
       newNodes.set(id, node);
     }
   }
 
-  // Remap wires
   const newWires: Wire[] = wires
     .filter(w => {
-      // Drop wires connected to 'off' CPs
       const srcBidir = isBidirectionalCpNode(w.source.nodeId);
       const tgtBidir = isBidirectionalCpNode(w.target.nodeId);
       if (srcBidir && !idMap.has(w.source.nodeId)) return false;
@@ -154,14 +146,14 @@ function transformBidirToStandard(
 /**
  * Bake a gameboard graph into a single evaluate closure.
  *
- * The closure captures mutable state (circular buffers for input CPs,
- * DelayState for delay nodes) and evaluates the entire graph in one call.
+ * Cycle-based: each call to evaluate() processes one cycle.
+ * No wire delay simulation. Memory nodes provide 1-cycle delay.
  */
 export function bakeGraph(
   nodes: ReadonlyMap<NodeId, NodeState>,
   wires: Wire[],
 ): Result<BakeResult, BakeError> {
-  // Check for bidirectional CPs (utility node editing)
+  // Handle bidirectional CPs (utility node editing)
   const hasBidirCps = Array.from(nodes.keys()).some(id => isBidirectionalCpNode(id));
   let cpLayout: ('input' | 'output' | 'off')[] | undefined;
   let bakeNodes = nodes;
@@ -189,8 +181,8 @@ export function bakeGraph(
   }
   const topoOrder = sortResult.value;
 
-  // Step 2: Analyze delays
-  const analysis = analyzeDelays(topoOrder, bakeNodes, bakeWires);
+  // Step 2: Analyze graph structure (no delay analysis)
+  const analysis = analyzeGraph(topoOrder, bakeNodes, bakeWires);
 
   // Step 3: Build metadata
   const metadata = buildMetadata(topoOrder, bakeNodes, bakeWires, analysis);
@@ -212,10 +204,8 @@ export function bakeGraph(
 
 /**
  * Reconstruct a BakeResult from serialized metadata.
- * Rebuilds the node map and wire array, then re-analyzes and builds a new closure.
  */
 export function reconstructFromMetadata(metadata: BakeMetadata): BakeResult {
-  // Rebuild nodes Map
   const nodes = new Map<NodeId, NodeState>();
   for (const config of metadata.nodeConfigs) {
     nodes.set(config.id, {
@@ -228,7 +218,6 @@ export function reconstructFromMetadata(metadata: BakeMetadata): BakeResult {
     });
   }
 
-  // Add CP virtual nodes that may not be in nodeConfigs
   for (let i = 0; i < metadata.inputCount; i++) {
     const cpNode = createConnectionPointNode('input', i);
     if (!nodes.has(cpNode.id)) {
@@ -242,7 +231,6 @@ export function reconstructFromMetadata(metadata: BakeMetadata): BakeResult {
     }
   }
 
-  // Rebuild wires
   const wires: Wire[] = metadata.edges.map((edge, i) =>
     createWire(
       `baked-wire-${i}`,
@@ -251,19 +239,116 @@ export function reconstructFromMetadata(metadata: BakeMetadata): BakeResult {
     ),
   );
 
-  // Re-analyze and build closure
-  const analysis = analyzeDelays(metadata.topoOrder, nodes, wires);
+  const analysis = analyzeGraph(metadata.topoOrder, nodes, wires);
   const evaluate = buildClosure(nodes, analysis);
 
   return { evaluate, metadata };
 }
 
-/** Build serializable metadata from the analysis results. */
+// =============================================================================
+// Graph analysis (replaces delay-calculator)
+// =============================================================================
+
+interface GraphAnalysis {
+  portSources: Map<string, PortSource>;
+  outputMappings: OutputMapping[];
+  processingOrder: NodeId[];
+  inputCount: number;
+  outputCount: number;
+}
+
+/**
+ * Analyze graph structure: determine port sources, output mappings,
+ * and processing order. No delay computation.
+ */
+function analyzeGraph(
+  topoOrder: NodeId[],
+  nodes: ReadonlyMap<NodeId, NodeState>,
+  wires: Wire[],
+): GraphAnalysis {
+  // Build wire lookup: target "nodeId:portIndex" → wire
+  const wireByTarget = new Map<string, Wire>();
+  for (const wire of wires) {
+    wireByTarget.set(`${wire.target.nodeId}:${wire.target.portIndex}`, wire);
+  }
+
+  const portSources = new Map<string, PortSource>();
+  const outputMappings: OutputMapping[] = [];
+  const processingOrder: NodeId[] = [];
+
+  let inputCount = 0;
+  let outputCount = 0;
+
+  for (const nodeId of topoOrder) {
+    const node = nodes.get(nodeId);
+    if (!node) continue;
+
+    if (isConnectionInputNode(nodeId)) {
+      const cpIndex = getConnectionPointIndex(nodeId);
+      if (cpIndex >= inputCount) inputCount = cpIndex + 1;
+      continue;
+    }
+
+    if (isConnectionOutputNode(nodeId)) {
+      const cpIndex = getConnectionPointIndex(nodeId);
+      if (cpIndex >= outputCount) outputCount = cpIndex + 1;
+
+      const wire = wireByTarget.get(`${nodeId}:0`);
+      if (wire) {
+        outputMappings.push({
+          cpIndex,
+          sourceNodeId: wire.source.nodeId,
+          sourcePort: wire.source.portIndex,
+        });
+      }
+      continue;
+    }
+
+    // Processing node
+    processingOrder.push(nodeId);
+
+    for (let portIndex = 0; portIndex < node.inputCount; portIndex++) {
+      const wireKey = `${nodeId}:${portIndex}`;
+      const wire = wireByTarget.get(wireKey);
+
+      if (!wire) {
+        portSources.set(wireKey, { kind: 'none' });
+        continue;
+      }
+
+      const sourceNodeId = wire.source.nodeId;
+
+      if (isConnectionInputNode(sourceNodeId)) {
+        const cpIndex = getConnectionPointIndex(sourceNodeId);
+        portSources.set(wireKey, { kind: 'cp', cpIndex });
+      } else {
+        portSources.set(wireKey, {
+          kind: 'node',
+          sourceNodeId,
+          sourcePort: wire.source.portIndex,
+        });
+      }
+    }
+  }
+
+  return {
+    portSources,
+    outputMappings,
+    processingOrder,
+    inputCount,
+    outputCount,
+  };
+}
+
+// =============================================================================
+// Metadata
+// =============================================================================
+
 function buildMetadata(
   topoOrder: NodeId[],
   nodes: ReadonlyMap<NodeId, NodeState>,
   wires: Wire[],
-  analysis: ReturnType<typeof analyzeDelays>,
+  analysis: GraphAnalysis,
 ): BakeMetadata {
   const nodeConfigs: BakedNodeConfig[] = [];
   for (const nodeId of topoOrder) {
@@ -283,29 +368,23 @@ function buildMetadata(
     fromPort: wire.source.portIndex,
     toNodeId: wire.target.nodeId,
     toPort: wire.target.portIndex,
-    wtsDelay: WIRE_BUFFER_SIZE,
   }));
 
   return {
     topoOrder,
     nodeConfigs,
     edges,
-    inputDelays: analysis.inputBufferSizes,
     inputCount: analysis.inputCount,
     outputCount: analysis.outputCount,
   };
 }
 
-/** Read from a circular buffer at an offset before the current write position. */
-function readCircularBuffer(buf: CircularBuffer, offset: number): number {
-  // offset=0 means the most recently written value
-  const index = ((buf.writeIndex - 1 - offset) % buf.capacity + buf.capacity) % buf.capacity;
-  return buf.data[index];
-}
+// =============================================================================
+// Closure builder
+// =============================================================================
 
 /**
- * Evaluate a single processing node given its input values.
- * Uses the node registry to look up and evaluate any fundamental node.
+ * Evaluate a single processing node.
  */
 function evaluateNodePure(
   type: string,
@@ -315,49 +394,32 @@ function evaluateNodePure(
   tickIndex: number,
 ): number[] {
   const def = getNodeDefinition(type);
-  if (!def) {
-    return [];
-  }
+  if (!def) return [];
 
   return def.evaluate({
     inputs,
-    params: params as Record<string, number | string | boolean>,
+    params,
     state: nodeState,
     tickIndex,
   });
 }
 
 /**
- * Build the evaluate closure that captures mutable state.
+ * Build the evaluate closure.
  *
- * The closure:
- * 1. Pushes each input value into its CP circular buffer
- * 2. Evaluates each processing node in topo order
- * 3. Collects output CP values and returns them
+ * Cycle-based: each call receives inputs directly, evaluates in topo order,
+ * returns outputs. No circular buffers or wire delays.
  */
 function buildClosure(
   nodes: ReadonlyMap<NodeId, NodeState>,
-  analysis: ReturnType<typeof analyzeDelays>,
+  analysis: GraphAnalysis,
 ): (inputs: number[]) => number[] {
   const {
     portSources,
-    inputBufferSizes,
     outputMappings,
     processingOrder,
-    inputCount,
     outputCount,
   } = analysis;
-
-  // Create circular buffers for input CPs
-  const cpBuffers: CircularBuffer[] = [];
-  for (let i = 0; i < inputCount; i++) {
-    const capacity = inputBufferSizes[i];
-    cpBuffers.push({
-      data: new Array<number>(capacity).fill(0),
-      writeIndex: 0,
-      capacity,
-    });
-  }
 
   // Build node specs for fast evaluation
   const nodeSpecs: NodeSpec[] = [];
@@ -367,11 +429,10 @@ function buildClosure(
     const node = nodes.get(nodeId);
     if (!node) continue;
 
-    const inputSpecs: InputSpec[] = [];
+    const inputSpecs: PortSource[] = [];
     for (let portIndex = 0; portIndex < node.inputCount; portIndex++) {
       const key = `${nodeId}:${portIndex}`;
-      const source = portSources.get(key) ?? { kind: 'none' as const };
-      inputSpecs.push({ source });
+      inputSpecs.push(portSources.get(key) ?? { kind: 'none' as const });
     }
 
     nodeSpecs.push({
@@ -382,7 +443,6 @@ function buildClosure(
       outputCount: node.outputCount,
     });
 
-    // Create node state for stateful nodes using the registry
     const def = getNodeDefinition(node.type);
     if (def?.createState) {
       nodeStates.set(nodeId, def.createState());
@@ -393,40 +453,24 @@ function buildClosure(
   const outputMap: OutputMapping[] = [];
   for (let i = 0; i < outputCount; i++) {
     const mapping = outputMappings.find((m) => m.cpIndex === i);
-    if (mapping) {
-      outputMap.push(mapping);
-    } else {
-      // Unconnected output — will produce 0
-      outputMap.push({ cpIndex: i, sourceNodeId: '', sourcePort: 0 });
-    }
+    outputMap.push(mapping ?? { cpIndex: i, sourceNodeId: '', sourcePort: 0 });
   }
 
   // Storage for node outputs, reused across calls
   const nodeOutputs = new Map<NodeId, number[]>();
-
-  // Track tick index for stateful nodes
   let tickIndex = 0;
 
   // The closure
   return function evaluate(inputs: number[]): number[] {
-    // Step 1: Push input values into CP circular buffers
-    for (let i = 0; i < inputCount; i++) {
-      const buf = cpBuffers[i];
-      const value = i < inputs.length ? inputs[i] : 0;
-      buf.data[buf.writeIndex] = value;
-      buf.writeIndex = (buf.writeIndex + 1) % buf.capacity;
-    }
-
-    // Step 2: Evaluate each processing node in topo order
     nodeOutputs.clear();
 
+    // Evaluate each processing node in topo order
     for (const spec of nodeSpecs) {
       const nodeInputs: number[] = [];
 
-      for (const inputSpec of spec.inputSpecs) {
-        const source = inputSpec.source;
+      for (const source of spec.inputSpecs) {
         if (source.kind === 'cp') {
-          nodeInputs.push(readCircularBuffer(cpBuffers[source.cpIndex], source.bufferOffset));
+          nodeInputs.push(source.cpIndex < inputs.length ? inputs[source.cpIndex] : 0);
         } else if (source.kind === 'node') {
           const outputs = nodeOutputs.get(source.sourceNodeId);
           nodeInputs.push(outputs ? (outputs[source.sourcePort] ?? 0) : 0);
@@ -442,17 +486,17 @@ function buildClosure(
 
     tickIndex++;
 
-    // Step 3: Collect output CP values
+    // Collect output CP values
     const result = new Array<number>(outputCount).fill(0);
     for (let i = 0; i < outputCount; i++) {
       const mapping = outputMap[i];
-      if (mapping.sourceNodeId === '') continue; // unconnected
+      if (mapping.sourceNodeId === '') continue;
 
       if (isConnectionPointNode(mapping.sourceNodeId)) {
-        // Direct CP-to-CP: read from the input buffer
+        // Direct CP-to-CP: use input value directly
         const cpIndex = getConnectionPointIndex(mapping.sourceNodeId);
-        if (cpIndex >= 0 && cpIndex < cpBuffers.length) {
-          result[i] = readCircularBuffer(cpBuffers[cpIndex], 0);
+        if (cpIndex >= 0 && cpIndex < inputs.length) {
+          result[i] = inputs[cpIndex];
         }
       } else {
         const outputs = nodeOutputs.get(mapping.sourceNodeId);

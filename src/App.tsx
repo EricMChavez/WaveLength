@@ -5,12 +5,11 @@ import { NavigationBar } from './ui/controls/NavigationBar.tsx'
 import { PuzzleInfoBar } from './ui/puzzle/PuzzleInfoBar.tsx'
 import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
 import { ZoomTransition } from './ui/puzzle/ZoomTransition.tsx'
-import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, LevelSelectOverlay, TrimDialog, SavePuzzleDialog, NodeCreationForm } from './ui/overlays/index.ts'
+import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, LevelSelectOverlay, SavePuzzleDialog, NodeCreationForm } from './ui/overlays/index.ts'
 import { PortConstantInput } from './ui/controls/PortConstantInput.tsx'
 import { useGameStore } from './store/index.ts'
 import type { GameboardState, NodeState } from './shared/types/index.ts'
 import { createCreativeSlotNode } from './puzzle/connection-point-nodes.ts'
-import { startSimulation } from './simulation/simulation-controller.ts'
 import { CREATIVE_SLOT_COUNT } from './store/slices/creative-slice.ts'
 import { StartScreen } from './ui/screens/index.ts'
 import { DevTools } from './dev/index.ts'
@@ -29,34 +28,45 @@ function createCreativeGameboard(): GameboardState {
   return { id: 'creative-mode', nodes, wires: [] };
 }
 
-/** Initialize creative mode gameboard and meters */
+/** Initialize creative mode gameboard and meters. If saved state exists, restore it. */
 export function initializeCreativeMode(): void {
   const store = useGameStore.getState();
+  const saved = store.savedCreativeState;
 
-  // Enter creative mode with fresh gameboard
+  // Enter creative mode — this restores saved slots if available
   store.enterCreativeMode();
-  store.setActiveBoard(createCreativeGameboard());
 
-  // Initialize meters: left = inputs, right = outputs
-  store.initializeMeters({
-    left: [
-      { active: true, direction: 'input' },
-      { active: true, direction: 'input' },
-      { active: true, direction: 'input' },
-    ],
-    right: [
-      { active: true, direction: 'output' },
-      { active: true, direction: 'output' },
-      { active: true, direction: 'output' },
-    ],
-  }, 'active');
-
-  // Initialize output buffers for puzzle authoring
-  store.initializeOutputBuffers();
-
-  // Auto-start simulation
-  store.setSimulationRunning(true);
-  startSimulation();
+  if (saved) {
+    // Restore saved board and port constants
+    store.restoreBoard(saved.board, saved.portConstants);
+    // Build meters from saved slots
+    const buildMeterConfig = (slots: typeof saved.slots) => ({
+      left: slots.slice(0, 3).map((s) => ({
+        active: true,
+        direction: s.direction === 'off' ? 'input' as const : s.direction,
+      })),
+      right: slots.slice(3, 6).map((s) => ({
+        active: true,
+        direction: s.direction === 'off' ? 'output' as const : s.direction,
+      })),
+    });
+    store.initializeMeters(buildMeterConfig(saved.slots), 'active');
+  } else {
+    // Fresh creative mode
+    store.setActiveBoard(createCreativeGameboard());
+    store.initializeMeters({
+      left: [
+        { active: true, direction: 'input' },
+        { active: true, direction: 'input' },
+        { active: true, direction: 'input' },
+      ],
+      right: [
+        { active: true, direction: 'output' },
+        { active: true, direction: 'output' },
+        { active: true, direction: 'output' },
+      ],
+    }, 'active');
+  }
 }
 
 function App() {
@@ -81,9 +91,6 @@ function App() {
         ],
       }, 'active');
 
-      // Initialize output buffers for puzzle authoring
-      store.initializeOutputBuffers();
-
       // Show start screen overlay
       store.openOverlay({ type: 'start-screen' });
     }
@@ -101,7 +108,6 @@ function App() {
       <ContextMenu />
       <WaveformSelectorOverlay />
       <LevelSelectOverlay />
-      <TrimDialog />
       <SavePuzzleDialog />
       <NodeCreationForm />
       <StartScreen />

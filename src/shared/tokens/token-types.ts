@@ -16,6 +16,7 @@ export const TOKEN_KEYS = [
   // Signals / Polarity
   'signalPositive',
   'signalNegative',
+  'signalZero',
   'colorNeutral',
   'colorTarget',
   'colorValidationMatch',
@@ -77,6 +78,7 @@ export const TOKEN_CSS_MAP: Record<TokenKey, string> = {
 
   signalPositive: '--token-signal-positive',
   signalNegative: '--token-signal-negative',
+  signalZero: '--token-signal-zero',
   colorNeutral: '--token-color-neutral',
   colorTarget: '--token-color-target',
   colorValidationMatch: '--token-color-validation-match',

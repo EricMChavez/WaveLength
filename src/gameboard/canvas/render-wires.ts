@@ -33,22 +33,24 @@ export function lerpColor(a: RGB, b: RGB, t: number): string {
 
 /**
  * Map a signal value (±100) to a polarity colour.
- * Gradient: neutral → polarity over |value| 0–colorRampEnd, clamped beyond.
+ * Gradient: signalZero (soft white) → polarity over |value| 0–colorRampEnd.
+ * At value 0 the colour is a soft white; at ±100 it is full amber/teal.
+ * This distinguishes "signal at 0" from "no signal" (which uses colorNeutral).
  */
 export function signalToColor(value: number, tokens: ThemeTokens): string {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
 
   const colorRampEnd = useOverrides ? devOverrides.wireStyle.colorRampEnd : 100;
-  const neutralColor = useOverrides ? devOverrides.colors.colorNeutral : tokens.colorNeutral;
+  const zeroColor = useOverrides ? devOverrides.colors.signalZero : tokens.signalZero;
   const positiveColor = useOverrides ? devOverrides.colors.signalPositive : tokens.signalPositive;
   const negativeColor = useOverrides ? devOverrides.colors.signalNegative : tokens.signalNegative;
 
   const abs = Math.abs(value);
   const t = Math.min(abs / colorRampEnd, 1.0);
-  const neutralRgb = hexToRgb(neutralColor);
+  const zeroRgb = hexToRgb(zeroColor);
   const polarityRgb = hexToRgb(value >= 0 ? positiveColor : negativeColor);
-  return lerpColor(neutralRgb, polarityRgb, t);
+  return lerpColor(zeroRgb, polarityRgb, t);
 }
 
 /**
@@ -67,28 +69,18 @@ export function signalToGlow(value: number): number {
   return ((abs - glowThreshold) / (100 - glowThreshold)) * glowMaxRadius;
 }
 
-// ── Ring-buffer → segment mapping ───────────────────────────────────────────
-
-const BUFFER_SIZE = 16; // must equal WIRE_BUFFER_SIZE
+// ── Wire signal lookup ──────────────────────────────────────────────────────
 
 /**
- * Return the signal value for segment `segIndex` of `totalSegments`.
- *
- * Path[0] = source end → newest sample.
- * Path[last] = target end → oldest sample.
+ * Look up the uniform signal value for a wire from the wireValues map.
+ * In cycle-based evaluation, every wire has a single value per cycle.
  */
-export function getSegmentSignal(
-  wire: Pick<Wire, 'signalBuffer' | 'writeHead'>,
-  segIndex: number,
-  totalSegments: number,
+export function getWireSignal(
+  wireId: string,
+  wireValues: ReadonlyMap<string, number> | undefined,
 ): number {
-  const newestIdx =
-    (wire.writeHead - 1 + BUFFER_SIZE) % BUFFER_SIZE;
-  const t = totalSegments <= 1 ? 0 : segIndex / (totalSegments - 1);
-  const sampleOffset = Math.floor(t * (BUFFER_SIZE - 1));
-  const bufIdx =
-    (newestIdx - sampleOffset + BUFFER_SIZE) % BUFFER_SIZE;
-  return wire.signalBuffer[bufIdx];
+  if (!wireValues) return 0;
+  return wireValues.get(wireId) ?? 0;
 }
 
 // ── Port position helpers ────────────────────────────────────────────────────
@@ -147,6 +139,7 @@ export function drawWires(
   wires: ReadonlyArray<Wire>,
   cellSize: number,
   nodes?: ReadonlyMap<string, NodeState>,
+  wireValues?: ReadonlyMap<string, number>,
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
@@ -227,39 +220,40 @@ export function drawWires(
 
     if (totalSegments === 0) continue; // single-point path, base drawn
 
-    // ── Pass 2: glow segments (|signal| > 75) ──
-    for (let s = 0; s < totalSegments; s++) {
-      const val = getSegmentSignal(wire, s, totalSegments);
-      const glow = signalToGlow(val);
-      if (glow <= 0) continue;
+    // Uniform signal value for the entire wire at current playpoint
+    const wireSignal = getWireSignal(wire.id, wireValues);
 
+    // ── Pass 2: glow (|signal| > 75) — single polyline ──
+    const glow = signalToGlow(wireSignal);
+    if (glow > 0) {
       ctx.save();
-      ctx.strokeStyle = signalToColor(val, tokens);
+      ctx.strokeStyle = signalToColor(wireSignal, tokens);
       ctx.lineWidth = wireWidth;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       ctx.shadowColor = ctx.strokeStyle;
       ctx.shadowBlur = glow;
       ctx.beginPath();
-      ctx.moveTo(dedupedPts[s].x, dedupedPts[s].y);
-      ctx.lineTo(dedupedPts[s + 1].x, dedupedPts[s + 1].y);
+      ctx.moveTo(dedupedPts[0].x, dedupedPts[0].y);
+      for (let i = 1; i < dedupedPts.length; i++) {
+        ctx.lineTo(dedupedPts[i].x, dedupedPts[i].y);
+      }
       ctx.stroke();
       ctx.restore();
     }
 
-    // ── Pass 3: polarity colour per segment ──
-    for (let s = 0; s < totalSegments; s++) {
-      const val = getSegmentSignal(wire, s, totalSegments);
-      ctx.save();
-      ctx.strokeStyle = signalToColor(val, tokens);
-      ctx.lineWidth = wireWidth;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(dedupedPts[s].x, dedupedPts[s].y);
-      ctx.lineTo(dedupedPts[s + 1].x, dedupedPts[s + 1].y);
-      ctx.stroke();
-      ctx.restore();
+    // ── Pass 3: polarity colour — single polyline ──
+    ctx.save();
+    ctx.strokeStyle = signalToColor(wireSignal, tokens);
+    ctx.lineWidth = wireWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(dedupedPts[0].x, dedupedPts[0].y);
+    for (let i = 1; i < dedupedPts.length; i++) {
+      ctx.lineTo(dedupedPts[i].x, dedupedPts[i].y);
     }
+    ctx.stroke();
+    ctx.restore();
   }
 }

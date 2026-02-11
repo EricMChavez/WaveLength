@@ -34,7 +34,7 @@ A **recursive tool-building puzzle game** about signal processing. Players wire 
 | **Mix** | A, B | Mode-based: Add, Subtract, Average, Max, Min | All modes clamp output |
 | **Invert** | A | `-A` | Phase flip |
 | **Threshold** | A + param | `A > threshold ? +100 : -100` | Binary output, param range [-100,+100] |
-| **Delay** | A + param | Delays signal by N subdivisions | 0-16 subdivisions of 1 WTS |
+| **Memory** | A | Outputs previous cycle's input | 1-cycle delay, initial output 0 |
 
 ### Two Custom Node Types
 
@@ -42,11 +42,13 @@ A **recursive tool-building puzzle game** about signal processing. Players wire 
 
 **Utility nodes** — player-created freeform. Player-named, editable, deletable. Convenience tools.
 
-### WTS Timing
+### Cycle-Based Evaluation
 
-- **1 WTS = 1 second**, 16 subdivisions per WTS.
-- All wires propagate in exactly 1 WTS.
-- Only the active board's wires carry WTS delay. Nested boards are baked.
+- **256 cycles** computed instantly on every graph edit — no start/stop simulation.
+- Each cycle: topological evaluation of all nodes, entire graph settles in one pass.
+- Memory nodes provide 1-cycle delay (output previous cycle's input).
+- A **playpoint** cursor (0-255) sweeps through results at 16 cycles/sec.
+- `cycleResults` stored in Zustand `PlaypointSlice`, auto-recomputed via subscriber.
 
 ### Gameboard Layout
 
@@ -58,16 +60,16 @@ Every gameboard (root or nested) has the same structure:
 
 ### Validation & Victory
 
-- **Continuous** — no Submit button. Every tick compares output to target.
-- **Victory:** All outputs within **±5** tolerance for **1 full waveform cycle**.
-- Any graph mutation resets the streak to zero.
+- **Instant** — computed from cycle results, no streaming validation.
+- **Victory:** All 256 output values within **±5** tolerance for ALL outputs.
+- Any graph mutation recomputes cycle results and re-validates.
 - On victory: ceremony animation plays, node named, zoom-out, node added to palette.
 
 ### Formula Baking
 
 When a puzzle is completed, its internal gameboard is "baked" into a closure:
-- Symbolic composition of internal node formulas
-- Internal WTS delays stripped; relative timing preserved via per-input circular buffers
+- Topological evaluation of internal node graph
+- Memory nodes maintain state across cycles within the baked closure
 - **Equivalence contract:** Baked output must exactly match live settled output. Highest-priority test.
 - Metadata is serializable. Closures reconstructed on load.
 - Hot-replace: saving a puzzle node updates all instances across all gameboards.
@@ -115,20 +117,18 @@ No sidebar. Single full-screen canvas gameboard. All UI is overlay-based:
 ### Three-Channel Analog Meters
 
 Each connection point gets a meter with 3 channels (left to right):
-1. **Scrolling waveform** — polarity-colored fill, circular buffer (~128 samples)
-2. **Level bar** — fills from center outward
-3. **Needle** — red horizontal line (#E03838) with glow
+1. **Static waveform graph** — all 256 samples as continuous polyline, polarity-colored, with playpoint indicator
+2. **Level bar** — fills from center outward (value at current playpoint)
+3. **Needle** — red horizontal line (#E03838) with glow (value at current playpoint)
 
-Target overlay: dashed unfilled line showing expected waveform.
+Target overlay: dashed unfilled polyline showing expected waveform over same 256-sample space.
 
 ### Wire Rendering (Three-Pass)
 
 Wires follow A*-routed grid paths (not bezier curves):
 1. **Base pass:** neutral color, low opacity
 2. **Glow pass:** |signal| > 75 gets shadowBlur proportional to intensity
-3. **Color pass:** polarity-colored stroke per segment
-
-Each wire stores 16 signal samples in a ring buffer. Renderer maps path segments to samples proportionally.
+3. **Color pass:** polarity-colored stroke (uniform value per wire at current playpoint)
 
 ### Lid-Open Zoom Animation
 
@@ -156,12 +156,11 @@ Vertical clamshell: parent board splits at center, left/right halves compress to
 
 | Domain | May Import From | Must NOT Import |
 |--------|----------------|-----------------|
-| `engine/` | `shared/` | React, Canvas, store, gameboard, ui, wts |
-| `wts/` | `shared/`, `engine/` | React, Canvas, store, gameboard, ui |
-| `shared/routing/` | `shared/grid/` | engine, wts, gameboard, store, ui |
-| `gameboard/` | `shared/`, other `gameboard/` | engine, wts, store (except render-loop.ts) |
-| `store/` | `shared/`, `engine/`, `wts/`, `puzzle/`, `palette/` | gameboard, ui |
-| `ui/` | `store/` (hooks), `shared/` | engine, wts, gameboard |
+| `engine/` | `shared/` | React, Canvas, store, gameboard, ui |
+| `shared/routing/` | `shared/grid/` | engine, gameboard, store, ui |
+| `gameboard/` | `shared/`, other `gameboard/` | engine, store (except render-loop.ts) |
+| `store/` | `shared/`, `engine/`, `puzzle/`, `palette/` | gameboard, ui |
+| `ui/` | `store/` (hooks), `shared/` | engine, gameboard |
 
 **No lateral imports.** All cross-domain communication through `src/store/`.
 
@@ -234,10 +233,10 @@ type LidAnimationState =
 
 - Create separate event bus or pub/sub. Zustand IS the event system.
 - Import between domains laterally. Route through `src/store/`.
-- Use React hooks in `engine/` or `wts/`. Pure TS only.
+- Use React hooks in `engine/`. Pure TS only.
 - Forget to clamp signals after node evaluation. Every. Single. Time.
 - Serialize closures. Serialize metadata; reconstruct closures on load.
-- Create separate animation state for wire signals. Wire state IS animation state.
+- Start/stop simulation manually. Cycle runner auto-recomputes on graph changes.
 - Evaluate dormant gameboards. Only the active board runs.
 - Allow circular node references. Cycle detection on every graph edit.
 - Read CSS directly in Canvas code. Use the ThemeTokens cache.
@@ -270,7 +269,7 @@ type LidAnimationState =
 1. Fundamental node operations (edge cases: -100, 0, +100, overflow clamping)
 2. Topological sort + cycle detection
 3. Formula baking equivalence (baked === live for any graph)
-4. WTS tick accuracy (correct subdivisions, no off-by-one)
+4. Cycle evaluator correctness (256-cycle results, memory node state)
 5. Lower: localStorage, undo stack, React components
 
 ### Patterns
@@ -278,7 +277,7 @@ type LidAnimationState =
 - Engine tests are pure TS — no DOM, no Canvas, no React.
 - Co-locate tests: `foo.test.ts` next to `foo.ts`.
 - Integration tests spanning domains go in `tests/` root.
-- Current: **976 tests across 66 suites**.
+- Current: **1025 tests across 69 suites**.
 
 ---
 
@@ -286,10 +285,10 @@ type LidAnimationState =
 
 ```
 GRID: 66 cols x 36 rows, playable area cols 10-55 (46 cols), meter zones 10 cols each
-SIGNAL: [-100, +100], tolerance ±5, victory cycles 1
-WTS: 1000ms base, 16 subdivisions, 16-sample ring buffer per wire
+SIGNAL: [-100, +100], tolerance ±5
+CYCLES: 256 per evaluation, playpoint sweeps at 16 cycles/sec
 HISTORY: ~50 entries max
-METERS: 256 sample circular buffer (16 WTS), 12 rows x 10 cols per meter
+METERS: 256 samples (flat array), 12 rows x 10 cols per meter
 NODE SIZES: Fundamental 3x2, Puzzle 3xN, Utility 5x3
 ```
 
@@ -300,7 +299,7 @@ NODE SIZES: Fundamental 3x2, Puzzle 3xN, Utility 5x3
 ```
 src/
 ├── engine/          # Pure TS: nodes, graph eval, topological sort, baking
-├── wts/             # Pure TS: clock, tick scheduler
+│   └── evaluation/  # Cycle evaluator (256-cycle computation)
 ├── gameboard/
 │   ├── canvas/      # Render functions (render-loop.ts is the bridge)
 │   ├── meters/      # Three-channel analog meter rendering
@@ -308,21 +307,21 @@ src/
 │   └── interaction/ # Mouse, keyboard, focus, escape handler
 ├── puzzle/          # Puzzle definitions, waveform generators, validation
 ├── palette/         # Node definitions, library management
-├── store/           # Zustand: 9+ slices, persistence, hot-replace
+├── simulation/      # Cycle runner (auto-recomputes on graph changes)
+├── store/           # Zustand: 10+ slices, persistence, hot-replace
 │   └── slices/      # gameboard, interaction, history, navigation, overlay,
-│                    # animation, meter, routing, palette, zoom-transition
+│                    # animation, meter, routing, palette, zoom-transition, playpoint
 ├── shared/
 │   ├── grid/        # GridPoint/PixelPoint types, conversions, viewport
 │   ├── tokens/      # ThemeTokens type, cache builder, theme manager
 │   ├── routing/     # A* auto-router, grid graph, occupancy
-│   ├── constants/   # SIGNAL_CONFIG, GRID_CONFIG, WTS_CONFIG
+│   ├── constants/   # SIGNAL_CONFIG, GRID_CONFIG
 │   ├── types/       # Common types (Result, PortRef, etc.)
 │   └── math/        # clamp(), utilities
 ├── ui/
 │   ├── overlays/    # PaletteModal, ContextMenu, ParameterPopover
 │   ├── puzzle/      # LevelSelect
-│   └── controls/    # Navigation, simulation controls
-├── simulation/      # Start/stop/step orchestration
+│   └── controls/    # Navigation, playpoint controls
 └── assets/styles/   # CSS tokens, themes (dark/light), animations
 ```
 

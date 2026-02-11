@@ -4,7 +4,6 @@ import { PUZZLE_LEVELS } from '../../puzzle/levels/index.ts';
 import { createPuzzleGameboard } from '../../puzzle/puzzle-gameboard.ts';
 import { buildConnectionPointConfig } from '../../puzzle/types.ts';
 import { exportCustomPuzzleAsSource } from '../../puzzle/export-puzzle.ts';
-import { startSimulation, stopSimulation } from '../../simulation/simulation-controller.ts';
 import styles from './LevelSelectOverlay.module.css';
 
 export function LevelSelectOverlay() {
@@ -38,9 +37,6 @@ function LevelSelectInner() {
     const puzzle = PUZZLE_LEVELS[index];
     if (!puzzle) return;
 
-    // Stop any running simulation
-    stopSimulation();
-
     // Exit creative mode if active
     if (store.isCreativeMode) {
       store.exitCreativeMode();
@@ -51,11 +47,8 @@ function LevelSelectInner() {
     store.setActiveBoard(createPuzzleGameboard(puzzle));
     const cpConfig = puzzle.connectionPoints
       ?? buildConnectionPointConfig(puzzle.activeInputs, puzzle.activeOutputs);
-    store.initializeMeters(cpConfig, 'dimmed');
+    store.initializeMeters(cpConfig, 'active');
 
-    // Start simulation and close overlay
-    store.setSimulationRunning(true);
-    startSimulation();
     closeOverlay();
   }, [closeOverlay]);
 
@@ -63,9 +56,6 @@ function LevelSelectInner() {
     const store = useGameStore.getState();
     const puzzle = store.customPuzzles.get(puzzleId);
     if (!puzzle) return;
-
-    // Stop any running simulation
-    stopSimulation();
 
     // Exit creative mode if active
     if (store.isCreativeMode) {
@@ -75,9 +65,6 @@ function LevelSelectInner() {
     // Load custom puzzle
     store.loadCustomPuzzle(puzzleId);
 
-    // Start simulation and close overlay
-    store.setSimulationRunning(true);
-    startSimulation();
     closeOverlay();
   }, [closeOverlay]);
 

@@ -16,6 +16,8 @@ import {
 /**
  * Leva-based developer tools for experimenting with visual parameters.
  * Only rendered in development mode.
+ *
+ * Every control here maps to a field actually consumed by a render function.
  */
 export function DevTools() {
   // Master enable toggle
@@ -28,43 +30,76 @@ export function DevTools() {
     window.dispatchEvent(new Event('dev-overrides-changed'));
   }, [enabled]);
 
-  // Color palette controls
-  const colorValues = useControls(
-    'Colors',
+  // ── Page background (GameboardCanvas.tsx) ──────────────────────────────────
+  const pageColorValues = useControls(
+    'Page Colors',
     {
-      pageBackground: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackground, label: 'Page BG Edge' },
-      pageBackgroundCenter: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackgroundCenter, label: 'Page BG Center' },
-      signalPositive: { value: DEFAULT_DEV_OVERRIDES.colors.signalPositive, label: 'Signal +' },
-      signalNegative: { value: DEFAULT_DEV_OVERRIDES.colors.signalNegative, label: 'Signal -' },
-      colorNeutral: { value: DEFAULT_DEV_OVERRIDES.colors.colorNeutral, label: 'Neutral' },
-      gridArea: { value: DEFAULT_DEV_OVERRIDES.colors.gridArea, label: 'Grid Area' },
-      gridAreaEdge: { value: DEFAULT_DEV_OVERRIDES.colors.gridAreaEdge, label: 'Grid Edge' },
-      gridAreaCenter: { value: DEFAULT_DEV_OVERRIDES.colors.gridAreaCenter, label: 'Grid Center' },
-      meterInterior: { value: DEFAULT_DEV_OVERRIDES.colors.meterInterior, label: 'Meter Interior' },
+      pageBackground: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackground, label: 'BG Edge' },
+      pageBackgroundCenter: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackgroundCenter, label: 'BG Center' },
+    },
+    { collapsed: true }
+  );
+
+  // ── Grid colors (render-grid.ts) ──────────────────────────────────────────
+  const gridColorValues = useControls(
+    'Grid Colors',
+    {
+      gridAreaEdge: { value: DEFAULT_DEV_OVERRIDES.colors.gridAreaEdge, label: 'Area Edge' },
+      gridAreaCenter: { value: DEFAULT_DEV_OVERRIDES.colors.gridAreaCenter, label: 'Area Center' },
+      gridLine: { value: DEFAULT_DEV_OVERRIDES.colors.gridLine, label: 'Grid Dots' },
+      boardBorder: { value: DEFAULT_DEV_OVERRIDES.colors.boardBorder, label: 'Board Border' },
+    },
+    { collapsed: true }
+  );
+
+  // ── Node colors (render-nodes.ts) ─────────────────────────────────────────
+  const nodeColorValues = useControls(
+    'Node Colors',
+    {
       surfaceNode: { value: DEFAULT_DEV_OVERRIDES.colors.surfaceNode, label: 'Node Top' },
       surfaceNodeBottom: { value: DEFAULT_DEV_OVERRIDES.colors.surfaceNodeBottom, label: 'Node Bottom' },
-      portFill: { value: DEFAULT_DEV_OVERRIDES.colors.portFill, label: 'Port Fill' },
-      portStroke: { value: DEFAULT_DEV_OVERRIDES.colors.portStroke, label: 'Port Stroke' },
-      gridLine: { value: DEFAULT_DEV_OVERRIDES.colors.gridLine, label: 'Grid Lines' },
+    },
+    { collapsed: true }
+  );
+
+  // ── Signal colors (render-wires.ts, render-level-bar.ts, render-waveform-channel.ts) ──
+  const signalColorValues = useControls(
+    'Signal Colors',
+    {
+      signalPositive: { value: DEFAULT_DEV_OVERRIDES.colors.signalPositive, label: 'Positive' },
+      signalNegative: { value: DEFAULT_DEV_OVERRIDES.colors.signalNegative, label: 'Negative' },
+      signalZero: { value: DEFAULT_DEV_OVERRIDES.colors.signalZero, label: 'Zero' },
+      colorNeutral: { value: DEFAULT_DEV_OVERRIDES.colors.colorNeutral, label: 'Neutral' },
+    },
+    { collapsed: true }
+  );
+
+  // ── Meter colors (render-meter.ts, render-needle.ts) ──────────────────────
+  const meterColorValues = useControls(
+    'Meter Colors',
+    {
+      meterInterior: { value: DEFAULT_DEV_OVERRIDES.colors.meterInterior, label: 'Interior' },
+      meterBorder: { value: DEFAULT_DEV_OVERRIDES.colors.meterBorder, label: 'Border' },
       meterNeedle: { value: DEFAULT_DEV_OVERRIDES.colors.meterNeedle, label: 'Needle' },
-      textPrimary: { value: DEFAULT_DEV_OVERRIDES.colors.textPrimary, label: 'Text' },
-      colorError: { value: DEFAULT_DEV_OVERRIDES.colors.colorError, label: 'Error' },
-      meterBorder: { value: DEFAULT_DEV_OVERRIDES.colors.meterBorder, label: 'Meter Border' },
-      boardBorder: { value: DEFAULT_DEV_OVERRIDES.colors.boardBorder, label: 'Board Border' },
-      colorValidationMatch: { value: DEFAULT_DEV_OVERRIDES.colors.colorValidationMatch, label: 'Validation Match' },
-      colorTarget: { value: DEFAULT_DEV_OVERRIDES.colors.colorTarget, label: 'Target' },
+      meterZero: { value: DEFAULT_DEV_OVERRIDES.colors.meterZero, label: 'Zero' },
     },
     { collapsed: true }
   );
 
   useEffect(() => {
     if (enabled) {
-      setColorOverrides(colorValues);
+      setColorOverrides({
+        ...pageColorValues,
+        ...gridColorValues,
+        ...nodeColorValues,
+        ...signalColorValues,
+        ...meterColorValues,
+      });
       window.dispatchEvent(new Event('dev-overrides-changed'));
     }
-  }, [enabled, colorValues]);
+  }, [enabled, pageColorValues, gridColorValues, nodeColorValues, signalColorValues, meterColorValues]);
 
-  // Node styling controls
+  // ── Node style (render-nodes.ts) ──────────────────────────────────────────
   const nodeValues = useControls(
     'Node Style',
     {
@@ -83,7 +118,7 @@ export function DevTools() {
     if (enabled) setNodeStyleOverrides(nodeValues);
   }, [enabled, nodeValues]);
 
-  // Wire styling controls
+  // ── Wire style (render-wires.ts) ──────────────────────────────────────────
   const wireValues = useControls(
     'Wire Style',
     {
@@ -100,14 +135,11 @@ export function DevTools() {
     if (enabled) setWireStyleOverrides(wireValues);
   }, [enabled, wireValues]);
 
-  // Grid styling controls
+  // ── Grid style (render-grid.ts) ───────────────────────────────────────────
   const gridValues = useControls(
     'Grid Style',
     {
-      lineOpacity: { value: DEFAULT_DEV_OVERRIDES.gridStyle.lineOpacity, min: 0, max: 1, step: 0.05, label: 'Line Opacity' },
-      shadowDepth: { value: DEFAULT_DEV_OVERRIDES.gridStyle.shadowDepth, min: 0, max: 1, step: 0.05, label: 'Shadow Depth' },
-      borderHighlight: { value: DEFAULT_DEV_OVERRIDES.gridStyle.borderHighlight, min: 0, max: 0.3, step: 0.01, label: 'Border Highlight' },
-      borderShadow: { value: DEFAULT_DEV_OVERRIDES.gridStyle.borderShadow, min: 0, max: 1, step: 0.05, label: 'Border Shadow' },
+      lineOpacity: { value: DEFAULT_DEV_OVERRIDES.gridStyle.lineOpacity, min: 0, max: 1, step: 0.05, label: 'Dot Opacity' },
       insetDepthTop: { value: DEFAULT_DEV_OVERRIDES.gridStyle.insetDepthTop, min: 0, max: 1, step: 0.05, label: 'Inset Depth (Top)' },
       insetDepthSide: { value: DEFAULT_DEV_OVERRIDES.gridStyle.insetDepthSide, min: 0, max: 1, step: 0.05, label: 'Inset Depth (Side)' },
       showGridLabels: { value: DEFAULT_DEV_OVERRIDES.gridStyle.showGridLabels, label: 'Grid Labels' },
@@ -119,7 +151,7 @@ export function DevTools() {
     if (enabled) setGridStyleOverrides(gridValues);
   }, [enabled, gridValues]);
 
-  // Meter styling controls
+  // ── Meter style (render-needle.ts) ────────────────────────────────────────
   const meterValues = useControls(
     'Meter Style',
     {
@@ -132,7 +164,7 @@ export function DevTools() {
     if (enabled) setMeterStyleOverrides(meterValues);
   }, [enabled, meterValues]);
 
-  // Actions
+  // ── Actions ───────────────────────────────────────────────────────────────
   useControls('Actions', {
     'New Node Definition': button(() => {
       useGameStore.getState().openOverlay({ type: 'node-creation-form' });
@@ -164,4 +196,3 @@ export function DevTools() {
 
   return <Leva collapsed={true} titleBar={{ title: 'Visual Dev Tools' }} />;
 }
-

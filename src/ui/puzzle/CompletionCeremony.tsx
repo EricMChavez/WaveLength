@@ -2,7 +2,6 @@ import { useGameStore } from '../../store/index.ts';
 import { PUZZLE_LEVELS } from '../../puzzle/levels/index.ts';
 import { createPuzzleGameboard } from '../../puzzle/puzzle-gameboard.ts';
 import { buildConnectionPointConfig } from '../../puzzle/types.ts';
-import { startSimulation, stopSimulation } from '../../simulation/simulation-controller.ts';
 import styles from './CompletionCeremony.module.css';
 
 export function CompletionCeremony() {
@@ -16,9 +15,6 @@ export function CompletionCeremony() {
 
   function handleContinue() {
     const store = useGameStore.getState();
-
-    // Stop any running simulation
-    stopSimulation();
 
     // Mark level as completed in progression state
     store.completeLevel(puzzle!.id);
@@ -37,11 +33,8 @@ export function CompletionCeremony() {
       // Initialize meters with the next puzzle's connection point configuration
       const cpConfig = nextPuzzle.connectionPoints
         ?? buildConnectionPointConfig(nextPuzzle.activeInputs, nextPuzzle.activeOutputs);
-      store.initializeMeters(cpConfig, 'dimmed');
+      store.initializeMeters(cpConfig, 'active');
 
-      // Start simulation for the new level
-      store.setSimulationRunning(true);
-      startSimulation();
     } else {
       // Last level completed — go to sandbox
       store.unloadPuzzle();

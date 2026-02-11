@@ -1,5 +1,5 @@
 /** Supported waveform shapes for puzzle inputs/outputs.
- *  Full = 16 WTS (256 ticks), Half = 8 WTS (128 ticks), Quarter = 4 WTS (64 ticks). */
+ *  Full = 256 cycles, Half = 128 cycles, Quarter = 64 cycles. */
 export type WaveformShape =
   | 'sine-full' | 'sine-half' | 'sine-quarter'
   | 'sine-full-reduced' | 'sine-half-reduced' | 'sine-quarter-reduced'

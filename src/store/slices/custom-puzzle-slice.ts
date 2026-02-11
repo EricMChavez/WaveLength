@@ -1,7 +1,6 @@
 import type { StateCreator } from 'zustand';
-import type { NodeState, Wire, GameboardState } from '../../shared/types/index.ts';
-import { WIRE_BUFFER_SIZE } from '../../shared/types/index.ts';
-import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition, PuzzleTestCase } from '../../puzzle/types.ts';
+import type { NodeState, GameboardState } from '../../shared/types/index.ts';
+import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition } from '../../puzzle/types.ts';
 import { createConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { PLAYABLE_START } from '../../shared/grid/index.ts';
@@ -226,7 +225,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
     // Load into store
     store.setActiveBoard(board);
     store.loadPuzzle(puzzleDef);
-    store.initializeMeters(cpConfig, 'dimmed');
+    store.initializeMeters(cpConfig, 'active');
   },
 
   getSerializableCustomPuzzles: () => {

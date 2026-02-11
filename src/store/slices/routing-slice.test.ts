@@ -79,12 +79,10 @@ describe('routing-slice', () => {
     expect(lastPt.col).toBe(25); // target node.col (left grid line)
   });
 
-  it('routeAllWires preserves wire id and signal buffer', () => {
+  it('routeAllWires preserves wire id and source/target', () => {
     const nodeA = makeNode('a', 12, 8);
     const nodeB = makeNode('b', 25, 8);
     const wire = createWire('w1', { nodeId: 'a', portIndex: 0, side: 'output' }, { nodeId: 'b', portIndex: 0, side: 'input' });
-    wire.signalBuffer[0] = 42;
-    wire.writeHead = 5;
     const board: GameboardState = {
       id: 'test-board',
       nodes: new Map([['a', nodeA], ['b', nodeB]]),
@@ -96,8 +94,8 @@ describe('routing-slice', () => {
 
     const routed = getWires();
     expect(routed[0].id).toBe('w1');
-    expect(routed[0].signalBuffer[0]).toBe(42);
-    expect(routed[0].writeHead).toBe(5);
+    expect(routed[0].source.nodeId).toBe('a');
+    expect(routed[0].target.nodeId).toBe('b');
   });
 
   it('routeAllWires sets empty path when routing fails', () => {

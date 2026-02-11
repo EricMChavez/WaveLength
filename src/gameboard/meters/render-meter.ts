@@ -1,9 +1,8 @@
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { PixelRect } from '../../shared/grid/types.ts';
 import type { MeterSlotState } from './meter-types.ts';
-import { CHANNEL_RATIOS, VERTICAL_HEIGHT_RATIO } from './meter-types.ts';
-import type { MeterCircularBuffer } from './circular-buffer.ts';
-import { drawWaveformChannel, drawMatchOverlay } from './render-waveform-channel.ts';
+import { CHANNEL_RATIOS, VERTICAL_HEIGHT_RATIO, METER_BUFFER_CAPACITY } from './meter-types.ts';
+import { drawWaveformChannel } from './render-waveform-channel.ts';
 import { drawLevelBar, type LevelBarCutout } from './render-level-bar.ts';
 import { drawNeedle } from './render-needle.ts';
 import { drawTargetOverlay } from './render-target-overlay.ts';
@@ -13,10 +12,14 @@ import { getDevOverrides } from '../../dev/index.ts';
 /** Data needed to render a single meter, assembled by the render loop */
 export interface RenderMeterState {
   slot: MeterSlotState;
-  signalBuffer: MeterCircularBuffer | null;
-  targetBuffer: MeterCircularBuffer | null;
+  /** 256 signal samples (one per cycle), or null if no data */
+  signalValues: readonly number[] | null;
+  /** 256 target samples for output meters, or null */
+  targetValues: readonly number[] | null;
   /** Per-sample match status for output meters (green coloring) */
-  matchStatus?: boolean[] | null;
+  matchStatus?: readonly boolean[] | null;
+  /** Current playpoint cycle index (0-255) for indicator line and current value */
+  playpoint: number;
 }
 
 /**
@@ -37,7 +40,7 @@ export function drawMeter(
   state: RenderMeterState,
   rect: PixelRect,
 ): void {
-  const { slot, signalBuffer, targetBuffer } = state;
+  const { slot, signalValues, targetValues } = state;
 
   if (slot.visualState === 'hidden') return;
 
@@ -54,13 +57,13 @@ export function drawMeter(
   const housingColor = devOverrides.enabled
     ? devOverrides.colors.meterInterior
     : tokens.meterHousing;
-  drawMeterHousing(ctx, housingColor, waveformRect, levelBarRect, slot.side);
+  drawMeterHousing(ctx, housingColor, waveformRect, levelBarRect);
 
   // Draw meter interior background (behind waveform + levelBar, respecting cutout)
   const meterInteriorColor = devOverrides.enabled
     ? devOverrides.colors.meterInterior
     : tokens.meterInterior;
-  drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout, slot.side);
+  drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout);
 
   if (slot.visualState === 'dimmed') {
     // Dimmed: draw a semi-transparent overlay and return
@@ -86,8 +89,11 @@ export function drawMeter(
   ctx.stroke();
   ctx.restore();
 
-  // Current value for level bar and needle
-  const currentValue = signalBuffer ? signalBuffer.latest() : 0;
+  // Current value at playpoint for level bar and needle
+  const playpoint = state.playpoint;
+  const currentValue = signalValues && playpoint < signalValues.length
+    ? signalValues[playpoint]
+    : 0;
 
   // Clip all channel drawing to meter bounds
   ctx.save();
@@ -95,22 +101,33 @@ export function drawMeter(
   ctx.rect(rect.x, rect.y, rect.width, rect.height);
   ctx.clip();
 
-  // Draw channels
-  if (signalBuffer) {
-    drawWaveformChannel(ctx, tokens, signalBuffer, waveformRect);
-  }
-
-  // Match overlay: green wash on top of waveform bars where signal matches target
-  if (signalBuffer && state.matchStatus) {
-    drawMatchOverlay(ctx, tokens, signalBuffer, waveformRect, state.matchStatus);
+  // Draw waveform polyline (playpoint-split: polarity fill left, white line right)
+  if (signalValues && signalValues.length > 0) {
+    drawWaveformChannel(ctx, tokens, signalValues, waveformRect, playpoint);
   }
 
   drawLevelBar(ctx, tokens, currentValue, levelBarRect, cutout);
   drawNeedle(ctx, tokens, currentValue, needleRect, slot.side);
 
   // Target overlay for output meters
-  if (targetBuffer && slot.direction === 'output') {
-    drawTargetOverlay(ctx, tokens, targetBuffer, waveformRect, state.matchStatus, signalBuffer?.count);
+  if (targetValues && slot.direction === 'output') {
+    drawTargetOverlay(ctx, tokens, targetValues, waveformRect);
+  }
+
+  // Playpoint indicator line (vertical line at current cycle position)
+  if (signalValues && signalValues.length > 0) {
+    const wfCenterY = rect.y + rect.height / 2;
+    const halfHeight = (waveformRect.height * VERTICAL_HEIGHT_RATIO) / 2;
+    const indicatorX = waveformRect.x + (playpoint / METER_BUFFER_CAPACITY) * waveformRect.width;
+    ctx.save();
+    ctx.strokeStyle = tokens.meterNeedle;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(indicatorX, wfCenterY - halfHeight);
+    ctx.lineTo(indicatorX, wfCenterY + halfHeight);
+    ctx.stroke();
+    ctx.restore();
   }
 
   ctx.restore();
@@ -254,7 +271,6 @@ function drawMeterInterior(
   waveformRect: PixelRect,
   levelBarRect: PixelRect,
   cutout: LevelBarCutout,
-  _side: 'left' | 'right',
 ): void {
   const verticalHeightRatio = VERTICAL_HEIGHT_RATIO;
 
@@ -310,7 +326,6 @@ function drawMeterHousing(
   color: string,
   waveformRect: PixelRect,
   levelBarRect: PixelRect,
-  side: 'left' | 'right',
 ): void {
   const left = Math.min(waveformRect.x, levelBarRect.x);
   const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
@@ -323,4 +338,3 @@ function drawMeterHousing(
   ctx.fillStyle = color;
   ctx.fillRect(left, top, width, height);
 }
-

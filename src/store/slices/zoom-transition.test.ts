@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { create } from 'zustand';
 import { createGameboardSlice } from './gameboard-slice.ts';
 import { createInteractionSlice } from './interaction-slice.ts';
-import { createSimulationSlice } from './simulation-slice.ts';
+import { createPlaypointSlice } from './playpoint-slice.ts';
 import { createPuzzleSlice } from './puzzle-slice.ts';
 import { createPaletteSlice } from './palette-slice.ts';
 import { createCeremonySlice } from './ceremony-slice.ts';
@@ -19,7 +19,7 @@ function createTestStore() {
   return create<GameStore>()((...a) => ({
     ...createGameboardSlice(...a),
     ...createInteractionSlice(...a),
-    ...createSimulationSlice(...a),
+    ...createPlaypointSlice(...a),
     ...createPuzzleSlice(...a),
     ...createPaletteSlice(...a),
     ...createCeremonySlice(...a),

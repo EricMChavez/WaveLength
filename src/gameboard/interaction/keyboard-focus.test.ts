@@ -22,8 +22,6 @@ function makeWire(id: string, sourceNodeId: string, sourcePort: number, targetNo
     source: { nodeId: sourceNodeId, portIndex: sourcePort, side: 'output' },
     target: { nodeId: targetNodeId, portIndex: targetPort, side: 'input' },
     path: [],
-    signalBuffer: new Array(16).fill(0),
-    writeHead: 0,
   };
 }
 

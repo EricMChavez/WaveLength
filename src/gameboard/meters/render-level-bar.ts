@@ -20,6 +20,9 @@ export interface LevelBarCutout {
  * Positive values fill upward, negative fill downward.
  * Signal range is -100..+100.
  *
+ * Uses a vertical gradient: signalZero (soft white) at center → polarity at extremes,
+ * matching the consistent polarity gradient used across all signal visualisations.
+ *
  * An optional cutout creates a circular arc near the connection point
  * to improve needle visibility and emphasize extreme levels.
  */
@@ -73,7 +76,14 @@ export function drawLevelBar(
 
   const positiveColor = useOverrides ? devOverrides.colors.signalPositive : tokens.signalPositive;
   const negativeColor = useOverrides ? devOverrides.colors.signalNegative : tokens.signalNegative;
-  ctx.fillStyle = normalized >= 0 ? positiveColor : negativeColor;
+  const zeroColor = useOverrides ? devOverrides.colors.meterZero : tokens.signalZero;
+
+  // Vertical gradient: signalZero at center, polarity colour at extremes
+  const gradient = ctx.createLinearGradient(0, centerY - halfHeight, 0, centerY + halfHeight);
+  gradient.addColorStop(0, positiveColor);
+  gradient.addColorStop(0.5, zeroColor);
+  gradient.addColorStop(1, negativeColor);
+  ctx.fillStyle = gradient;
 
   if (normalized >= 0) {
     // Fill upward from center - use original rect bounds, clip does the shaping

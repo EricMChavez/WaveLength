@@ -1,4 +1,4 @@
-/** Number of samples stored in each meter's circular buffer (16 WTS × 16 subdivisions) */
+/** Number of samples stored in each meter (256 cycles) */
 export const METER_BUFFER_CAPACITY = 256;
 
 /** Number of meter slots per side (left / right) */

@@ -9,7 +9,7 @@ function makeUtilityEntry(utilityId: string, title: string): UtilityNodeEntry {
     title,
     inputCount: 1,
     outputCount: 1,
-    bakeMetadata: { delays: [], evaluationOrder: [], nodeDelays: new Map() },
+    bakeMetadata: { topoOrder: [], nodeConfigs: [], edges: [], inputCount: 1, outputCount: 1 },
     board: { id: utilityId, nodes: new Map(), wires: [] },
     versionHash: 'v1',
   };

@@ -2,7 +2,6 @@ import { useGameStore } from '../../store/index.ts';
 import { nodeRegistry, getNodeLabel } from '../../engine/nodes/registry.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
-import { stopSimulation } from '../../simulation/simulation-controller.ts';
 import { LevelSelect } from '../../ui/puzzle/LevelSelect.tsx';
 import styles from './PalettePanel.module.css';
 
@@ -23,11 +22,6 @@ export function PalettePanel() {
     const utilityId = generateId();
     const board = createUtilityGameboard(utilityId);
 
-    if (state.simulationRunning) {
-      stopSimulation();
-      state.setSimulationRunning(false);
-    }
-
     const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
     state.startZoomTransition('in', snapshot);
     state.startEditingUtility(utilityId, board);
@@ -37,11 +31,6 @@ export function PalettePanel() {
     const state = useGameStore.getState();
     const entry = state.utilityNodes.get(utilityId);
     if (!entry) return;
-
-    if (state.simulationRunning) {
-      stopSimulation();
-      state.setSimulationRunning(false);
-    }
 
     const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
     state.startZoomTransition('in', snapshot);

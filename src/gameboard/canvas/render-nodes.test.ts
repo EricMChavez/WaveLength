@@ -33,6 +33,7 @@ function makeTokens(overrides: Partial<ThemeTokens> = {}): ThemeTokens {
     meterInterior: '',
     signalPositive: '',
     signalNegative: '',
+    signalZero: '',
     colorTarget: '',
     meterNeedle: '',
     wireWidthBase: '',

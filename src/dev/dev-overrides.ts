@@ -1,6 +1,8 @@
 /**
  * Visual override parameters controllable via Leva dev tools.
  * These override the theme tokens at render time for experimentation.
+ *
+ * Only includes overrides that are actually consumed by render functions.
  */
 
 export interface NodeStyleOverrides {
@@ -23,9 +25,6 @@ export interface WireStyleOverrides {
 
 export interface GridStyleOverrides {
   lineOpacity: number;
-  shadowDepth: number;
-  borderHighlight: number;
-  borderShadow: number;
   insetDepthTop: number;
   insetDepthSide: number;
   showGridLabels: boolean;
@@ -36,27 +35,27 @@ export interface MeterStyleOverrides {
 }
 
 export interface ColorOverrides {
+  // Page background (GameboardCanvas.tsx)
   pageBackground: string;
   pageBackgroundCenter: string;
-  signalPositive: string;
-  signalNegative: string;
-  colorNeutral: string;
-  gridArea: string;
+  // Grid (render-grid.ts)
   gridAreaEdge: string;
   gridAreaCenter: string;
-  meterInterior: string;
+  gridLine: string;
+  boardBorder: string;
+  // Nodes (render-nodes.ts)
   surfaceNode: string;
   surfaceNodeBottom: string;
-  portFill: string;
-  portStroke: string;
-  gridLine: string;
-  meterNeedle: string;
-  textPrimary: string;
-  colorError: string;
+  // Signal polarity (render-wires.ts, render-level-bar.ts, render-waveform-channel.ts)
+  signalPositive: string;
+  signalNegative: string;
+  signalZero: string;
+  colorNeutral: string;
+  // Meters (render-meter.ts, render-needle.ts, render-level-bar.ts, render-waveform-channel.ts)
+  meterInterior: string;
   meterBorder: string;
-  boardBorder: string;
-  colorValidationMatch: string;
-  colorTarget: string;
+  meterNeedle: string;
+  meterZero: string;
 }
 
 export interface DevOverrides {
@@ -68,7 +67,7 @@ export interface DevOverrides {
   colors: ColorOverrides;
 }
 
-/** Default values matching current implementation */
+/** Default values matching current dark theme + hardcoded render defaults */
 export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
   enabled: false,
   nodeStyle: {
@@ -89,9 +88,6 @@ export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
   },
   gridStyle: {
     lineOpacity: 0.8,
-    shadowDepth: 1,
-    borderHighlight: 0.3,
-    borderShadow: 1,
     insetDepthTop: 1,
     insetDepthSide: 1,
     showGridLabels: false,
@@ -100,27 +96,27 @@ export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
     needleGlow: 10,
   },
   colors: {
-    pageBackground: '#0a0a0a',
-    pageBackgroundCenter: '#282a2e',
-    signalPositive: '#ff9200',
-    signalNegative: '#0782e0',
-    colorNeutral: '#242424',
-    gridArea: '#000000',
+    // Page background (matches hardcoded gradient in GameboardCanvas.tsx)
+    pageBackground: '#121216',
+    pageBackgroundCenter: '#3d3e42',
+    // Grid
     gridAreaEdge: '#000000',
     gridAreaCenter: '#0a0b0d',
-    meterInterior: '#000000',
+    gridLine: '#16161a',
+    boardBorder: '#3d3e42',
+    // Nodes
     surfaceNode: '#44484e',
     surfaceNodeBottom: '#2a2a2a',
-    portFill: '#3a7bd5',
-    portStroke: '#5a9bf5',
-    gridLine: '#16161a',
-    meterNeedle: '#f5f5f5',
-    textPrimary: '#e0e0f0',
-    colorError: '#e04040',
+    // Signal polarity
+    signalPositive: '#ff9200',
+    signalNegative: '#0782e0',
+    signalZero: '#d0d0d8',
+    colorNeutral: '#242424',
+    // Meters
+    meterInterior: '#000000',
     meterBorder: '#6c6666',
-    boardBorder: '#3d3e42',
-    colorValidationMatch: '#22c55e',
-    colorTarget: '#c8c8d8',
+    meterNeedle: '#f5f5f5',
+    meterZero: '#d0d0d8',
   },
 };
 

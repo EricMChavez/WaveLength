@@ -8,7 +8,6 @@ function makeMetadata(overrides: Partial<BakeMetadata> = {}): BakeMetadata {
     topoOrder: [],
     nodeConfigs: [],
     edges: [],
-    inputDelays: [],
     inputCount: 1,
     outputCount: 1,
     ...overrides,
@@ -32,8 +31,8 @@ describe('gameboardFromBakeMetadata', () => {
         { id: cpOutputId(0), type: 'connection-output', params: {}, inputCount: 1, outputCount: 0 },
       ],
       edges: [
-        { fromNodeId: cpInputId(0), fromPort: 0, toNodeId: 'n1', toPort: 0, wtsDelay: 16 },
-        { fromNodeId: 'n1', fromPort: 0, toNodeId: cpOutputId(0), toPort: 0, wtsDelay: 16 },
+        { fromNodeId: cpInputId(0), fromPort: 0, toNodeId: 'n1', toPort: 0 },
+        { fromNodeId: 'n1', fromPort: 0, toNodeId: cpOutputId(0), toPort: 0 },
       ],
     });
 
@@ -70,11 +69,11 @@ describe('gameboardFromBakeMetadata', () => {
         { id: cpOutputId(0), type: 'connection-output', params: {}, inputCount: 1, outputCount: 0 },
       ],
       edges: [
-        { fromNodeId: cpInputId(0), fromPort: 0, toNodeId: 'a', toPort: 0, wtsDelay: 16 },
-        { fromNodeId: cpInputId(1), fromPort: 0, toNodeId: 'b', toPort: 0, wtsDelay: 16 },
-        { fromNodeId: 'a', fromPort: 0, toNodeId: 'c', toPort: 0, wtsDelay: 16 },
-        { fromNodeId: 'b', fromPort: 0, toNodeId: 'c', toPort: 1, wtsDelay: 16 },
-        { fromNodeId: 'c', fromPort: 0, toNodeId: cpOutputId(0), toPort: 0, wtsDelay: 16 },
+        { fromNodeId: cpInputId(0), fromPort: 0, toNodeId: 'a', toPort: 0 },
+        { fromNodeId: cpInputId(1), fromPort: 0, toNodeId: 'b', toPort: 0 },
+        { fromNodeId: 'a', fromPort: 0, toNodeId: 'c', toPort: 0 },
+        { fromNodeId: 'b', fromPort: 0, toNodeId: 'c', toPort: 1 },
+        { fromNodeId: 'c', fromPort: 0, toNodeId: cpOutputId(0), toPort: 0 },
       ],
     });
 
@@ -108,7 +107,7 @@ describe('gameboardFromBakeMetadata', () => {
         { id: cpOutputId(0), type: 'connection-output', params: {}, inputCount: 1, outputCount: 0 },
       ],
       edges: [
-        { fromNodeId: cpInputId(0), fromPort: 0, toNodeId: cpOutputId(0), toPort: 0, wtsDelay: 16 },
+        { fromNodeId: cpInputId(0), fromPort: 0, toNodeId: cpOutputId(0), toPort: 0 },
       ],
     });
 

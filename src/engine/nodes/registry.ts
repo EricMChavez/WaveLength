@@ -9,7 +9,6 @@ import type { NodeDefinition, NodeCategory, ParamValue } from './framework';
 import { createDefaultParams } from './framework';
 import {
   inverterNode,
-  delayNode,
   mixerNode,
   ampNode,
   diverterNode,
@@ -17,6 +16,7 @@ import {
   shifterNode,
   splitterNode,
   mergerNode,
+  memoryNode,
 } from './definitions';
 
 // =============================================================================
@@ -29,14 +29,14 @@ import {
  */
 const NODE_DEFINITIONS: readonly NodeDefinition<Record<string, ParamValue>>[] = [
   inverterNode,
-  delayNode as NodeDefinition<Record<string, ParamValue>>,
   mixerNode as NodeDefinition<Record<string, ParamValue>>,
   ampNode as NodeDefinition<Record<string, ParamValue>>,
   diverterNode as NodeDefinition<Record<string, ParamValue>>,
   polarizerNode,
   shifterNode as NodeDefinition<Record<string, ParamValue>>,
-  splitterNode as NodeDefinition<Record<string, ParamValue>>, 
+  splitterNode as NodeDefinition<Record<string, ParamValue>>,
   mergerNode as NodeDefinition<Record<string, ParamValue>>,
+  memoryNode as NodeDefinition<Record<string, ParamValue>>,
 ] as const;
 
 // =============================================================================

@@ -5,9 +5,6 @@ import type { CustomPuzzle } from '../../store/slices/custom-puzzle-slice.ts';
 import { nodeRegistry, getNodeLabel } from '../../engine/nodes/registry.ts';
 import styles from './SavePuzzleDialog.module.css';
 
-/** Samples per WTS (16 subdivisions) */
-const SAMPLES_PER_WTS = 16;
-
 export function SavePuzzleDialog() {
   const overlay = useGameStore((s) => s.activeOverlay);
   if (overlay.type !== 'save-puzzle-dialog') return null;
@@ -17,8 +14,7 @@ export function SavePuzzleDialog() {
 function SavePuzzleDialogInner() {
   const closeOverlay = useGameStore((s) => s.closeOverlay);
   const cancelAuthoring = useGameStore((s) => s.cancelAuthoring);
-  const trimBufferSnapshot = useGameStore((s) => s.trimBufferSnapshot);
-  const trimConfig = useGameStore((s) => s.trimConfig);
+  const cycleResults = useGameStore((s) => s.cycleResults);
   const creativeSlots = useGameStore((s) => s.creativeSlots);
   const activeBoard = useGameStore((s) => s.activeBoard);
   const addCustomPuzzle = useGameStore((s) => s.addCustomPuzzle);
@@ -29,7 +25,6 @@ function SavePuzzleDialogInner() {
     for (const def of nodeRegistry.all) {
       types.push({ type: def.type, label: getNodeLabel(def.type) });
     }
-    // Add "Custom" as a fundamental node type that enables all user-created nodes
     types.push({ type: 'custom', label: 'Custom' });
     return types;
   }, []);
@@ -64,36 +59,34 @@ function SavePuzzleDialogInner() {
     .map((slot, index) => ({ slot, index }))
     .filter(({ slot }) => slot.direction === 'output');
 
-  const { startWTS, endWTS } = trimConfig;
-  const durationWTS = endWTS - startWTS;
-
   const handleCancel = useCallback(() => {
     cancelAuthoring();
     closeOverlay();
   }, [cancelAuthoring, closeOverlay]);
 
   const handleSave = useCallback(() => {
-    // Validate
     if (!title.trim()) {
       setError('Please enter a title');
       return;
     }
 
-    if (!activeBoard || !trimBufferSnapshot) {
+    if (!activeBoard || !cycleResults) {
       setError('Invalid state - please try again');
       return;
     }
 
-    // Extract trimmed samples for each output slot
+    // Extract 256-sample target arrays from cycle results for each output slot.
+    // Creative output slots 3-5 map to fixed output indices 0-2 (slotIndex - 3).
     const targetSamples = new Map<number, number[]>();
-    const startSample = startWTS * SAMPLES_PER_WTS;
-    const endSample = endWTS * SAMPLES_PER_WTS;
-
+    const outputCount = cycleResults.outputValues[0]?.length ?? 0;
     for (const { index: slotIndex } of outputSlots) {
-      const fullBuffer = trimBufferSnapshot.get(slotIndex);
-      if (fullBuffer) {
-        const trimmed = fullBuffer.slice(startSample, endSample);
-        targetSamples.set(slotIndex, trimmed);
+      const outputIdx = slotIndex - 3; // slots 3-5 → output indices 0-2
+      if (outputIdx >= 0 && outputIdx < outputCount) {
+        const samples: number[] = [];
+        for (let c = 0; c < cycleResults.outputValues.length; c++) {
+          samples.push(cycleResults.outputValues[c][outputIdx] ?? 0);
+        }
+        targetSamples.set(slotIndex, samples);
       }
     }
 
@@ -116,7 +109,6 @@ function SavePuzzleDialogInner() {
         rotation: node.rotation,
       }));
 
-    // No wires for starting nodes (they're placed individually)
     const initialWires: CustomPuzzle['initialWires'] = [];
 
     // Compute allowedNodes: null means all types allowed
@@ -124,7 +116,6 @@ function SavePuzzleDialogInner() {
       ? null
       : Array.from(allowedNodeSet);
 
-    // Create puzzle
     const puzzle: CustomPuzzle = {
       id: `custom-${Date.now()}`,
       title: title.trim(),
@@ -144,9 +135,7 @@ function SavePuzzleDialogInner() {
     title,
     description,
     activeBoard,
-    trimBufferSnapshot,
-    startWTS,
-    endWTS,
+    cycleResults,
     creativeSlots,
     outputSlots,
     addCustomPuzzle,
@@ -233,8 +222,8 @@ function SavePuzzleDialogInner() {
                 </span>
               </div>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Loop duration:</span>
-                <span className={styles.summaryValue}>{durationWTS} WTS ({durationWTS}s)</span>
+                <span className={styles.summaryLabel}>Cycles:</span>
+                <span className={styles.summaryValue}>256</span>
               </div>
             </div>
           </div>

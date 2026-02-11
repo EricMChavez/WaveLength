@@ -2,7 +2,6 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/index.ts';
 import { buildContextMenuItems } from './context-menu-items.ts';
 import type { ContextMenuItem } from './context-menu-items.ts';
-import { stopSimulation } from '../../simulation/simulation-controller.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
 import styles from './ContextMenu.module.css';
@@ -105,10 +104,6 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
         break;
       case 'inspect':
         if (target.type === 'node') {
-          if (state.simulationRunning) {
-            stopSimulation();
-            state.setSimulationRunning(false);
-          }
           captureAndStartLidOpen(state);
           state.zoomIntoNode(target.nodeId);
         }
@@ -117,11 +112,6 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
         if (target.type === 'node') {
           const node = state.activeBoard?.nodes.get(target.nodeId);
           if (!node) break;
-
-          if (state.simulationRunning) {
-            stopSimulation();
-            state.setSimulationRunning(false);
-          }
 
           if (node.type === 'custom-blank') {
             // Create a fresh utility gameboard for a blank custom node

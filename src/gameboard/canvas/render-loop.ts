@@ -1,6 +1,7 @@
 import { useGameStore } from '../../store/index.ts';
 import { getThemeTokens } from '../../shared/tokens/theme-manager.ts';
-import { isRunning, tickSimulation, getMeterBuffers, getTargetDisplayBuffers, getPerSampleMatch } from '../../simulation/simulation-controller.ts';
+import { getPerSampleMatch } from '../../simulation/cycle-runner.ts';
+import { generateWaveformValue } from '../../puzzle/waveform-generators.ts';
 import { GRID_COLS, GRID_ROWS, METER_LEFT_START, METER_RIGHT_START, gridRectToPixels, pixelToGrid } from '../../shared/grid/index.ts';
 import { drawMeter } from '../meters/render-meter.ts';
 import type { RenderMeterState } from '../meters/render-meter.ts';
@@ -18,31 +19,57 @@ import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts
 import { getRejectedKnobNodeId } from './rejected-knob.ts';
 import { getPortGridAnchor, getPortWireDirection, findPath, DIR_E } from '../../shared/routing/index.ts';
 import type { GridPoint } from '../../shared/grid/types.ts';
-import type { MeterCircularBuffer } from '../meters/circular-buffer.ts';
+import type { KnobInfo } from './render-types.ts';
+import type { NodeState, Wire } from '../../shared/types/index.ts';
+import type { CycleResults } from '../../engine/evaluation/index.ts';
+import { KNOB_NODES } from '../../shared/constants/index.ts';
 
-const WIRE_BUFFER_SIZE = 16;
+const PLAYPOINT_RATE = 16; // cycles per second
 
-/** Build a map of latest signal value per CP, from meter circular buffers. */
-function computeCpSignals(meterBuffers: ReadonlyMap<string, MeterCircularBuffer>): ReadonlyMap<string, number> {
+/** Build a map of signal value per CP at current playpoint, from meter signal arrays. */
+function computeCpSignals(
+  meterSignalArrays: ReadonlyMap<string, number[]>,
+  playpoint: number,
+): ReadonlyMap<string, number> {
   const result = new Map<string, number>();
-  for (const [key, buffer] of meterBuffers) {
-    result.set(key, buffer.latest());
+  for (const [key, samples] of meterSignalArrays) {
+    result.set(key, samples[playpoint] ?? 0);
   }
   return result;
 }
 
-/** Build a map of signal value per node port, from wire buffers. */
-function computePortSignals(wires: ReadonlyArray<Wire>): ReadonlyMap<string, number> {
+/** Build a map of signal value per node port at current playpoint, from cycle results. */
+function computePortSignals(
+  cycleResults: CycleResults | null,
+  playpoint: number,
+  wires: ReadonlyArray<Wire>,
+): ReadonlyMap<string, number> {
   const result = new Map<string, number>();
+  if (!cycleResults) return result;
+
+  // For each wire, the source output port value = the wire's value at this cycle
   for (const wire of wires) {
-    if (!wire.signalBuffer || wire.signalBuffer.length === 0) continue;
-    // Source output port: newest sample (matches first wire segment)
-    const newest = wire.signalBuffer[(wire.writeHead - 1 + WIRE_BUFFER_SIZE) % WIRE_BUFFER_SIZE];
-    result.set(`${wire.source.nodeId}:output:${wire.source.portIndex}`, newest);
-    // Target input port: oldest sample (matches last wire segment)
-    const oldest = wire.signalBuffer[wire.writeHead];
-    result.set(`${wire.target.nodeId}:input:${wire.target.portIndex}`, oldest);
+    const wireVal = cycleResults.wireValues.get(wire.id)?.[playpoint] ?? 0;
+    result.set(`${wire.source.nodeId}:output:${wire.source.portIndex}`, wireVal);
+    result.set(`${wire.target.nodeId}:input:${wire.target.portIndex}`, wireVal);
   }
+
+  return result;
+}
+
+/** Build a map of wire signal values at the current playpoint. */
+function computeWireValues(
+  cycleResults: CycleResults | null,
+  playpoint: number,
+  wires: ReadonlyArray<Wire>,
+): ReadonlyMap<string, number> {
+  const result = new Map<string, number>();
+  if (!cycleResults) return result;
+
+  for (const wire of wires) {
+    result.set(wire.id, cycleResults.wireValues.get(wire.id)?.[playpoint] ?? 0);
+  }
+
   return result;
 }
 
@@ -50,6 +77,10 @@ function computePortSignals(wires: ReadonlyArray<Wire>): ReadonlyMap<string, num
 let lastPreviewGridCol = -1;
 let lastPreviewGridRow = -1;
 let cachedPreviewPath: GridPoint[] | null = null;
+
+// Playpoint animation state
+let lastPlaypointTimestamp = 0;
+let playAccumulator = 0;
 
 /**
  * Start the requestAnimationFrame render loop.
@@ -72,13 +103,22 @@ export function startRenderLoop(
   function render(timestamp: number) {
     if (!running) return;
 
-    // Drive simulation ticks BEFORE reading state — guarantees wires and
-    // meters are consistent for the current frame's draw calls.
-    tickSimulation(timestamp);
-
     // Single getState() + getThemeTokens() per frame
     const state = useGameStore.getState();
     const tokens = getThemeTokens();
+
+    // Advance playpoint when playing
+    if (state.playMode === 'playing' && lastPlaypointTimestamp > 0) {
+      const elapsed = timestamp - lastPlaypointTimestamp;
+      playAccumulator += elapsed;
+      const cyclesPerMs = PLAYPOINT_RATE / 1000;
+      const cyclesToAdvance = Math.floor(playAccumulator * cyclesPerMs);
+      if (cyclesToAdvance > 0) {
+        playAccumulator -= cyclesToAdvance / cyclesPerMs;
+        state.stepPlaypoint(cyclesToAdvance);
+      }
+    }
+    lastPlaypointTimestamp = timestamp;
 
     // Derive logical dimensions from grid cell size
     const cellSize = getCellSize();
@@ -118,14 +158,17 @@ export function startRenderLoop(
     // Grid zones and lines (lowest z-order)
     drawGrid(ctx!, tokens, {}, cellSize);
 
+    // Read cycle results and playpoint for rendering
+    const cycleResults = state.cycleResults;
+    const playpoint = state.playpoint;
+
     // Draw meters in side zones
-    const meterBuffers = getMeterBuffers();
-    const targetDisplayBuffers = getTargetDisplayBuffers();
     const perSampleMatch = getPerSampleMatch();
-    const isSimRunning = isRunning();
+    // Build flat arrays for meter rendering from cycleResults + puzzle
+    const meterSignalArrays = buildMeterSignalArrays(cycleResults, state);
+    const meterTargetArrays = buildMeterTargetArrays(state);
 
     // Calculate meter starting offset (meters fill the full height)
-    // 3 meters × 6 rows = 18 rows total (no gaps, no margins)
     const meterTopMargin = 0; // in grid rows
     const meterStride = METER_GRID_ROWS + METER_GAP_ROWS; // rows per meter + gap
 
@@ -145,9 +188,10 @@ export function startRenderLoop(
         const dir = leftSlot.direction;
         const renderState: RenderMeterState = {
           slot: leftSlot,
-          signalBuffer: meterBuffers.get(`${dir}:${cpIdx}`) ?? null,
-          targetBuffer: dir === 'output' ? (targetDisplayBuffers.get(`target:${cpIdx}`) ?? null) : null,
+          signalValues: meterSignalArrays.get(`${dir}:${cpIdx}`) ?? null,
+          targetValues: dir === 'output' ? (meterTargetArrays.get(`target:${cpIdx}`) ?? null) : null,
           matchStatus: dir === 'output' ? (perSampleMatch.get(`output:${cpIdx}`) ?? null) : undefined,
+          playpoint,
         };
         drawMeter(ctx!, tokens, renderState, leftRect);
       }
@@ -167,22 +211,28 @@ export function startRenderLoop(
         const dirR = rightSlot.direction;
         const renderState: RenderMeterState = {
           slot: rightSlot,
-          signalBuffer: meterBuffers.get(`${dirR}:${cpIdxR}`) ?? null,
-          targetBuffer: dirR === 'output' ? (targetDisplayBuffers.get(`target:${cpIdxR}`) ?? null) : null,
+          signalValues: meterSignalArrays.get(`${dirR}:${cpIdxR}`) ?? null,
+          targetValues: dirR === 'output' ? (meterTargetArrays.get(`target:${cpIdxR}`) ?? null) : null,
           matchStatus: dirR === 'output' ? (perSampleMatch.get(`output:${cpIdxR}`) ?? null) : undefined,
+          playpoint,
         };
         drawMeter(ctx!, tokens, renderState, rightRect);
       }
     }
 
-    // Compute signal values for port/CP coloring
-    const cpSignals = computeCpSignals(meterBuffers);
-    const portSignals = state.activeBoard ? computePortSignals(state.activeBoard.wires) : new Map<string, number>();
+    // Compute signal values for port/CP coloring from meter signal arrays
+    const cpSignals = computeCpSignals(meterSignalArrays, playpoint);
+    const portSignals = state.activeBoard
+      ? computePortSignals(cycleResults, playpoint, state.activeBoard.wires)
+      : new Map<string, number>();
 
     if (state.activeBoard) {
-      drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes);
-      // Compute knob values for all knob-equipped nodes (mixer, amp, etc.)
-      const knobValues = computeKnobValues(state.activeBoard.nodes, state.activeBoard.wires);
+      // Compute wire values at current playpoint for coloring
+      const wireValues = computeWireValues(cycleResults, playpoint, state.activeBoard.wires);
+      drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, wireValues);
+
+      // Compute knob values from cycle results
+      const knobValues = computeKnobValues(state.activeBoard.nodes, state.activeBoard.wires, cycleResults, playpoint);
 
       drawNodes(ctx!, tokens, {
         puzzleNodes: state.puzzleNodes,
@@ -209,7 +259,6 @@ export function startRenderLoop(
     renderConnectionPoints(ctx!, tokens, {
       activePuzzle: state.activePuzzle,
       perPortMatch: state.perPortMatch,
-      isSimRunning,
       editingUtilityId: state.editingUtilityId,
       cpSignals,
     }, cellSize);
@@ -322,10 +371,6 @@ export function startRenderLoop(
   };
 }
 
-import type { KnobInfo } from './render-types.ts';
-import type { NodeState, Wire } from '../../shared/types/index.ts';
-import { KNOB_NODES } from '../../shared/constants/index.ts';
-
 /**
  * Handle ceremony completion: add puzzle node, complete level, dismiss ceremony.
  * Called from render loop when ceremony zoom-out reaches progress >= 1.
@@ -346,14 +391,94 @@ function handleCeremonyCompletion(state: ReturnType<typeof useGameStore.getState
   state.completeLevel(ceremonyPuzzle.id);
 }
 
+const CYCLE_COUNT = 256;
+
+/**
+ * Build flat signal arrays for all meter CPs from cycle results.
+ * Input CPs get their values from the input waveforms (test case or creative slots).
+ * Output CPs get their values from cycle evaluation results.
+ */
+function buildMeterSignalArrays(
+  cycleResults: CycleResults | null,
+  state: ReturnType<typeof useGameStore.getState>,
+): ReadonlyMap<string, number[]> {
+  const result = new Map<string, number[]>();
+  const { activePuzzle, activeTestCaseIndex } = state;
+
+  // Input signals from test case waveforms or creative mode slots
+  if (activePuzzle) {
+    const testCase = activePuzzle.testCases[activeTestCaseIndex];
+    if (testCase) {
+      for (let i = 0; i < testCase.inputs.length; i++) {
+        const samples = new Array(CYCLE_COUNT);
+        for (let c = 0; c < CYCLE_COUNT; c++) {
+          samples[c] = generateWaveformValue(c, testCase.inputs[i]);
+        }
+        result.set(`input:${i}`, samples);
+      }
+    }
+  } else if (state.isCreativeMode) {
+    for (let i = 0; i < 3; i++) {
+      const slot = state.creativeSlots[i];
+      if (slot?.direction === 'input') {
+        const samples = new Array(CYCLE_COUNT);
+        for (let c = 0; c < CYCLE_COUNT; c++) {
+          samples[c] = generateWaveformValue(c, slot.waveform);
+        }
+        result.set(`input:${i}`, samples);
+      }
+    }
+  }
+
+  // Output signals from cycle results
+  if (cycleResults) {
+    const outputCount = cycleResults.outputValues[0]?.length ?? 0;
+    for (let i = 0; i < outputCount; i++) {
+      const samples = new Array(CYCLE_COUNT);
+      for (let c = 0; c < CYCLE_COUNT; c++) {
+        samples[c] = cycleResults.outputValues[c]?.[i] ?? 0;
+      }
+      result.set(`output:${i}`, samples);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Build flat target arrays for output meters from puzzle test case expected outputs.
+ */
+function buildMeterTargetArrays(
+  state: ReturnType<typeof useGameStore.getState>,
+): ReadonlyMap<string, number[]> {
+  const result = new Map<string, number[]>();
+  const { activePuzzle, activeTestCaseIndex } = state;
+
+  if (!activePuzzle) return result;
+
+  const testCase = activePuzzle.testCases[activeTestCaseIndex];
+  if (!testCase) return result;
+
+  for (let i = 0; i < testCase.expectedOutputs.length; i++) {
+    const samples = new Array(CYCLE_COUNT);
+    for (let c = 0; c < CYCLE_COUNT; c++) {
+      samples[c] = generateWaveformValue(c, testCase.expectedOutputs[i]);
+    }
+    result.set(`target:${i}`, samples);
+  }
+
+  return result;
+}
+
 /**
  * Compute knob display values for all knob-equipped nodes on the active board.
- * Checks if the knob port is wired, and reads the value from
- * either the wire's signal buffer or the port constant / node params.
+ * Uses cycle results for wired knobs, or node params for unwired knobs.
  */
 function computeKnobValues(
   nodes: ReadonlyMap<string, NodeState>,
   wires: ReadonlyArray<Wire>,
+  cycleResults: CycleResults | null,
+  playpoint: number,
 ): ReadonlyMap<string, KnobInfo> {
   const result = new Map<string, KnobInfo>();
 
@@ -364,23 +489,14 @@ function computeKnobValues(
     const { portIndex, paramKey } = knobConfig;
 
     // Check if the knob port is wired
-    const isWired = wires.some(
+    const wire = wires.find(
       w => w.target.nodeId === node.id && w.target.portIndex === portIndex,
     );
 
-    if (isWired) {
-      // Read value from wire's signal buffer (oldest arrived sample, with WTS delay)
-      const wire = wires.find(
-        w => w.target.nodeId === node.id && w.target.portIndex === portIndex,
-      );
-      const buf = wire?.signalBuffer;
-      let value = 0;
-      if (buf && buf.length > 0) {
-        // Read oldest sample at writeHead — same index the tick scheduler delivers
-        const head = wire.writeHead ?? 0;
-        value = buf[head];
-      }
-      result.set(node.id, { value, isWired: true });
+    if (wire) {
+      // Read value from cycle results at current playpoint
+      const wireVal = cycleResults?.wireValues.get(wire.id)?.[playpoint] ?? 0;
+      result.set(node.id, { value: wireVal, isWired: true });
     } else {
       // Use the node's param value
       const value = Number(node.params[paramKey] ?? 0);

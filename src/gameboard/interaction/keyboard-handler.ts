@@ -35,6 +35,8 @@ export type KeyboardAction =
   | { type: 'move-ghost'; delta: GridPoint }
   | { type: 'open-palette' }
   | { type: 'rotate-placement' }
+  | { type: 'toggle-play' }
+  | { type: 'step-playpoint'; delta: number }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'noop' };
@@ -48,6 +50,7 @@ export interface KeyboardHandlerState {
   activeBoard: { nodes: ReadonlyMap<string, NodeState>; wires: ReadonlyArray<Wire> } | null;
   activePuzzle: PuzzleDefinition | null;
   keyboardGhostPosition: GridPoint | null;
+  playMode: 'playing' | 'paused';
 }
 
 // ---------------------------------------------------------------------------
@@ -76,17 +79,27 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
     return { type: 'advance-focus', direction };
   }
 
-  // Arrow keys (placement ghost movement)
+  // Arrow keys (placement ghost movement OR playpoint stepping when paused)
   if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {
-    if (isOverlayActive || isReadOnly) return { type: 'noop' };
-    if (mode.type !== 'placing-node') return { type: 'noop' };
+    if (isOverlayActive) return { type: 'noop' };
 
-    const delta: GridPoint = { col: 0, row: 0 };
-    if (key === 'ArrowUp') delta.row = -1;
-    else if (key === 'ArrowDown') delta.row = 1;
-    else if (key === 'ArrowLeft') delta.col = -1;
-    else if (key === 'ArrowRight') delta.col = 1;
-    return { type: 'move-ghost', delta };
+    // Placing-node mode: arrow keys move the ghost
+    if (mode.type === 'placing-node' && !isReadOnly) {
+      const delta: GridPoint = { col: 0, row: 0 };
+      if (key === 'ArrowUp') delta.row = -1;
+      else if (key === 'ArrowDown') delta.row = 1;
+      else if (key === 'ArrowLeft') delta.col = -1;
+      else if (key === 'ArrowRight') delta.col = 1;
+      return { type: 'move-ghost', delta };
+    }
+
+    // When paused and idle: left/right step playpoint
+    if (state.playMode === 'paused' && mode.type === 'idle') {
+      if (key === 'ArrowLeft') return { type: 'step-playpoint', delta: -1 };
+      if (key === 'ArrowRight') return { type: 'step-playpoint', delta: 1 };
+    }
+
+    return { type: 'noop' };
   }
 
   // Enter
@@ -117,7 +130,7 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
         return { type: 'enter-node', nodeId: focus.nodeId };
       }
       // Fundamental with editable params → open parameter popover
-      if (node.type === 'mix' || node.type === 'threshold' || node.type === 'delay') {
+      if (node.type === 'mix' || node.type === 'threshold') {
         return { type: 'open-params', nodeId: focus.nodeId };
       }
     }
@@ -154,11 +167,19 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
     return { type: 'noop' };
   }
 
-  // N or Space → open palette modal
-  if ((key === 'n' || key === ' ') && !e.ctrlKey && !e.metaKey) {
+  // N → open palette modal
+  if (key === 'n' && !e.ctrlKey && !e.metaKey) {
     if (isOverlayActive || isReadOnly) return { type: 'noop' };
     if (mode.type !== 'idle') return { type: 'noop' };
     return { type: 'open-palette' };
+  }
+
+  // Space or P → toggle play/pause
+  if ((key === ' ' || key.toLowerCase() === 'p') && !e.ctrlKey && !e.metaKey) {
+    if (isOverlayActive) return { type: 'noop' };
+    if (mode.type === 'idle' || mode.type === 'keyboard-wiring') {
+      return { type: 'toggle-play' };
+    }
   }
 
   // R key → rotate placement ghost or dragging node
@@ -199,6 +220,10 @@ export interface KeyboardActionExecutor {
   onCompleteWire?: (fromPort: PortRef, toPort: PortRef) => void;
   /** Callback for placing a node at keyboard ghost position */
   onPlaceNode?: (position: GridPoint) => void;
+  /** Toggle play/pause mode */
+  togglePlayMode: () => void;
+  /** Step playpoint by delta cycles */
+  stepPlaypoint: (delta: number) => void;
 }
 
 export function executeKeyboardAction(action: KeyboardAction, executor: KeyboardActionExecutor): void {
@@ -299,6 +324,12 @@ export function executeKeyboardAction(action: KeyboardAction, executor: Keyboard
       break;
     case 'rotate-placement':
       executor.rotatePlacement();
+      break;
+    case 'toggle-play':
+      executor.togglePlayMode();
+      break;
+    case 'step-playpoint':
+      executor.stepPlaypoint(action.delta);
       break;
     case 'undo':
       executor.undo();

@@ -15,7 +15,6 @@ export interface BakedEdge {
   fromPort: number;
   toNodeId: NodeId;
   toPort: number;
-  wtsDelay: number;
 }
 
 /** Serializable metadata describing the baked graph structure. */
@@ -23,7 +22,6 @@ export interface BakeMetadata {
   topoOrder: NodeId[];
   nodeConfigs: BakedNodeConfig[];
   edges: BakedEdge[];
-  inputDelays: number[];
   inputCount: number;
   outputCount: number;
   /** For utility nodes: per-CP direction. CPs 0-2 = left, 3-5 = right. */

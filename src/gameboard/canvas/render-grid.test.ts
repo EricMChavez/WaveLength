@@ -22,6 +22,7 @@ function makeTokens(overrides: Partial<ThemeTokens> = {}): ThemeTokens {
     surfaceNodeBottom: '',
     signalPositive: '',
     signalNegative: '',
+    signalZero: '',
     colorNeutral: '',
     colorTarget: '',
     meterNeedle: '',

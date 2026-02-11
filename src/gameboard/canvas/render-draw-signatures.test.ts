@@ -90,19 +90,14 @@ describe('Draw function contracts', () => {
       expect(content).toMatch(/getThemeTokens/);
     });
 
-    it('imports isRunning', () => {
+    it('builds meter signal arrays from cycle results', () => {
       const content = readCanvasFile('render-loop.ts');
-      expect(content).toMatch(/isRunning/);
+      expect(content).toMatch(/buildMeterSignalArrays/);
     });
 
-    it('imports getMeterBuffers', () => {
+    it('builds meter target arrays from puzzle test case', () => {
       const content = readCanvasFile('render-loop.ts');
-      expect(content).toMatch(/getMeterBuffers/);
-    });
-
-    it('imports getTargetDisplayBuffers', () => {
-      const content = readCanvasFile('render-loop.ts');
-      expect(content).toMatch(/getTargetDisplayBuffers/);
+      expect(content).toMatch(/buildMeterTargetArrays/);
     });
 
     it('calls useGameStore.getState() exactly once', () => {

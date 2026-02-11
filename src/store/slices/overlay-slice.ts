@@ -18,7 +18,6 @@ export type ActiveOverlay =
   | { type: 'unsaved-changes' }
   | { type: 'waveform-selector'; slotIndex: number }
   | { type: 'start-screen' }
-  | { type: 'trim-dialog' }
   | { type: 'save-puzzle-dialog' }
   | { type: 'level-select' }
   | { type: 'node-creation-form' };

@@ -1,4 +1,5 @@
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
+import { signalToColor } from './render-wires.ts';
 
 /** Knob sweep: 270 degrees (gap at bottom, from 7 o'clock to 5 o'clock) */
 const SWEEP_DEG = 270;
@@ -64,7 +65,7 @@ export function drawKnob(
     } else {
       ctx.arc(centerX, centerY, radius, valueAngle, centerAngle, false);
     }
-    ctx.strokeStyle = value > 0 ? tokens.signalPositive : tokens.signalNegative;
+    ctx.strokeStyle = signalToColor(value, tokens);
     ctx.globalAlpha = 0.9;
     ctx.lineWidth = arcWidth;
     ctx.lineCap = 'round';

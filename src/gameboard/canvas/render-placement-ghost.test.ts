@@ -16,6 +16,7 @@ const tokens = {
   colorNeutral: '#888888',
   signalPositive: '#F5AF28',
   signalNegative: '#1ED2C3',
+  signalZero: '#d0d0d8',
   meterNeedle: '#E03838',
 } as ThemeTokens;
 
@@ -161,7 +162,7 @@ describe('renderPlacementGhost', () => {
         description: '',
         inputCount: 1,
         outputCount: 1,
-        bakeMetadata: { delays: [], evaluationOrder: [], nodeDelays: new Map() },
+        bakeMetadata: { topoOrder: [], nodeConfigs: [], edges: [], inputCount: 1, outputCount: 1 },
         versionHash: 'v1',
       }],
     ]);
@@ -181,7 +182,7 @@ describe('renderPlacementGhost', () => {
         title: 'My Filter',
         inputCount: 1,
         outputCount: 1,
-        bakeMetadata: { delays: [], evaluationOrder: [], nodeDelays: new Map() },
+        bakeMetadata: { topoOrder: [], nodeConfigs: [], edges: [], inputCount: 1, outputCount: 1 },
         board: { id: 'u1', nodes: new Map(), wires: [] },
         versionHash: 'v1',
       }],

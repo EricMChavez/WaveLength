@@ -3,8 +3,8 @@ import { createGameboardSlice } from './slices/gameboard-slice.ts';
 import type { GameboardSlice } from './slices/gameboard-slice.ts';
 import { createInteractionSlice } from './slices/interaction-slice.ts';
 import type { InteractionSlice } from './slices/interaction-slice.ts';
-import { createSimulationSlice } from './slices/simulation-slice.ts';
-import type { SimulationSlice } from './slices/simulation-slice.ts';
+import { createPlaypointSlice } from './slices/playpoint-slice.ts';
+import type { PlaypointSlice } from './slices/playpoint-slice.ts';
 import { createPuzzleSlice } from './slices/puzzle-slice.ts';
 import type { PuzzleSlice } from './slices/puzzle-slice.ts';
 import { createPaletteSlice } from './slices/palette-slice.ts';
@@ -33,13 +33,14 @@ import { createAuthoringSlice } from './slices/authoring-slice.ts';
 import type { AuthoringSlice } from './slices/authoring-slice.ts';
 import { initPersistence } from './persistence.ts';
 import { initCustomPuzzlePersistence } from './custom-puzzle-persistence.ts';
+import { initCycleRunner } from '../simulation/cycle-runner.ts';
 
-export type GameStore = GameboardSlice & InteractionSlice & SimulationSlice & PuzzleSlice & PaletteSlice & CeremonySlice & NavigationSlice & ProgressionSlice & HistorySlice & MeterSlice & RoutingSlice & OverlaySlice & AnimationSlice & CreativeSlice & CustomPuzzleSlice & AuthoringSlice;
+export type GameStore = GameboardSlice & InteractionSlice & PlaypointSlice & PuzzleSlice & PaletteSlice & CeremonySlice & NavigationSlice & ProgressionSlice & HistorySlice & MeterSlice & RoutingSlice & OverlaySlice & AnimationSlice & CreativeSlice & CustomPuzzleSlice & AuthoringSlice;
 
 export const useGameStore = create<GameStore>()((...a) => ({
   ...createGameboardSlice(...a),
   ...createInteractionSlice(...a),
-  ...createSimulationSlice(...a),
+  ...createPlaypointSlice(...a),
   ...createPuzzleSlice(...a),
   ...createPaletteSlice(...a),
   ...createCeremonySlice(...a),
@@ -66,3 +67,6 @@ initPersistence(useGameStore);
 
 // Hydrate custom puzzles from localStorage and set up auto-save
 initCustomPuzzlePersistence(useGameStore);
+
+// Set up cycle runner to auto-recompute on graph changes
+initCycleRunner(useGameStore);

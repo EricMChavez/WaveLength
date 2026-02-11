@@ -61,8 +61,8 @@ function getParamDisplay(node: NodeState): string {
       return String(node.params['mode'] ?? 'Add');
     case 'threshold':
       return `thr: ${node.params['threshold'] ?? 0}`;
-    case 'delay':
-      return `del: ${node.params['wts'] ?? 1} WTS`;
+    case 'memory':
+      return 'mem';
     case 'mixer':
     case 'amp':
     case 'diverter':

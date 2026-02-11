@@ -1,5 +1,5 @@
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-export type LogNamespace = 'Graph' | 'WTS' | 'Bake' | 'Render' | 'Save' | 'UI';
+export type LogNamespace = 'Graph' | 'CycleRunner' | 'Bake' | 'Render' | 'Save' | 'UI';
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
   DEBUG: 0,

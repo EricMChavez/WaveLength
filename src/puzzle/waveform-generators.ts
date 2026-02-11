@@ -66,7 +66,7 @@ export function generateWaveformValue(tick: number, def: WaveformDef): number {
 }
 
 /** Get the canonical period for a waveform shape.
- *  Full = 256 (16 WTS), Half = 128 (8 WTS), Quarter = 64 (4 WTS). */
+ *  Full = 256 cycles, Half = 128 cycles, Quarter = 64 cycles. */
 export function getShapePeriod(shape: WaveformShape): number {
   // Strip -reduced suffix for period calculation
   const baseShape = shape.endsWith('-reduced') ? shape.replace(/-reduced$/, '') : shape;

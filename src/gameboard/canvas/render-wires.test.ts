@@ -1,19 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   hexToRgb,
   lerpColor,
   signalToColor,
   signalToGlow,
-  getSegmentSignal,
+  getWireSignal,
   drawWires,
 } from './render-wires';
 import type { ThemeTokens } from '../../shared/tokens/token-types';
 import type { Wire } from '../../shared/types/index';
 
 /** Minimal tokens for signal colour tests (dark theme values) */
-const tokens: Pick<ThemeTokens, 'signalPositive' | 'signalNegative' | 'colorNeutral' | 'wireWidthBase'> = {
+const tokens: Pick<ThemeTokens, 'signalPositive' | 'signalNegative' | 'signalZero' | 'colorNeutral' | 'wireWidthBase'> = {
   signalPositive: '#ff9200',
   signalNegative: '#0782e0',
+  signalZero: '#d0d0d8',
   colorNeutral: '#242424',
   wireWidthBase: '6',
 };
@@ -61,18 +62,18 @@ describe('lerpColor', () => {
     expect(lerpColor(a, b, 0.5)).toBe('rgb(50,100,25)');
   });
 
-  it('lerp(neutral, positive, 0) = neutral', () => {
-    const neutral = hexToRgb(tokens.colorNeutral);
+  it('lerp(signalZero, positive, 0) = signalZero', () => {
+    const zero = hexToRgb(tokens.signalZero);
     const positive = hexToRgb(tokens.signalPositive);
-    expect(lerpColor(neutral, positive, 0)).toBe(
-      `rgb(${neutral[0]},${neutral[1]},${neutral[2]})`,
+    expect(lerpColor(zero, positive, 0)).toBe(
+      `rgb(${zero[0]},${zero[1]},${zero[2]})`,
     );
   });
 
-  it('lerp(neutral, positive, 1) = positive', () => {
-    const neutral = hexToRgb(tokens.colorNeutral);
+  it('lerp(signalZero, positive, 1) = positive', () => {
+    const zero = hexToRgb(tokens.signalZero);
     const positive = hexToRgb(tokens.signalPositive);
-    expect(lerpColor(neutral, positive, 1)).toBe(
+    expect(lerpColor(zero, positive, 1)).toBe(
       `rgb(${positive[0]},${positive[1]},${positive[2]})`,
     );
   });
@@ -81,9 +82,9 @@ describe('lerpColor', () => {
 // ── signalToColor ───────────────────────────────────────────────────────────
 
 describe('signalToColor', () => {
-  it('signal 0 → neutral', () => {
+  it('signal 0 → signalZero (soft white)', () => {
     const result = signalToColor(0, tokens as ThemeTokens);
-    const [r, g, b] = hexToRgb(tokens.colorNeutral);
+    const [r, g, b] = hexToRgb(tokens.signalZero);
     expect(result).toBe(`rgb(${r},${g},${b})`);
   });
 
@@ -99,13 +100,13 @@ describe('signalToColor', () => {
     expect(result).toBe(`rgb(${r},${g},${b})`);
   });
 
-  it('signal +50 → intermediate between neutral and positive', () => {
+  it('signal +50 → intermediate between signalZero and positive', () => {
     const result = signalToColor(50, tokens as ThemeTokens);
     // t = 50/100 = 0.5
-    const neutral = hexToRgb(tokens.colorNeutral);
+    const zero = hexToRgb(tokens.signalZero);
     const pos = hexToRgb(tokens.signalPositive);
     const t = 50 / 100;
-    const expected = `rgb(${Math.round(neutral[0] + (pos[0] - neutral[0]) * t)},${Math.round(neutral[1] + (pos[1] - neutral[1]) * t)},${Math.round(neutral[2] + (pos[2] - neutral[2]) * t)})`;
+    const expected = `rgb(${Math.round(zero[0] + (pos[0] - zero[0]) * t)},${Math.round(zero[1] + (pos[1] - zero[1]) * t)},${Math.round(zero[2] + (pos[2] - zero[2]) * t)})`;
     expect(result).toBe(expected);
   });
 });
@@ -146,44 +147,26 @@ describe('signalToGlow', () => {
   });
 });
 
-// ── getSegmentSignal ────────────────────────────────────────────────────────
+// ── getWireSignal ─────────────────────────────────────────────────────────
 
-describe('getSegmentSignal', () => {
-  function makeWire(buffer: number[], writeHead: number) {
-    return { signalBuffer: buffer, writeHead };
-  }
-
-  it('segment 0 (source) returns newest sample', () => {
-    // Buffer: [10,20,30,...], writeHead=3 → newest = index 2 (value 30)
-    const buf = new Array(16).fill(0);
-    buf[0] = 10; buf[1] = 20; buf[2] = 30;
-    const wire = makeWire(buf, 3);
-    expect(getSegmentSignal(wire, 0, 10)).toBe(30);
+describe('getWireSignal', () => {
+  it('returns 0 when wireValues is undefined', () => {
+    expect(getWireSignal('w1', undefined)).toBe(0);
   });
 
-  it('last segment (target) returns oldest sample', () => {
-    // Buffer filled 0..15, writeHead=0 (wrapped) → newest = idx 15, oldest = idx 0
-    const buf = Array.from({ length: 16 }, (_, i) => i);
-    const wire = makeWire(buf, 0);
-    // segment N-1 of N → t=1 → sampleOffset=15 → bufIdx = (15-15+16)%16 = 0
-    expect(getSegmentSignal(wire, 9, 10)).toBe(0);
+  it('returns 0 when wire not in map', () => {
+    const map = new Map<string, number>();
+    expect(getWireSignal('w1', map)).toBe(0);
   });
 
-  it('single-segment wire returns newest sample', () => {
-    const buf = new Array(16).fill(0);
-    buf[5] = 42;
-    const wire = makeWire(buf, 6);
-    // totalSegments=1 → t=0 → newest
-    expect(getSegmentSignal(wire, 0, 1)).toBe(42);
+  it('returns the value from the map', () => {
+    const map = new Map<string, number>([['w1', 42]]);
+    expect(getWireSignal('w1', map)).toBe(42);
   });
 
-  it('midpoint segment maps to middle of buffer', () => {
-    // Buffer: indices 0..15, writeHead=0 → newest=15
-    const buf = Array.from({ length: 16 }, (_, i) => i * 10);
-    const wire = makeWire(buf, 0);
-    // segment 5 of 16 segments → t=5/15 ≈ 0.333 → offset = floor(0.333*15) = 5
-    // bufIdx = (15-5+16)%16 = 10 → value = 100
-    expect(getSegmentSignal(wire, 5, 16)).toBe(100);
+  it('returns negative values', () => {
+    const map = new Map<string, number>([['w1', -75]]);
+    expect(getWireSignal('w1', map)).toBe(-75);
   });
 });
 
@@ -211,6 +194,7 @@ describe('drawWires', () => {
   const fullTokens = {
     signalPositive: '#ff9200',
     signalNegative: '#0782e0',
+    signalZero: '#d0d0d8',
     colorNeutral: '#242424',
     wireWidthBase: '6',
   } as ThemeTokens;
@@ -222,8 +206,6 @@ describe('drawWires', () => {
       source: { nodeId: 'a', portIndex: 0, side: 'output' },
       target: { nodeId: 'b', portIndex: 0, side: 'input' },
       path: [],
-      signalBuffer: new Array(16).fill(0),
-      writeHead: 0,
     };
     drawWires(ctx, fullTokens, [wire], 40);
     expect(ctx.beginPath).not.toHaveBeenCalled();
@@ -240,12 +222,11 @@ describe('drawWires', () => {
         { col: 1, row: 0 },
         { col: 2, row: 0 },
       ],
-      signalBuffer: new Array(16).fill(0),
-      writeHead: 0,
     };
     drawWires(ctx, fullTokens, [wire], 40);
-    // At minimum: 1 base-pass beginPath + 2 segment color passes = 3
-    expect((ctx.beginPath as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(3);
+    // 3 passes: base polyline + polarity polyline (signal=0 so no glow) = 2 beginPath calls
+    // But with signal=0, glow pass is skipped. So: base (1) + polarity (1) = 2
+    expect((ctx.beginPath as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('single-point path draws base only, no segments', () => {
@@ -255,8 +236,6 @@ describe('drawWires', () => {
       source: { nodeId: 'a', portIndex: 0, side: 'output' },
       target: { nodeId: 'b', portIndex: 0, side: 'input' },
       path: [{ col: 5, row: 5 }],
-      signalBuffer: new Array(16).fill(0),
-      writeHead: 0,
     };
     drawWires(ctx, fullTokens, [wire], 40);
     // Only 1 beginPath call for the base polyline (a single moveTo, no lineTo segments)

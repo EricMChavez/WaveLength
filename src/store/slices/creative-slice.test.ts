@@ -4,8 +4,9 @@ import { CREATIVE_SLOT_COUNT } from './creative-slice.ts';
 
 describe('creative-slice', () => {
   beforeEach(() => {
-    // Reset creative mode state before each test
+    // Fully reset creative mode state before each test
     useGameStore.getState().exitCreativeMode();
+    useGameStore.getState().clearSavedCreativeState();
   });
 
   describe('enterCreativeMode', () => {
@@ -28,16 +29,19 @@ describe('creative-slice', () => {
       expect(useGameStore.getState().isCreativeMode).toBe(false);
     });
 
-    it('resets creative slots to default (left=input, right=output)', () => {
+    it('saves creative slots state on exit (for persistence)', () => {
       useGameStore.getState().enterCreativeMode();
-      useGameStore.getState().setCreativeSlotDirection(0, 'output'); // Change from default
+      useGameStore.getState().setActiveBoard({ id: 'creative-mode', nodes: new Map(), wires: [] });
+      useGameStore.getState().setCreativeSlotDirection(0, 'output');
       useGameStore.getState().setCreativeSlotWaveformShape(0, 'square-quarter');
 
       useGameStore.getState().exitCreativeMode();
 
-      const slots = useGameStore.getState().creativeSlots;
-      expect(slots[0].direction).toBe('input'); // Reset to default
-      expect(slots[0].waveform.shape).toBe('sine-quarter'); // Default waveform
+      // Slots are saved, not reset
+      const saved = useGameStore.getState().savedCreativeState;
+      expect(saved).not.toBeNull();
+      expect(saved!.slots[0].direction).toBe('output');
+      expect(saved!.slots[0].waveform.shape).toBe('square-quarter');
     });
   });
 
@@ -128,7 +132,7 @@ describe('creative-slice', () => {
       const slot = useGameStore.getState().creativeSlots[0];
       expect(slot.waveform.shape).toBe('sine-full');
       expect(slot.waveform.amplitude).toBe(originalAmplitude);
-      expect(slot.waveform.period).toBe(256); // full = 16 WTS
+      expect(slot.waveform.period).toBe(256); // full = 256 cycles
     });
 
     it('ignores invalid indices', () => {
@@ -172,6 +176,48 @@ describe('creative-slice', () => {
       for (let i = 0; i < newSlots.length; i++) {
         expect(newSlots[i].waveform).toEqual(originalSlots[i].waveform);
       }
+    });
+  });
+
+  describe('persistence', () => {
+    it('exitCreativeMode saves current state', () => {
+      const store = useGameStore.getState();
+      store.enterCreativeMode();
+      store.setActiveBoard({ id: 'creative-mode', nodes: new Map(), wires: [] });
+      store.setCreativeSlotWaveformShape(0, 'square-quarter');
+
+      store.exitCreativeMode();
+
+      const saved = useGameStore.getState().savedCreativeState;
+      expect(saved).not.toBeNull();
+      expect(saved!.slots[0].waveform.shape).toBe('square-quarter');
+      expect(saved!.board.id).toBe('creative-mode');
+    });
+
+    it('enterCreativeMode restores saved slots', () => {
+      const store = useGameStore.getState();
+      store.enterCreativeMode();
+      store.setActiveBoard({ id: 'creative-mode', nodes: new Map(), wires: [] });
+      store.setCreativeSlotWaveformShape(1, 'triangle-half');
+      store.exitCreativeMode();
+
+      // Re-enter
+      store.enterCreativeMode();
+      const slots = useGameStore.getState().creativeSlots;
+      expect(slots[1].waveform.shape).toBe('triangle-half');
+    });
+
+    it('clearSavedCreativeState resets to defaults', () => {
+      const store = useGameStore.getState();
+      store.enterCreativeMode();
+      store.setActiveBoard({ id: 'creative-mode', nodes: new Map(), wires: [] });
+      store.setCreativeSlotWaveformShape(0, 'square-quarter');
+      store.exitCreativeMode();
+      expect(useGameStore.getState().savedCreativeState).not.toBeNull();
+
+      store.clearSavedCreativeState();
+      expect(useGameStore.getState().savedCreativeState).toBeNull();
+      expect(useGameStore.getState().creativeSlots[0].waveform.shape).toBe('sine-quarter');
     });
   });
 

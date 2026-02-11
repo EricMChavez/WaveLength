@@ -14,6 +14,7 @@ const DARK_VALUES: Record<string, string> = {
   '--token-surface-node-bottom': '#2a2a2a',
   '--token-signal-positive': '#ff9200',
   '--token-signal-negative': '#0782e0',
+  '--token-signal-zero': '#3e3e3e',
   '--token-color-neutral': '#242424',
   '--token-color-target': '#c8c8d8',
   '--token-color-validation-match': '#22c55e',
@@ -49,6 +50,7 @@ const LIGHT_VALUES: Record<string, string> = {
   '--token-surface-node': '#f0ece8',
   '--token-signal-positive': '#c08020',
   '--token-signal-negative': '#208870',
+  '--token-signal-zero': '#e0dcd8',
   '--token-text-primary': '#1a1a28',
   '--token-text-secondary': '#4a4a60',
   '--token-color-selection': '#1a1a2e',
@@ -101,7 +103,7 @@ describe('TOKEN_KEYS and TOKEN_CSS_MAP', () => {
   });
 
   it('includes required signal tokens', () => {
-    const required = ['signalPositive', 'signalNegative', 'colorNeutral', 'colorTarget', 'meterNeedle'];
+    const required = ['signalPositive', 'signalNegative', 'signalZero', 'colorNeutral', 'colorTarget', 'meterNeedle'];
     for (const key of required) {
       expect(TOKEN_KEYS).toContain(key);
     }

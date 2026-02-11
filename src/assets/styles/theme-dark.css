@@ -16,6 +16,7 @@
 
   --token-signal-positive: #ff9200;
   --token-signal-negative: #0782e0;
+  --token-signal-zero: #3e3e3e;
   --token-color-neutral: #242424;
   --token-color-target: #c8c8d8;
   --token-color-validation-match: #22c55e;

@@ -21,8 +21,6 @@ function makeWire(id: string, sourceNodeId: string, sourcePort: number, targetNo
     source: { nodeId: sourceNodeId, portIndex: sourcePort, side: 'output' },
     target: { nodeId: targetNodeId, portIndex: targetPort, side: 'input' },
     path: [],
-    signalBuffer: new Array(16).fill(0),
-    writeHead: 0,
   };
 }
 
@@ -35,6 +33,7 @@ function makeState(overrides: Partial<KeyboardHandlerState> = {}): KeyboardHandl
     activeBoard: { nodes: new Map(), wires: [] },
     activePuzzle: null,
     keyboardGhostPosition: null,
+    playMode: 'playing',
     ...overrides,
   };
 }
@@ -56,6 +55,9 @@ function makeExecutor(overrides: Partial<KeyboardActionExecutor> = {}): Keyboard
     cycleWiringTarget: vi.fn(),
     cancelKeyboardWiring: vi.fn(),
     setKeyboardGhostPosition: vi.fn(),
+    rotatePlacement: vi.fn(),
+    togglePlayMode: vi.fn(),
+    stepPlaypoint: vi.fn(),
     interactionMode: { type: 'idle' },
     activeBoard: { nodes: new Map(), wires: [] },
     activePuzzle: null,
@@ -112,27 +114,52 @@ describe('getKeyboardAction', () => {
   });
 
   it('ArrowUp returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowUp', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
+    const action = getKeyboardAction('ArrowUp', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: 0, row: -1 } });
   });
 
   it('ArrowDown returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowDown', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
+    const action = getKeyboardAction('ArrowDown', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: 0, row: 1 } });
   });
 
   it('ArrowLeft returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowLeft', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
+    const action = getKeyboardAction('ArrowLeft', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: -1, row: 0 } });
   });
 
   it('ArrowRight returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowRight', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
+    const action = getKeyboardAction('ArrowRight', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: 1, row: 0 } });
   });
 
-  it('Arrow keys return noop in idle mode', () => {
+  it('Arrow keys return noop in idle+playing mode', () => {
     const action = getKeyboardAction('ArrowUp', makeKeyEvent(), makeState());
+    expect(action.type).toBe('noop');
+  });
+
+  it('ArrowLeft returns step-playpoint when paused and idle', () => {
+    const action = getKeyboardAction('ArrowLeft', makeKeyEvent(), makeState({ playMode: 'paused' }));
+    expect(action).toEqual({ type: 'step-playpoint', delta: -1 });
+  });
+
+  it('ArrowRight returns step-playpoint when paused and idle', () => {
+    const action = getKeyboardAction('ArrowRight', makeKeyEvent(), makeState({ playMode: 'paused' }));
+    expect(action).toEqual({ type: 'step-playpoint', delta: 1 });
+  });
+
+  it('ArrowUp returns noop when paused and idle', () => {
+    const action = getKeyboardAction('ArrowUp', makeKeyEvent(), makeState({ playMode: 'paused' }));
+    expect(action.type).toBe('noop');
+  });
+
+  it('P returns toggle-play in idle mode', () => {
+    const action = getKeyboardAction('p', makeKeyEvent(), makeState());
+    expect(action).toEqual({ type: 'toggle-play' });
+  });
+
+  it('P returns noop with active overlay', () => {
+    const action = getKeyboardAction('p', makeKeyEvent(), makeState({ hasActiveOverlay: () => true }));
     expect(action.type).toBe('noop');
   });
 
@@ -144,7 +171,7 @@ describe('getKeyboardAction', () => {
   });
 
   it('Enter in placing-node mode places node', () => {
-    const action = getKeyboardAction('Enter', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
+    const action = getKeyboardAction('Enter', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
     expect(action).toEqual({ type: 'place-node' });
   });
 
@@ -210,13 +237,13 @@ describe('getKeyboardAction', () => {
     expect(action).toEqual({ type: 'open-palette' });
   });
 
-  it('Space returns open-palette in idle mode', () => {
+  it('Space returns toggle-play in idle mode', () => {
     const action = getKeyboardAction(' ', makeKeyEvent(), makeState());
-    expect(action).toEqual({ type: 'open-palette' });
+    expect(action).toEqual({ type: 'toggle-play' });
   });
 
   it('N returns noop when not idle', () => {
-    const action = getKeyboardAction('n', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert' } }));
+    const action = getKeyboardAction('n', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
     expect(action.type).toBe('noop');
   });
 
@@ -346,6 +373,18 @@ describe('executeKeyboardAction', () => {
     const exec = makeExecutor({ keyboardGhostPosition: pos, onPlaceNode });
     executeKeyboardAction({ type: 'place-node' }, exec);
     expect(onPlaceNode).toHaveBeenCalledWith(pos);
+  });
+
+  it('toggle-play calls togglePlayMode', () => {
+    const exec = makeExecutor();
+    executeKeyboardAction({ type: 'toggle-play' }, exec);
+    expect(exec.togglePlayMode).toHaveBeenCalled();
+  });
+
+  it('step-playpoint calls stepPlaypoint with delta', () => {
+    const exec = makeExecutor();
+    executeKeyboardAction({ type: 'step-playpoint', delta: -1 }, exec);
+    expect(exec.stepPlaypoint).toHaveBeenCalledWith(-1);
   });
 
   it('noop does nothing', () => {

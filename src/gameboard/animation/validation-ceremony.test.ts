@@ -6,6 +6,7 @@ import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 const mockTokens: ThemeTokens = {
   signalPositive: '#ff9200',
   signalNegative: '#0782e0',
+  signalZero: '#d0d0d8',
   textPrimary: '#e0e0f0',
   textSecondary: '#9090b0',
   colorNeutral: '#242424',

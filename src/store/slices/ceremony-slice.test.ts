@@ -12,7 +12,6 @@ const fakeMeta: BakeMetadata = {
   topoOrder: ['n1'],
   nodeConfigs: [{ id: 'n1', type: 'invert', params: {}, inputCount: 1, outputCount: 1 }],
   edges: [],
-  inputDelays: [0],
   inputCount: 1,
   outputCount: 1,
 };

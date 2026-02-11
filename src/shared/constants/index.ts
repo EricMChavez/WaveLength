@@ -37,12 +37,6 @@ export const SIGNAL_CONFIG = {
   MATCH_TOLERANCE: 0,
 } as const;
 
-/** WTS timing constants */
-export const WTS_CONFIG = {
-  SUBDIVISIONS: 16,
-  DEFAULT_SPEED: 1,
-} as const;
-
 /** Validation constants */
 export const VALIDATION_CONFIG = {
   MATCH_TOLERANCE: 2,
@@ -71,12 +65,12 @@ export const COLORS = {
 export const NODE_TYPE_LABELS: Record<string, string> = {
   // v2 nodes
   inverter: 'Inverter',
-  delay: 'Delay',
   mixer: 'Mixer',
   amp: 'Amp',
   diverter: 'Diverter',
   polarizer: 'Polarizer',
   shifter: 'Shifter',
+  memory: 'Memory',
   // Custom blank (unsaved utility node)
   'custom-blank': 'Custom',
   // Legacy v1 nodes (for migration period)

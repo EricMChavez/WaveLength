@@ -3,7 +3,6 @@ import { startRenderLoop } from './render-loop.ts';
 import { useGameStore } from '../../store/index.ts';
 import { hitTest, hitTestMeter } from './hit-testing.ts';
 import { getEscapeAction, executeEscapeAction } from '../interaction/escape-handler.ts';
-import { stopSimulation } from '../../simulation/simulation-controller.ts';
 import { getKeyboardAction, executeKeyboardAction } from '../interaction/keyboard-handler.ts';
 import { setFocusVisible } from '../interaction/keyboard-focus.ts';
 import { generateId } from '../../shared/generate-id.ts';
@@ -29,6 +28,15 @@ import {
 import { KNOB_NODES } from '../../shared/constants/index.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
+
+function blendHex(a: string, b: string, t: number): string {
+  const ai = parseInt(a.slice(1), 16);
+  const bi = parseInt(b.slice(1), 16);
+  const r = Math.round(((ai >> 16) & 0xff) * (1 - t) + ((bi >> 16) & 0xff) * t);
+  const g = Math.round(((ai >> 8) & 0xff) * (1 - t) + ((bi >> 8) & 0xff) * t);
+  const bl = Math.round((ai & 0xff) * (1 - t) + (bi & 0xff) * t);
+  return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, '0')}`;
+}
 
 function getCanvasLogicalSize(canvas: HTMLCanvasElement) {
   const cellSize = parseInt(canvas.dataset.cellSize || '0', 10);
@@ -205,7 +213,9 @@ export function GameboardCanvas() {
       if (devOverrides.enabled) {
         const edge = devOverrides.colors.pageBackground;
         const center = devOverrides.colors.pageBackgroundCenter;
-        parent.style.background = `linear-gradient(to right, ${edge}, ${center}, ${edge})`;
+        // Blend an intermediate stop halfway between edge and center for a smooth 5-stop gradient
+        const mid = blendHex(edge, center, 0.5);
+        parent.style.background = `linear-gradient(to right, ${edge}, ${mid}, ${center}, ${mid}, ${edge})`;
       } else {
         parent.style.background =
           'linear-gradient(to right, #121216, #2b2c2f, #3d3e42, #2b2c2f, #121216)';
@@ -293,10 +303,6 @@ export function GameboardCanvas() {
         activePuzzle: state.activePuzzle,
         keyboardGhostPosition: state.keyboardGhostPosition,
         onEnterNode: (nodeId: string) => {
-          if (state.simulationRunning) {
-            stopSimulation();
-            state.setSimulationRunning(false);
-          }
           const canvas = canvasRef.current;
           if (canvas) {
             const snapshot = new OffscreenCanvas(canvas.width, canvas.height);
@@ -369,6 +375,8 @@ export function GameboardCanvas() {
           }
           state.cancelPlacing();
         },
+        togglePlayMode: state.togglePlayMode,
+        stepPlaypoint: state.stepPlaypoint,
       });
     }
     window.addEventListener('keydown', handleKeyDown);

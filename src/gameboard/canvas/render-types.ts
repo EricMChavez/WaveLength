@@ -36,7 +36,6 @@ export interface RenderNodesState {
 export interface RenderConnectionPointsState {
   activePuzzle: PuzzleDefinition | null;
   perPortMatch: readonly boolean[];
-  isSimRunning: boolean;
   /** Non-null when editing a utility node (bidirectional CPs) */
   editingUtilityId?: string | null;
   /** Latest signal value per CP, keyed by `${direction}:${cpIndex}` (e.g. "input:0", "output:1"). */

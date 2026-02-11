@@ -1,36 +1,30 @@
 import { useCallback } from 'react';
 import { useGameStore } from '../../store/index.ts';
-import { TRIM_WINDOW_WTS } from '../../store/slices/authoring-slice.ts';
 import styles from './SimulationControls.module.css';
-
-/** Minimum samples per output buffer before Save is enabled */
-const MIN_BUFFER_SAMPLES = TRIM_WINDOW_WTS * 16;
 
 export function SimulationControls() {
   const isCreativeMode = useGameStore((s) => s.isCreativeMode);
   const openOverlay = useGameStore((s) => s.openOverlay);
-  const openTrimDialog = useGameStore((s) => s.openTrimDialog);
+  const beginSaveAsPuzzle = useGameStore((s) => s.beginSaveAsPuzzle);
   const canSave = useGameStore((s) => {
     if (!s.isCreativeMode) return false;
-    // validRecordedWTS only counts WTS where at least one output had signal
-    if (s.validRecordedWTS < TRIM_WINDOW_WTS) return false;
-    // ALL output slots must have enough buffer data
-    let hasOutput = false;
-    for (let i = 0; i < s.creativeSlots.length; i++) {
-      if (s.creativeSlots[i].direction === 'output') {
-        hasOutput = true;
-        const buf = s.outputBuffers.get(i);
-        if (!buf || buf.length < MIN_BUFFER_SAMPLES) return false;
+    const { cycleResults } = s;
+    if (!cycleResults) return false;
+    // Must have at least one output with non-zero signal
+    const outputCount = cycleResults.outputValues[0]?.length ?? 0;
+    if (outputCount === 0) return false;
+    for (let oi = 0; oi < outputCount; oi++) {
+      for (let c = 0; c < cycleResults.outputValues.length; c++) {
+        if (cycleResults.outputValues[c][oi] !== 0) return true;
       }
     }
-    return hasOutput;
+    return false;
   });
 
   const handleSaveAsPuzzle = useCallback(() => {
-    // Snapshot output buffers and open trim dialog
-    openTrimDialog();
-    openOverlay({ type: 'trim-dialog' });
-  }, [openTrimDialog, openOverlay]);
+    beginSaveAsPuzzle();
+    openOverlay({ type: 'save-puzzle-dialog' });
+  }, [beginSaveAsPuzzle, openOverlay]);
 
   if (!isCreativeMode) return null;
 
@@ -40,7 +34,7 @@ export function SimulationControls() {
         className={styles.saveButton}
         onClick={handleSaveAsPuzzle}
         disabled={!canSave}
-        title={canSave ? 'Save current configuration as a puzzle' : `Record at least ${TRIM_WINDOW_WTS} WTS of non-silent output before saving`}
+        title={canSave ? 'Save current configuration as a puzzle' : 'Wire an output with non-zero signal before saving'}
       >
         Save as Puzzle
       </button>

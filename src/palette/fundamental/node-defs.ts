@@ -39,10 +39,10 @@ export const FUNDAMENTAL_NODES: FundamentalNodeDef[] = [
     defaultParams: { threshold: 0 },
   },
   {
-    type: 'delay',
-    label: 'Delay',
+    type: 'memory',
+    label: 'Memory',
     inputCount: 1,
     outputCount: 1,
-    defaultParams: { wts: 1 },
+    defaultParams: {},
   },
 ];

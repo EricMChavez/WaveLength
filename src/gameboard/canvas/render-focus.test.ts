@@ -25,6 +25,7 @@ function makeTokens(): ThemeTokens {
     meterInterior: '',
     signalPositive: '',
     signalNegative: '',
+    signalZero: '',
     colorTarget: '',
     meterNeedle: '',
     wireWidthBase: '',
@@ -128,8 +129,6 @@ describe('drawKeyboardFocus', () => {
       source: { nodeId: 'n1', portIndex: 0, side: 'output' },
       target: { nodeId: 'n2', portIndex: 0, side: 'input' },
       path: [{ col: 5, row: 3 }, { col: 10, row: 3 }, { col: 10, row: 6 }],
-      signalBuffer: new Array(16).fill(0),
-      writeHead: 0,
     };
     const target: KeyboardFocusTarget = { type: 'wire', wireId: 'w1' };
 
@@ -147,8 +146,6 @@ describe('drawKeyboardFocus', () => {
       source: { nodeId: 'n1', portIndex: 0, side: 'output' },
       target: { nodeId: 'n2', portIndex: 0, side: 'input' },
       path: [],
-      signalBuffer: new Array(16).fill(0),
-      writeHead: 0,
     };
     const target: KeyboardFocusTarget = { type: 'wire', wireId: 'w1' };
 

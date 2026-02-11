@@ -19,14 +19,14 @@ describe('logger', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
 
-    const logger = createLogger('WTS');
+    const logger = createLogger('CycleRunner');
     logger.error('err');
     logger.warn('wrn');
     logger.debug('dbg');
 
-    expect(errorSpy).toHaveBeenCalledWith('[WTS]', 'err');
-    expect(warnSpy).toHaveBeenCalledWith('[WTS]', 'wrn');
-    expect(debugSpy).toHaveBeenCalledWith('[WTS]', 'dbg');
+    expect(errorSpy).toHaveBeenCalledWith('[CycleRunner]', 'err');
+    expect(warnSpy).toHaveBeenCalledWith('[CycleRunner]', 'wrn');
+    expect(debugSpy).toHaveBeenCalledWith('[CycleRunner]', 'dbg');
   });
 
   it('filters messages below current level', () => {

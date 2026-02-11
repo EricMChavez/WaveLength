@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand';
+import type { GameboardState } from '../../shared/types/index.ts';
 import type { WaveformDef, WaveformShape } from '../../puzzle/types.ts';
 import { getShapePeriod } from '../../puzzle/waveform-generators.ts';
 
@@ -30,15 +31,24 @@ function createDefaultSlots(): CreativeSlotState[] {
   }));
 }
 
+/** Saved creative mode state for persistence across puzzle loads */
+export interface SavedCreativeState {
+  board: GameboardState;
+  slots: CreativeSlotState[];
+  portConstants: Map<string, number>;
+}
+
 export interface CreativeSlice {
   /** Whether creative mode is active */
   isCreativeMode: boolean;
   /** State for all 6 slots (0-2 = left side, 3-5 = right side) */
   creativeSlots: CreativeSlotState[];
+  /** Saved creative mode state (preserved when switching to puzzle mode) */
+  savedCreativeState: SavedCreativeState | null;
 
   /** Enter creative mode */
   enterCreativeMode: () => void;
-  /** Exit creative mode */
+  /** Exit creative mode (saves current state for later restoration) */
   exitCreativeMode: () => void;
   /** Set slot direction (returns true if direction changed) */
   setCreativeSlotDirection: (slotIndex: number, direction: 'input' | 'output' | 'off') => boolean;
@@ -48,6 +58,8 @@ export interface CreativeSlice {
   setCreativeSlotWaveformShape: (slotIndex: number, shape: WaveformShape) => void;
   /** Get the slot index for a meter (side + index) */
   getCreativeSlotIndex: (side: 'left' | 'right', index: number) => number;
+  /** Clear saved creative state (for "New Creative" action) */
+  clearSavedCreativeState: () => void;
 }
 
 /** Convert meter side + index to slot index */
@@ -66,13 +78,37 @@ export function slotToMeterInfo(slotIndex: number): { side: 'left' | 'right'; in
 export const createCreativeSlice: StateCreator<CreativeSlice> = (set, get) => ({
   isCreativeMode: false,
   creativeSlots: createDefaultSlots(),
+  savedCreativeState: null,
 
-  enterCreativeMode: () => set({ isCreativeMode: true }),
+  enterCreativeMode: () => {
+    const { savedCreativeState } = get();
+    if (savedCreativeState) {
+      // Restore saved slots
+      set({ isCreativeMode: true, creativeSlots: savedCreativeState.slots });
+    } else {
+      set({ isCreativeMode: true });
+    }
+  },
 
-  exitCreativeMode: () => set({
-    isCreativeMode: false,
-    creativeSlots: createDefaultSlots(),
-  }),
+  exitCreativeMode: () => {
+    // Snapshot current state before leaving creative mode
+    const fullStore = get() as unknown as {
+      activeBoard: GameboardState | null;
+      creativeSlots: CreativeSlotState[];
+      portConstants: Map<string, number>;
+    };
+    const saved: SavedCreativeState | null = fullStore.activeBoard
+      ? {
+          board: fullStore.activeBoard,
+          slots: [...fullStore.creativeSlots],
+          portConstants: new Map(fullStore.portConstants),
+        }
+      : null;
+    set({
+      isCreativeMode: false,
+      savedCreativeState: saved,
+    });
+  },
 
   setCreativeSlotDirection: (slotIndex, direction) => {
     const state = get();
@@ -111,4 +147,9 @@ export const createCreativeSlice: StateCreator<CreativeSlice> = (set, get) => ({
     }),
 
   getCreativeSlotIndex: (side, index) => meterToSlotIndex(side, index),
+
+  clearSavedCreativeState: () => set({
+    savedCreativeState: null,
+    creativeSlots: createDefaultSlots(),
+  }),
 });

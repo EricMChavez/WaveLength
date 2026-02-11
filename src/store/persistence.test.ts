@@ -19,7 +19,6 @@ const fakeMeta: BakeMetadata = {
   topoOrder: ['n1'],
   nodeConfigs: [{ id: 'n1', type: 'invert', params: {}, inputCount: 1, outputCount: 1 }],
   edges: [],
-  inputDelays: [0],
   inputCount: 1,
   outputCount: 1,
 };
@@ -41,8 +40,6 @@ function makeBoard(id: string): GameboardState {
     { nodeId: 'cp-in-0', portIndex: 0, side: 'output' },
     { nodeId: 'node-1', portIndex: 0, side: 'input' },
   );
-  // Set a non-zero value for testing serialization
-  wire.signalBuffer[0] = 50;
   return {
     id,
     nodes: new Map([
@@ -105,14 +102,6 @@ describe('gameboard serialization', () => {
     expect(deserialized.nodes.size).toBe(1);
     expect(deserialized.nodes.get('node-1')!.type).toBe('invert');
     expect(deserialized.nodes.get('node-1')!.position).toEqual({ col: 10, row: 20 });
-  });
-
-  it('resets signalBuffer on serialize', () => {
-    const board = makeBoard('test-board');
-    expect(board.wires[0].signalBuffer[0]).toBe(50);
-
-    const serialized = serializeGameboard(board);
-    expect(serialized.wires[0].signalBuffer.every((v: number) => v === 0)).toBe(true);
   });
 
   it('preserves wire structure', () => {

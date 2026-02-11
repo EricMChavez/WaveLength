@@ -19,7 +19,7 @@ export function LevelSelect() {
     store.loadPuzzle(puzzle);
     store.setActiveBoard(createPuzzleGameboard(puzzle));
     const cpConfig = buildConnectionPointConfig(puzzle.activeInputs, puzzle.activeOutputs);
-    store.initializeMeters(cpConfig, 'dimmed');
+    store.initializeMeters(cpConfig, 'active');
   }
 
   return (
