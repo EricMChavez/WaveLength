@@ -9,7 +9,7 @@ export const diverterNode = defineNode<DiverterParams>({
 
   inputs: [
     { name: 'A' },
-    { name: 'X', description: 'Fade control', side: 'bottom' },
+    { name: 'X', description: 'Fade control', side: 'bottom', knob: 'fade' },
   ],
   outputs: [{ name: 'Y' }, { name: 'Z', gridPosition: 2 }],
 

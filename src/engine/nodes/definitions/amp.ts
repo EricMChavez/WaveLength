@@ -9,7 +9,7 @@ export const ampNode = defineNode<AmpParams>({
 
   inputs: [
     { name: 'A', gridPosition: 0 },
-    { name: 'X', description: 'Gain control', side: 'bottom' },
+    { name: 'X', description: 'Gain control', side: 'bottom', knob: 'gain' },
   ],
   outputs: [{ name: 'Out', gridPosition: 0 }],
 

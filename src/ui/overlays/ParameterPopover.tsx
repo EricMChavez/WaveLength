@@ -3,9 +3,12 @@ import { useGameStore } from '../../store/index.ts';
 import { getNodePixelRect } from '../../gameboard/canvas/render-nodes.ts';
 import { computePopoverPosition } from './popover-position.ts';
 import { getCellSize } from '../../shared/grid/index.ts';
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
+import { getKnobConfig } from '../../engine/nodes/framework.ts';
+import type { ParamDefinition, ParamValue } from '../../engine/nodes/framework.ts';
 import styles from './ParameterPopover.module.css';
 
-const MIX_MODES = ['Add', 'Subtract', 'Average', 'Min', 'Max'] as const;
+const KNOB_VALUES = [-100, -75, -50, -25, 0, 25, 50, 75, 100] as const;
 
 export function ParameterPopover() {
   const overlay = useGameStore((s) => s.activeOverlay);
@@ -16,6 +19,7 @@ export function ParameterPopover() {
 function ParameterPopoverInner({ nodeId }: { nodeId: string }) {
   const closeOverlay = useGameStore((s) => s.closeOverlay);
   const updateNodeParams = useGameStore((s) => s.updateNodeParams);
+  const setPortConstant = useGameStore((s) => s.setPortConstant);
   const node = useGameStore((s) => s.activeBoard?.nodes.get(nodeId));
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +54,14 @@ function ParameterPopoverInner({ nodeId }: { nodeId: string }) {
     canvasOffset,
   );
 
+  const def = getNodeDefinition(node.type);
+  const knobConfig = def ? getKnobConfig(def) : null;
+  const paramDefs = def?.params ?? [];
+
+  // Legacy v1 nodes without registered definitions
+  const isLegacyMix = node.type === 'mix';
+  const isLegacyThreshold = node.type === 'threshold';
+
   return (
     <>
       <div className={styles.backdrop} onClick={closeOverlay} />
@@ -62,32 +74,158 @@ function ParameterPopoverInner({ nodeId }: { nodeId: string }) {
         aria-label="Node Parameters"
       >
         <div className={styles.title}>Parameters</div>
-        {node.type === 'mix' && (
-          <MixControls node={node} updateNodeParams={updateNodeParams} />
+        {isLegacyMix && (
+          <LegacyMixControls node={node} updateNodeParams={updateNodeParams} />
         )}
-        {node.type === 'threshold' && (
-          <ThresholdControls node={node} updateNodeParams={updateNodeParams} />
+        {isLegacyThreshold && (
+          <LegacyThresholdControls node={node} updateNodeParams={updateNodeParams} />
         )}
-        {node.type === 'mixer' && (
-          <MixerControls node={node} updateNodeParams={updateNodeParams} />
-        )}
-        {node.type === 'amp' && (
-          <AmpControls node={node} updateNodeParams={updateNodeParams} />
-        )}
-        {node.type === 'diverter' && (
-          <DiverterControls node={node} updateNodeParams={updateNodeParams} />
-        )}
+        {paramDefs.map((paramDef) => {
+          const isKnobParam = knobConfig?.paramKey === paramDef.key;
+          if (isKnobParam) {
+            return (
+              <KnobParamControl
+                key={paramDef.key}
+                node={node}
+                paramDef={paramDef}
+                knobPortIndex={knobConfig!.portIndex}
+                updateNodeParams={updateNodeParams}
+                setPortConstant={setPortConstant}
+              />
+            );
+          }
+          return (
+            <GenericParamControl
+              key={paramDef.key}
+              node={node}
+              paramDef={paramDef}
+              updateNodeParams={updateNodeParams}
+            />
+          );
+        })}
       </div>
     </>
   );
 }
 
-interface ControlProps {
-  node: { id: string; params: Record<string, number | string | boolean> };
-  updateNodeParams: (nodeId: string, params: Record<string, number | string | boolean>) => void;
+// =============================================================================
+// Generic controls
+// =============================================================================
+
+interface KnobParamControlProps {
+  node: { id: string; params: Record<string, ParamValue> };
+  paramDef: ParamDefinition;
+  knobPortIndex: number;
+  updateNodeParams: (nodeId: string, params: Record<string, ParamValue>) => void;
+  setPortConstant: (nodeId: string, portIndex: number, value: number) => void;
 }
 
-function MixControls({ node, updateNodeParams }: ControlProps) {
+function KnobParamControl({ node, paramDef, knobPortIndex, updateNodeParams, setPortConstant }: KnobParamControlProps) {
+  const current = Number(node.params[paramDef.key] ?? 0);
+  return (
+    <div className={styles.field}>
+      <label className={styles.label}>{paramDef.label} ({current})</label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        {KNOB_VALUES.map((v) => (
+          <button
+            key={v}
+            className={styles.select}
+            style={{
+              padding: '2px 6px',
+              minWidth: '36px',
+              fontWeight: v === current ? 'bold' : 'normal',
+              opacity: v === current ? 1 : 0.7,
+            }}
+            onClick={() => {
+              updateNodeParams(node.id, { [paramDef.key]: v });
+              setPortConstant(node.id, knobPortIndex, v);
+            }}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface GenericParamControlProps {
+  node: { id: string; params: Record<string, ParamValue> };
+  paramDef: ParamDefinition;
+  updateNodeParams: (nodeId: string, params: Record<string, ParamValue>) => void;
+}
+
+function GenericParamControl({ node, paramDef, updateNodeParams }: GenericParamControlProps) {
+  if (paramDef.type === 'string' && paramDef.options) {
+    const current = String(node.params[paramDef.key] ?? paramDef.default);
+    return (
+      <div className={styles.field}>
+        <label className={styles.label}>{paramDef.label}</label>
+        <select
+          className={styles.select}
+          value={current}
+          onChange={(e) => updateNodeParams(node.id, { [paramDef.key]: e.target.value })}
+        >
+          {paramDef.options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  if (paramDef.type === 'number') {
+    const current = Number(node.params[paramDef.key] ?? paramDef.default);
+    return (
+      <div className={styles.field}>
+        <label className={styles.label}>{paramDef.label}</label>
+        <div className={styles.rangeWrap}>
+          <input
+            type="range"
+            className={styles.range}
+            min={paramDef.min ?? -100}
+            max={paramDef.max ?? 100}
+            step={paramDef.step ?? 1}
+            value={current}
+            onChange={(e) => updateNodeParams(node.id, { [paramDef.key]: Number(e.target.value) })}
+          />
+          <span className={styles.rangeValue}>{current}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (paramDef.type === 'boolean') {
+    const current = Boolean(node.params[paramDef.key] ?? paramDef.default);
+    return (
+      <div className={styles.field}>
+        <label className={styles.label}>
+          <input
+            type="checkbox"
+            checked={current}
+            onChange={(e) => updateNodeParams(node.id, { [paramDef.key]: e.target.checked })}
+          />
+          {' '}{paramDef.label}
+        </label>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// =============================================================================
+// Legacy v1 controls (no registered definition)
+// =============================================================================
+
+const MIX_MODES = ['Add', 'Subtract', 'Average', 'Min', 'Max'] as const;
+
+interface LegacyControlProps {
+  node: { id: string; params: Record<string, ParamValue> };
+  updateNodeParams: (nodeId: string, params: Record<string, ParamValue>) => void;
+}
+
+function LegacyMixControls({ node, updateNodeParams }: LegacyControlProps) {
   const current = String(node.params['mode'] ?? 'Add');
   return (
     <div className={styles.field}>
@@ -105,7 +243,7 @@ function MixControls({ node, updateNodeParams }: ControlProps) {
   );
 }
 
-function ThresholdControls({ node, updateNodeParams }: ControlProps) {
+function LegacyThresholdControls({ node, updateNodeParams }: LegacyControlProps) {
   const current = Number(node.params['threshold'] ?? 0);
   return (
     <div className={styles.field}>
@@ -120,100 +258,6 @@ function ThresholdControls({ node, updateNodeParams }: ControlProps) {
           onChange={(e) => updateNodeParams(node.id, { threshold: Number(e.target.value) })}
         />
         <span className={styles.rangeValue}>{current}</span>
-      </div>
-    </div>
-  );
-}
-
-const KNOB_VALUES = [-100, -75, -50, -25, 0, 25, 50, 75, 100] as const;
-
-const MIXER_VALUES = KNOB_VALUES;
-
-function MixerControls({ node, updateNodeParams }: ControlProps) {
-  const setPortConstant = useGameStore((s) => s.setPortConstant);
-  const current = Number(node.params['mix'] ?? 0);
-  return (
-    <div className={styles.field}>
-      <label className={styles.label}>Mix ({current})</label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {MIXER_VALUES.map((v) => (
-          <button
-            key={v}
-            className={styles.select}
-            style={{
-              padding: '2px 6px',
-              minWidth: '36px',
-              fontWeight: v === current ? 'bold' : 'normal',
-              opacity: v === current ? 1 : 0.7,
-            }}
-            onClick={() => {
-              updateNodeParams(node.id, { mix: v });
-              setPortConstant(node.id, 2, v);
-            }}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DiverterControls({ node, updateNodeParams }: ControlProps) {
-  const setPortConstant = useGameStore((s) => s.setPortConstant);
-  const current = Number(node.params['fade'] ?? 0);
-  return (
-    <div className={styles.field}>
-      <label className={styles.label}>Fade ({current})</label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {KNOB_VALUES.map((v) => (
-          <button
-            key={v}
-            className={styles.select}
-            style={{
-              padding: '2px 6px',
-              minWidth: '36px',
-              fontWeight: v === current ? 'bold' : 'normal',
-              opacity: v === current ? 1 : 0.7,
-            }}
-            onClick={() => {
-              updateNodeParams(node.id, { fade: v });
-              setPortConstant(node.id, 1, v);
-            }}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AmpControls({ node, updateNodeParams }: ControlProps) {
-  const setPortConstant = useGameStore((s) => s.setPortConstant);
-  const current = Number(node.params['gain'] ?? 0);
-  return (
-    <div className={styles.field}>
-      <label className={styles.label}>Gain ({current})</label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {KNOB_VALUES.map((v) => (
-          <button
-            key={v}
-            className={styles.select}
-            style={{
-              padding: '2px 6px',
-              minWidth: '36px',
-              fontWeight: v === current ? 'bold' : 'normal',
-              opacity: v === current ? 1 : 0.7,
-            }}
-            onClick={() => {
-              updateNodeParams(node.id, { gain: v });
-              setPortConstant(node.id, 1, v);
-            }}
-          >
-            {v}
-          </button>
-        ))}
       </div>
     </div>
   );

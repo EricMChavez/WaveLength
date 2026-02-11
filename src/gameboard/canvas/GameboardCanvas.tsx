@@ -25,7 +25,7 @@ import {
   canPlaceNode,
   canMoveNode,
 } from '../../shared/grid/index.ts';
-import { KNOB_NODES } from '../../shared/constants/index.ts';
+import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
 
@@ -368,7 +368,7 @@ export function GameboardCanvas() {
               params: kbParams, inputCount: def.inputs.length, outputCount: def.outputs.length,
               rotation,
             });
-            const kbKnobConfig = KNOB_NODES[nodeType];
+            const kbKnobConfig = getKnobConfig(getNodeDefinition(nodeType));
             if (kbKnobConfig) {
               state.setPortConstant(kbNodeId, kbKnobConfig.portIndex, Number(kbParams[kbKnobConfig.paramKey] ?? 0));
             }
@@ -508,7 +508,7 @@ export function GameboardCanvas() {
         rotation,
       });
       // Set initial port constant for knob input to match param
-      const clickKnobConfig = KNOB_NODES[nodeType];
+      const clickKnobConfig = getKnobConfig(getNodeDefinition(nodeType));
       if (clickKnobConfig) {
         state.setPortConstant(nodeId, clickKnobConfig.portIndex, Number(params[clickKnobConfig.paramKey] ?? 0));
       }
@@ -585,7 +585,7 @@ export function GameboardCanvas() {
       if (!state.activeBoardReadOnly) {
         const node = state.activeBoard.nodes.get(hit.nodeId);
         // Don't auto-open parameter popover for knob nodes (knob is the primary control)
-        if (node && !(node.type in KNOB_NODES) && hasEditableParams(node.type)) {
+        if (node && !getKnobConfig(getNodeDefinition(node.type)) && hasEditableParams(node.type)) {
           state.openOverlay({ type: 'parameter-popover', nodeId: hit.nodeId });
         }
       }
@@ -667,7 +667,7 @@ export function GameboardCanvas() {
     if (hit.type === 'knob') {
       const node = state.activeBoard.nodes.get(hit.nodeId);
       if (node) {
-        const knobConfig = KNOB_NODES[node.type];
+        const knobConfig = getKnobConfig(getNodeDefinition(node.type));
         if (knobConfig) {
           const isXWired = state.activeBoard.wires.some(
             w => w.target.nodeId === node.id && w.target.portIndex === knobConfig.portIndex,
@@ -703,7 +703,7 @@ export function GameboardCanvas() {
       const canvas = canvasRef.current;
       if (canvas) {
         const node = state.activeBoard?.nodes.get(nodeId);
-        const knobConfig = node ? KNOB_NODES[node.type] : undefined;
+        const knobConfig = node ? getKnobConfig(getNodeDefinition(node.type)) : null;
         if (knobConfig) {
           const rect = canvas.getBoundingClientRect();
           const y = e.clientY - rect.top;
@@ -772,7 +772,7 @@ export function GameboardCanvas() {
     if (state.interactionMode.type === 'adjusting-knob') {
       const { nodeId, startY, startValue } = state.interactionMode;
       const node = state.activeBoard?.nodes.get(nodeId);
-      const knobConfig = node ? KNOB_NODES[node.type] : undefined;
+      const knobConfig = node ? getKnobConfig(getNodeDefinition(node.type)) : null;
       if (knobConfig) {
         const deltaY = startY - y;
         const sensitivity = 32; // pixels per 50-unit step

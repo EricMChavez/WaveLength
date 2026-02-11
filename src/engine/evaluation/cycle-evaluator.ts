@@ -13,7 +13,7 @@ import { topologicalSort } from '../graph/topological-sort.ts';
 import { getNodeDefinition } from '../nodes/registry.ts';
 import type { NodeRuntimeState } from '../nodes/framework.ts';
 import { clamp } from '../../shared/math/index.ts';
-import { KNOB_NODES } from '../../shared/constants/index.ts';
+import { getKnobConfig } from '../nodes/framework.ts';
 import {
   isConnectionPointNode,
   isConnectionInputNode,
@@ -349,7 +349,7 @@ function isParameterWire(wire: Wire, nodes: ReadonlyMap<NodeId, NodeState>): boo
   const targetNode = nodes.get(wire.target.nodeId);
   if (!targetNode) return false;
 
-  const knobConfig = KNOB_NODES[targetNode.type];
+  const knobConfig = getKnobConfig(getNodeDefinition(targetNode.type));
   if (!knobConfig) return false;
 
   return wire.target.portIndex === knobConfig.portIndex;

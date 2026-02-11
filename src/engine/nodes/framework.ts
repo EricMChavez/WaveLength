@@ -45,6 +45,8 @@ export interface PortDefinition {
   side?: PortSide;
   /** Override the distributed position along the port's side (row for left/right, col for top/bottom) */
   gridPosition?: number;
+  /** Links this input port to a node param key, making it a knob-controlled port */
+  knob?: string;
 }
 
 // =============================================================================
@@ -175,4 +177,28 @@ export function createDefaultParams<TParams extends Record<string, ParamValue>>(
     params[p.key] = p.default;
   }
   return params as TParams;
+}
+
+/** Knob configuration derived from a node definition's input ports. */
+export interface KnobConfig {
+  portIndex: number;
+  paramKey: string;
+}
+
+/**
+ * Get the knob configuration from a node definition.
+ * Scans input ports for one with a `knob` field set, returning the port index and param key.
+ * Returns null if the definition has no knob port.
+ */
+export function getKnobConfig(
+  def: NodeDefinition<Record<string, ParamValue>> | undefined,
+): KnobConfig | null {
+  if (!def) return null;
+  for (let i = 0; i < def.inputs.length; i++) {
+    const port = def.inputs[i];
+    if (port.knob) {
+      return { portIndex: i, paramKey: port.knob };
+    }
+  }
+  return null;
 }

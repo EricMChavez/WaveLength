@@ -7,6 +7,7 @@ import {
   getDefaultParams,
   CATEGORY_LABELS,
 } from './registry';
+import { getKnobConfig } from './framework';
 
 describe('Node Registry', () => {
   describe('nodeRegistry', () => {
@@ -97,6 +98,35 @@ describe('Node Registry', () => {
       expect(CATEGORY_LABELS.routing).toBe('Routing');
       expect(CATEGORY_LABELS.timing).toBe('Timing');
       expect(CATEGORY_LABELS.custom).toBe('Custom');
+    });
+  });
+
+  describe('getKnobConfig', () => {
+    it('returns correct config for mixer', () => {
+      expect(getKnobConfig(getNodeDefinition('mixer'))).toEqual({ portIndex: 2, paramKey: 'mix' });
+    });
+
+    it('returns correct config for amp', () => {
+      expect(getKnobConfig(getNodeDefinition('amp'))).toEqual({ portIndex: 1, paramKey: 'gain' });
+    });
+
+    it('returns correct config for diverter', () => {
+      expect(getKnobConfig(getNodeDefinition('diverter'))).toEqual({ portIndex: 1, paramKey: 'fade' });
+    });
+
+    it('returns correct config for offset', () => {
+      expect(getKnobConfig(getNodeDefinition('offset'))).toEqual({ portIndex: 1, paramKey: 'offset' });
+    });
+
+    it('returns null for non-knob types', () => {
+      expect(getKnobConfig(getNodeDefinition('inverter'))).toBeNull();
+      expect(getKnobConfig(getNodeDefinition('memory'))).toBeNull();
+      expect(getKnobConfig(getNodeDefinition('polarizer'))).toBeNull();
+      expect(getKnobConfig(getNodeDefinition('splitter'))).toBeNull();
+    });
+
+    it('returns null for undefined definition', () => {
+      expect(getKnobConfig(undefined)).toBeNull();
     });
   });
 });

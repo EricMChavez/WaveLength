@@ -9,7 +9,7 @@ export const offsetNode = defineNode<OffsetParams>({
 
   inputs: [
     { name: 'A' },
-    { name: 'X', description: 'Offset amount', side: 'bottom' },
+    { name: 'X', description: 'Offset amount', side: 'bottom', knob: 'offset' },
   ],
   outputs: [{ name: 'Out' }],
 

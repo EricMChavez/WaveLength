@@ -2,7 +2,9 @@ import type { NodeState } from '../../shared/types/index.ts';
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { RenderNodesState } from './render-types.ts';
 import type { PixelRect } from '../../shared/grid/types.ts';
-import { NODE_STYLE, NODE_TYPE_LABELS, KNOB_NODES } from '../../shared/constants/index.ts';
+import { NODE_STYLE, NODE_TYPE_LABELS } from '../../shared/constants/index.ts';
+import { getKnobConfig } from '../../engine/nodes/framework.ts';
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { getNodePortPosition, getNodeBodyPixelRect } from './port-positions.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
 import { gridToPixel, getNodeGridSize } from '../../shared/grid/index.ts';
@@ -56,20 +58,23 @@ function getNodeVisualState(nodeId: string, state: RenderNodesState): NodeVisual
 }
 
 function getParamDisplay(node: NodeState): string {
-  switch (node.type) {
-    case 'mix':
-      return String(node.params['mode'] ?? 'Add');
-    case 'threshold':
-      return `thr: ${node.params['threshold'] ?? 0}`;
-    case 'memory':
-      return 'mem';
-    case 'mixer':
-    case 'amp':
-    case 'diverter':
-      return ''; // Knob renders the value visually
-    default:
-      return '';
+  // Legacy v1 nodes (no registered definition)
+  if (node.type === 'mix') return String(node.params['mode'] ?? 'Add');
+  if (node.type === 'threshold') return `thr: ${node.params['threshold'] ?? 0}`;
+
+  const def = getNodeDefinition(node.type);
+  if (!def) return '';
+
+  // Knob nodes show nothing — the visual knob suffices
+  if (getKnobConfig(def)) return '';
+
+  // Non-knob parameterized nodes: show first param value
+  const firstParam = def.params?.[0];
+  if (firstParam) {
+    return String(node.params[firstParam.key] ?? firstParam.default);
   }
+
+  return '';
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +206,7 @@ function drawNodeBody(
   ctx.textBaseline = 'middle';
 
   // Offset label up if there's a param sublabel or knob (relative to rotated center)
-  const hasKnob = node.type in KNOB_NODES;
+  const hasKnob = !!getKnobConfig(getNodeDefinition(node.type));
   const labelOffsetY = hasKnob ? -cellSize * 0.7 : paramText ? -labelFontSize * 0.4 : 0;
   ctx.fillText(label, 0, labelOffsetY);
 

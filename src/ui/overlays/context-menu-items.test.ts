@@ -67,17 +67,18 @@ describe('buildContextMenuItems', () => {
 });
 
 describe('hasEditableParams', () => {
-  it('returns true for mix, threshold, mixer, amp, diverter', () => {
+  it('returns true for parameterized node types', () => {
     expect(hasEditableParams('mix')).toBe(true);
     expect(hasEditableParams('threshold')).toBe(true);
     expect(hasEditableParams('mixer')).toBe(true);
     expect(hasEditableParams('amp')).toBe(true);
     expect(hasEditableParams('diverter')).toBe(true);
+    expect(hasEditableParams('offset')).toBe(true);
   });
 
   it('returns false for non-parameterized types', () => {
-    expect(hasEditableParams('multiply')).toBe(false);
-    expect(hasEditableParams('invert')).toBe(false);
+    expect(hasEditableParams('inverter')).toBe(false);
+    expect(hasEditableParams('polarizer')).toBe(false);
     expect(hasEditableParams('puzzle:abc')).toBe(false);
   });
 });

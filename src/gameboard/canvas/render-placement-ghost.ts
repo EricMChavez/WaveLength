@@ -5,8 +5,8 @@ import type { GridPoint } from '../../shared/grid/types.ts';
 import type { PuzzleNodeEntry, UtilityNodeEntry } from '../../store/slices/palette-slice.ts';
 import type { RenderNodesState, KnobInfo } from './render-types.ts';
 import { pixelToGrid, getNodeGridSizeFromType, canPlaceNode, canMoveNode, PLAYABLE_START, PLAYABLE_END, GRID_ROWS } from '../../shared/grid/index.ts';
-import { KNOB_NODES } from '../../shared/constants/index.ts';
 import { getNodeDefinition, getDefaultParams } from '../../engine/nodes/registry.ts';
+import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { drawSingleNode } from './render-nodes.ts';
 import { getNodeBodyPixelRect } from './port-positions.ts';
 
@@ -78,9 +78,9 @@ function buildGhostRenderState(
   utilityNodes: ReadonlyMap<string, UtilityNodeEntry>,
 ): RenderNodesState {
   const knobValues = new Map<string, KnobInfo>();
-  const knobConfig = KNOB_NODES[ghostNode.type];
-  if (knobConfig) {
-    const defaultValue = (ghostNode.params[knobConfig.paramKey] as number) ?? 0;
+  const knobCfg = getKnobConfig(getNodeDefinition(ghostNode.type));
+  if (knobCfg) {
+    const defaultValue = (ghostNode.params[knobCfg.paramKey] as number) ?? 0;
     knobValues.set('__ghost__', { value: defaultValue, isWired: false });
   }
 

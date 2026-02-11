@@ -1,5 +1,7 @@
 import type { NodeId, NodeState, PortRef, Vec2, Wire } from '../../shared/types/index.ts';
-import { CONNECTION_POINT_CONFIG, NODE_STYLE, KNOB_NODES } from '../../shared/constants/index.ts';
+import { CONNECTION_POINT_CONFIG, NODE_STYLE } from '../../shared/constants/index.ts';
+import { getKnobConfig } from '../../engine/nodes/framework.ts';
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { getNodePortPosition, getConnectionPointPosition, getNodeHitRect, getNodeBodyPixelRect } from './port-positions.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
 import { gridToPixel, getNodeGridSize, METER_LEFT_START, METER_RIGHT_START } from '../../shared/grid/index.ts';
@@ -117,7 +119,7 @@ export function hitTest(
   // 3. Check knobs (before node bodies for priority)
   for (const node of nodes.values()) {
     if (isConnectionPointNode(node.id)) continue;
-    if (!(node.type in KNOB_NODES)) continue;
+    if (!getKnobConfig(getNodeDefinition(node.type))) continue;
     const bodyRect = getNodeBodyPixelRect(node, cellSize);
     const labelFontSize = Math.round(NODE_STYLE.LABEL_FONT_RATIO * cellSize);
     const centerX = bodyRect.x + bodyRect.width / 2;

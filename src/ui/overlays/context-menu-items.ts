@@ -1,3 +1,5 @@
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
+
 export interface ContextMenuItem {
   id: string;
   label: string;
@@ -52,5 +54,8 @@ export function buildContextMenuItems(
 
 /** Returns true for node types that have user-editable parameters */
 export function hasEditableParams(nodeType: string): boolean {
-  return nodeType === 'mix' || nodeType === 'threshold' || nodeType === 'mixer' || nodeType === 'amp' || nodeType === 'diverter';
+  const def = getNodeDefinition(nodeType);
+  if (def) return (def.params?.length ?? 0) > 0;
+  // Legacy v1 nodes (no registered definition)
+  return nodeType === 'mix' || nodeType === 'threshold';
 }

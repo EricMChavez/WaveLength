@@ -10,7 +10,7 @@ export const mixerNode = defineNode<MixerParams>({
   inputs: [
     { name: 'A' },
     { name: 'B', gridPosition: 2 },
-    { name: 'X', description: 'Crossfade control', side: 'bottom' },
+    { name: 'X', description: 'Crossfade control', side: 'bottom', knob: 'mix' },
   ],
   outputs: [{ name: 'Out' }],
 

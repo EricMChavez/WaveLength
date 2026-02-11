@@ -79,11 +79,3 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
   invert: 'Invert',
   threshold: 'Threshold',
 };
-
-/** Nodes that use a bottom-port knob control (portIndex + paramKey mapping) */
-export const KNOB_NODES: Record<string, { portIndex: number; paramKey: string }> = {
-  mixer: { portIndex: 2, paramKey: 'mix' },
-  amp: { portIndex: 1, paramKey: 'gain' },
-  diverter: { portIndex: 1, paramKey: 'fade' },
-  offset: { portIndex: 1, paramKey: 'offset' },
-};

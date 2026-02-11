@@ -25,7 +25,8 @@ import type { GridPoint } from '../../shared/grid/types.ts';
 import type { KnobInfo } from './render-types.ts';
 import type { NodeState, Wire } from '../../shared/types/index.ts';
 import type { CycleResults } from '../../engine/evaluation/index.ts';
-import { KNOB_NODES } from '../../shared/constants/index.ts';
+import { getKnobConfig } from '../../engine/nodes/framework.ts';
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 
 const PLAYPOINT_RATE = 16; // cycles per second
 
@@ -88,7 +89,7 @@ let playAccumulator = 0;
 // Pause blip animation state
 let pauseAnimAccumulator = 0;
 let lastPauseTimestamp = 0;
-const PAUSE_ANIM_CYCLE_MS = 2500;
+const PAUSE_ANIM_CYCLE_MS = 1250;
 let cachedWireAnim: WireAnimationCache | null = null;
 let cachedWireAnimResults: CycleResults | null = null;
 let cachedWireAnimPlaypoint = -1;
@@ -529,7 +530,7 @@ function computeKnobValues(
   const result = new Map<string, KnobInfo>();
 
   for (const node of nodes.values()) {
-    const knobConfig = KNOB_NODES[node.type];
+    const knobConfig = getKnobConfig(getNodeDefinition(node.type));
     if (!knobConfig) continue;
 
     const { portIndex, paramKey } = knobConfig;
