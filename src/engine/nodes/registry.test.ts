@@ -12,36 +12,36 @@ import { getKnobConfig } from './framework';
 describe('Node Registry', () => {
   describe('nodeRegistry', () => {
     it('contains all fundamental nodes', () => {
-      expect(nodeRegistry.allTypes).toContain('inverter');
+      expect(nodeRegistry.allTypes).toContain('add');
+      expect(nodeRegistry.allTypes).toContain('scale');
+      expect(nodeRegistry.allTypes).toContain('threshold');
+      expect(nodeRegistry.allTypes).toContain('max');
+      expect(nodeRegistry.allTypes).toContain('min');
+      expect(nodeRegistry.allTypes).toContain('split');
       expect(nodeRegistry.allTypes).toContain('memory');
-      expect(nodeRegistry.allTypes).toContain('mixer');
-      expect(nodeRegistry.allTypes).toContain('amp');
-      expect(nodeRegistry.allTypes).toContain('diverter');
-      expect(nodeRegistry.allTypes).toContain('polarizer');
-      expect(nodeRegistry.allTypes).toContain('offset');
     });
 
     it('has correct count', () => {
-      expect(nodeRegistry.all).toHaveLength(9);
+      expect(nodeRegistry.all).toHaveLength(7);
     });
 
     it('has byType lookup', () => {
-      expect(nodeRegistry.byType.get('inverter')).toBeDefined();
+      expect(nodeRegistry.byType.get('add')).toBeDefined();
       expect(nodeRegistry.byType.get('unknown')).toBeUndefined();
     });
 
     it('has byCategory lookup', () => {
-      expect(nodeRegistry.byCategory.math).toHaveLength(4); // inverter, amp, polarizer, offset
-      expect(nodeRegistry.byCategory.routing).toHaveLength(4); // mixer, diverter, splitter, average
+      expect(nodeRegistry.byCategory.math).toHaveLength(5); // add, scale, threshold, max, min
+      expect(nodeRegistry.byCategory.routing).toHaveLength(1); // split
       expect(nodeRegistry.byCategory.timing).toHaveLength(1); // memory
     });
   });
 
   describe('getNodeDefinition', () => {
     it('returns definition for known type', () => {
-      const def = getNodeDefinition('amp');
+      const def = getNodeDefinition('scale');
       expect(def).toBeDefined();
-      expect(def?.type).toBe('amp');
+      expect(def?.type).toBe('scale');
       expect(def?.inputs).toHaveLength(2);
     });
 
@@ -57,8 +57,8 @@ describe('Node Registry', () => {
 
   describe('isFundamentalNode', () => {
     it('returns true for fundamental types', () => {
-      expect(isFundamentalNode('inverter')).toBe(true);
-      expect(isFundamentalNode('amp')).toBe(true);
+      expect(isFundamentalNode('add')).toBe(true);
+      expect(isFundamentalNode('scale')).toBe(true);
       expect(isFundamentalNode('memory')).toBe(true);
     });
 
@@ -71,20 +71,23 @@ describe('Node Registry', () => {
 
   describe('getNodeLabel', () => {
     it('capitalizes first letter', () => {
-      expect(getNodeLabel('inverter')).toBe('Inverter');
-      expect(getNodeLabel('amp')).toBe('Amp');
+      expect(getNodeLabel('add')).toBe('Add');
+      expect(getNodeLabel('scale')).toBe('Scale');
       expect(getNodeLabel('memory')).toBe('Memory');
     });
   });
 
   describe('getDefaultParams', () => {
     it('returns default params for parameterized nodes', () => {
-      expect(getDefaultParams('amp')).toEqual({ gain: 0 });
+      expect(getDefaultParams('scale')).toEqual({ factor: 100 });
+      expect(getDefaultParams('add')).toEqual({ amount: 0 });
+      expect(getDefaultParams('threshold')).toEqual({ level: 0 });
     });
 
     it('returns empty object for non-parameterized nodes', () => {
-      expect(getDefaultParams('inverter')).toEqual({});
-      expect(getDefaultParams('polarizer')).toEqual({});
+      expect(getDefaultParams('max')).toEqual({});
+      expect(getDefaultParams('min')).toEqual({});
+      expect(getDefaultParams('split')).toEqual({});
     });
 
     it('returns empty object for unknown types', () => {
@@ -102,27 +105,23 @@ describe('Node Registry', () => {
   });
 
   describe('getKnobConfig', () => {
-    it('returns correct config for mixer', () => {
-      expect(getKnobConfig(getNodeDefinition('mixer'))).toEqual({ portIndex: 2, paramKey: 'mix' });
+    it('returns correct config for scale', () => {
+      expect(getKnobConfig(getNodeDefinition('scale'))).toEqual({ portIndex: 1, paramKey: 'factor' });
     });
 
-    it('returns correct config for amp', () => {
-      expect(getKnobConfig(getNodeDefinition('amp'))).toEqual({ portIndex: 1, paramKey: 'gain' });
+    it('returns correct config for add', () => {
+      expect(getKnobConfig(getNodeDefinition('add'))).toEqual({ portIndex: 1, paramKey: 'amount' });
     });
 
-    it('returns correct config for diverter', () => {
-      expect(getKnobConfig(getNodeDefinition('diverter'))).toEqual({ portIndex: 1, paramKey: 'fade' });
-    });
-
-    it('returns correct config for offset', () => {
-      expect(getKnobConfig(getNodeDefinition('offset'))).toEqual({ portIndex: 1, paramKey: 'offset' });
+    it('returns correct config for threshold', () => {
+      expect(getKnobConfig(getNodeDefinition('threshold'))).toEqual({ portIndex: 1, paramKey: 'level' });
     });
 
     it('returns null for non-knob types', () => {
-      expect(getKnobConfig(getNodeDefinition('inverter'))).toBeNull();
+      expect(getKnobConfig(getNodeDefinition('max'))).toBeNull();
+      expect(getKnobConfig(getNodeDefinition('min'))).toBeNull();
       expect(getKnobConfig(getNodeDefinition('memory'))).toBeNull();
-      expect(getKnobConfig(getNodeDefinition('polarizer'))).toBeNull();
-      expect(getKnobConfig(getNodeDefinition('splitter'))).toBeNull();
+      expect(getKnobConfig(getNodeDefinition('split'))).toBeNull();
     });
 
     it('returns null for undefined definition', () => {

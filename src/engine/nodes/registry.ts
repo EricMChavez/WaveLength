@@ -8,14 +8,12 @@
 import type { NodeDefinition, NodeCategory, ParamValue } from './framework';
 import { createDefaultParams } from './framework';
 import {
-  inverterNode,
-  mixerNode,
-  ampNode,
-  diverterNode,
-  polarizerNode,
-  offsetNode,
-  splitterNode,
-  averageNode,
+  addNode,
+  scaleNode,
+  thresholdNode,
+  maxNode,
+  minNode,
+  splitNode,
   memoryNode,
 } from './definitions';
 
@@ -28,14 +26,12 @@ import {
  * To add a new node: import it and add it to this array.
  */
 const NODE_DEFINITIONS: readonly NodeDefinition<Record<string, ParamValue>>[] = [
-  inverterNode,
-  mixerNode as NodeDefinition<Record<string, ParamValue>>,
-  ampNode as NodeDefinition<Record<string, ParamValue>>,
-  diverterNode as NodeDefinition<Record<string, ParamValue>>,
-  polarizerNode,
-  offsetNode as NodeDefinition<Record<string, ParamValue>>,
-  splitterNode as NodeDefinition<Record<string, ParamValue>>,
-  averageNode as NodeDefinition<Record<string, ParamValue>>,
+  addNode as NodeDefinition<Record<string, ParamValue>>,
+  scaleNode as NodeDefinition<Record<string, ParamValue>>,
+  thresholdNode as NodeDefinition<Record<string, ParamValue>>,
+  maxNode as NodeDefinition<Record<string, ParamValue>>,
+  minNode as NodeDefinition<Record<string, ParamValue>>,
+  splitNode as NodeDefinition<Record<string, ParamValue>>,
   memoryNode as NodeDefinition<Record<string, ParamValue>>,
 ] as const;
 

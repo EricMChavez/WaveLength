@@ -48,7 +48,7 @@ export function createPuzzleGameboard(puzzle: PuzzleDefinition): GameboardState 
         inputCount: nodeDef.inputCount,
         outputCount: nodeDef.outputCount,
         rotation: nodeDef.rotation ?? 0,
-        locked: true, // Initial nodes are locked (player cannot move/delete)
+        locked: nodeDef.locked ?? true,
       };
       nodes.set(node.id, node);
     }

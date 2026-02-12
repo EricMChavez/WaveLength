@@ -125,26 +125,7 @@ export function drawGrid(
   ctx.fill();
   ctx.restore();
 
-  // 6. Board border (stroke around the playable area)
-  // Left/right: extends outward into meter zone. Top/bottom: extends inward.
-  const borderColor = useOverrides ? devOverrides.colors.boardBorder : tokens.boardBorder;
-  const borderWidth = cellSize * 0.5 + 2;
-  const halfBW = borderWidth / 2;
-  ctx.save();
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = borderWidth;
-  ctx.beginPath();
-  ctx.roundRect(
-    playableX - halfBW,
-    halfBW,
-    playableWidth + borderWidth,
-    totalHeight - borderWidth,
-    cornerRadius,
-  );
-  ctx.stroke();
-  ctx.restore();
-
-  // 7. Debug grid labels (dev override only)
+  // 6. Debug grid labels (dev override only)
   const showLabels = devOverrides.enabled && devOverrides.gridStyle.showGridLabels;
   if (showLabels) {
     ctx.save();

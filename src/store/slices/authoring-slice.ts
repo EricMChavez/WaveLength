@@ -1,21 +1,128 @@
 import type { StateCreator } from 'zustand';
+import type { NodeState, Wire } from '../../shared/types/index.ts';
 
 /** Authoring workflow phase */
-export type AuthoringPhase = 'idle' | 'saving';
+export type AuthoringPhase = 'idle' | 'configuring-start' | 'saving';
+
+/** Snapshot of board state at recording time */
+export interface BoardSnapshot {
+  nodes: Map<string, NodeState>;
+  wires: Wire[];
+}
 
 export interface AuthoringSlice {
   /** Current authoring workflow phase */
   authoringPhase: AuthoringPhase;
-  /** Begin saving as puzzle (transitions to 'saving' phase) */
+  /** Captured output samples at the moment the author clicks "Record Target" */
+  recordedTargetSamples: Map<number, number[]> | null;
+  /** Board state at recording time (for "Reset to Solution") */
+  solutionBoardSnapshot: BoardSnapshot | null;
+
+  /** Capture current outputs as target, snapshot board, transition to 'configuring-start' */
+  beginRecordTarget: () => void;
+  /** Restore board from solutionBoardSnapshot (only valid in 'configuring-start') */
+  resetToSolution: () => void;
+  /** Transition from 'configuring-start' to 'saving' (opens save dialog) */
   beginSaveAsPuzzle: () => void;
-  /** Cancel authoring workflow */
+  /** Cancel authoring workflow, clear recorded state */
   cancelAuthoring: () => void;
 }
 
-export const createAuthoringSlice: StateCreator<AuthoringSlice> = (set) => ({
+export const createAuthoringSlice: StateCreator<AuthoringSlice> = (set, get) => ({
   authoringPhase: 'idle',
+  recordedTargetSamples: null,
+  solutionBoardSnapshot: null,
 
-  beginSaveAsPuzzle: () => set({ authoringPhase: 'saving' }),
+  beginRecordTarget: () => {
+    // Access other slices via composed store
+    const store = get() as unknown as {
+      cycleResults: { outputValues: number[][] } | null;
+      creativeSlots: Array<{ direction: 'input' | 'output' | 'off' }>;
+      activeBoard: { nodes: Map<string, NodeState>; wires: Wire[] } | null;
+    };
 
-  cancelAuthoring: () => set({ authoringPhase: 'idle' }),
+    const { cycleResults, creativeSlots, activeBoard } = store;
+    if (!cycleResults || !activeBoard) return;
+
+    // Capture output samples from cycle results
+    const targetSamples = new Map<number, number[]>();
+    const outputCount = cycleResults.outputValues[0]?.length ?? 0;
+
+    // Find output slots (indices 3-5 are right side)
+    const outputSlotIndices: number[] = [];
+    for (let i = 0; i < creativeSlots.length; i++) {
+      if (creativeSlots[i].direction === 'output') {
+        outputSlotIndices.push(i);
+      }
+    }
+
+    for (const slotIndex of outputSlotIndices) {
+      const outputIdx = slotIndex - 3; // slots 3-5 → output indices 0-2
+      if (outputIdx >= 0 && outputIdx < outputCount) {
+        const samples: number[] = [];
+        for (let c = 0; c < cycleResults.outputValues.length; c++) {
+          samples.push(cycleResults.outputValues[c][outputIdx] ?? 0);
+        }
+        targetSamples.set(slotIndex, samples);
+      }
+    }
+
+    // Deep-copy board state for snapshot
+    const snapshotNodes = new Map<string, NodeState>();
+    for (const [id, node] of activeBoard.nodes) {
+      snapshotNodes.set(id, { ...node, position: { ...node.position }, params: { ...node.params } });
+    }
+    const snapshotWires = activeBoard.wires.map(w => ({
+      ...w,
+      source: { ...w.source },
+      target: { ...w.target },
+      path: [...w.path],
+    }));
+
+    set({
+      authoringPhase: 'configuring-start',
+      recordedTargetSamples: targetSamples,
+      solutionBoardSnapshot: { nodes: snapshotNodes, wires: snapshotWires },
+    });
+  },
+
+  resetToSolution: () => {
+    const state = get();
+    if (state.authoringPhase !== 'configuring-start' || !state.solutionBoardSnapshot) return;
+
+    // Restore board from snapshot
+    const store = get() as unknown as {
+      setActiveBoard: (board: { id: string; nodes: Map<string, NodeState>; wires: Wire[] }) => void;
+      activeBoard: { id: string } | null;
+    };
+
+    if (!store.activeBoard) return;
+
+    // Deep-copy snapshot to avoid mutating it
+    const nodes = new Map<string, NodeState>();
+    for (const [id, node] of state.solutionBoardSnapshot.nodes) {
+      nodes.set(id, { ...node, position: { ...node.position }, params: { ...node.params } });
+    }
+    const wires = state.solutionBoardSnapshot.wires.map(w => ({
+      ...w,
+      source: { ...w.source },
+      target: { ...w.target },
+      path: [...w.path],
+    }));
+
+    store.setActiveBoard({ id: store.activeBoard.id, nodes, wires });
+  },
+
+  beginSaveAsPuzzle: () => {
+    const state = get();
+    if (state.authoringPhase !== 'configuring-start') return;
+    set({ authoringPhase: 'saving' });
+  },
+
+  cancelAuthoring: () =>
+    set({
+      authoringPhase: 'idle',
+      recordedTargetSamples: null,
+      solutionBoardSnapshot: null,
+    }),
 });

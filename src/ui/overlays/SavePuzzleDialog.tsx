@@ -2,8 +2,13 @@ import { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import { useGameStore } from '../../store/index.ts';
 import { slotToMeterInfo } from '../../store/slices/creative-slice.ts';
 import type { CustomPuzzle } from '../../store/slices/custom-puzzle-slice.ts';
+import type { AllowedNodes } from '../../puzzle/types.ts';
 import { nodeRegistry, getNodeLabel } from '../../engine/nodes/registry.ts';
+import { isCreativeSlotNode, creativeSlotId, cpInputId, cpOutputId } from '../../puzzle/connection-point-nodes.ts';
 import styles from './SavePuzzleDialog.module.css';
+
+/** Tolerance for checking if starting config solves the puzzle (±5). */
+const SOLVE_CHECK_TOLERANCE = 5;
 
 export function SavePuzzleDialog() {
   const overlay = useGameStore((s) => s.activeOverlay);
@@ -14,10 +19,11 @@ export function SavePuzzleDialog() {
 function SavePuzzleDialogInner() {
   const closeOverlay = useGameStore((s) => s.closeOverlay);
   const cancelAuthoring = useGameStore((s) => s.cancelAuthoring);
-  const cycleResults = useGameStore((s) => s.cycleResults);
+  const recordedTargetSamples = useGameStore((s) => s.recordedTargetSamples);
   const creativeSlots = useGameStore((s) => s.creativeSlots);
   const activeBoard = useGameStore((s) => s.activeBoard);
   const addCustomPuzzle = useGameStore((s) => s.addCustomPuzzle);
+  const cycleResults = useGameStore((s) => s.cycleResults);
 
   // Build list of all fundamental node types (including "Custom" for user-created nodes)
   const allNodeTypes = useMemo(() => {
@@ -29,21 +35,30 @@ function SavePuzzleDialogInner() {
     return types;
   }, []);
 
-  const allTypeStrings = useMemo(() => allNodeTypes.map((t) => t.type), [allNodeTypes]);
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
-  const [allowedNodeSet, setAllowedNodeSet] = useState<Set<string>>(() => new Set(allTypeStrings));
-  const [startingNodeIds, setStartingNodeIds] = useState<Set<string>>(new Set());
+  // quantity: -1 = unlimited, 0+ = max count
+  const [quantities, setQuantities] = useState<Record<string, number>>(() =>
+    Object.fromEntries(allNodeTypes.map((t) => [t.type, -1]))
+  );
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Non-CP board nodes available as starting nodes
-  const boardNodes = useMemo(() => {
+  // Non-CP board nodes = starting nodes (auto-captured from current board state)
+  const startingNodes = useMemo(() => {
     if (!activeBoard) return [];
     return Array.from(activeBoard.nodes.values())
-      .filter((node) => !node.id.startsWith('creative-slot-'));
+      .filter((node) => !isCreativeSlotNode(node.id));
   }, [activeBoard]);
+
+  // Count starting nodes by type
+  const startingNodeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const node of startingNodes) {
+      counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
+    }
+    return counts;
+  }, [startingNodes]);
 
   // Focus title input on mount
   useEffect(() => {
@@ -59,6 +74,35 @@ function SavePuzzleDialogInner() {
     .map((slot, index) => ({ slot, index }))
     .filter(({ slot }) => slot.direction === 'output');
 
+  // Validation: check if starting config already solves the puzzle
+  const alreadySolved = useMemo(() => {
+    if (!cycleResults || !recordedTargetSamples) return false;
+    const outputCount = cycleResults.outputValues[0]?.length ?? 0;
+    const tolerance = SOLVE_CHECK_TOLERANCE;
+
+    for (const [slotIndex, targetSamples] of recordedTargetSamples) {
+      const outputIdx = slotIndex - 3;
+      if (outputIdx < 0 || outputIdx >= outputCount) return false;
+      for (let c = 0; c < targetSamples.length; c++) {
+        const actual = cycleResults.outputValues[c]?.[outputIdx] ?? 0;
+        if (Math.abs(actual - targetSamples[c]) > tolerance) return false;
+      }
+    }
+    return true;
+  }, [cycleResults, recordedTargetSamples]);
+
+  // Validation: check if any type budget < starting node count
+  const budgetErrors = useMemo(() => {
+    const errors: string[] = [];
+    for (const [type, count] of startingNodeCounts) {
+      const budget = quantities[type];
+      if (budget !== undefined && budget !== -1 && budget < count) {
+        errors.push(`${getNodeLabel(type)}: budget ${budget} < ${count} starting nodes`);
+      }
+    }
+    return errors;
+  }, [quantities, startingNodeCounts]);
+
   const handleCancel = useCallback(() => {
     cancelAuthoring();
     closeOverlay();
@@ -70,24 +114,14 @@ function SavePuzzleDialogInner() {
       return;
     }
 
-    if (!activeBoard || !cycleResults) {
+    if (!activeBoard || !recordedTargetSamples) {
       setError('Invalid state - please try again');
       return;
     }
 
-    // Extract 256-sample target arrays from cycle results for each output slot.
-    // Creative output slots 3-5 map to fixed output indices 0-2 (slotIndex - 3).
-    const targetSamples = new Map<number, number[]>();
-    const outputCount = cycleResults.outputValues[0]?.length ?? 0;
-    for (const { index: slotIndex } of outputSlots) {
-      const outputIdx = slotIndex - 3; // slots 3-5 → output indices 0-2
-      if (outputIdx >= 0 && outputIdx < outputCount) {
-        const samples: number[] = [];
-        for (let c = 0; c < cycleResults.outputValues.length; c++) {
-          samples.push(cycleResults.outputValues[c][outputIdx] ?? 0);
-        }
-        targetSamples.set(slotIndex, samples);
-      }
+    if (budgetErrors.length > 0) {
+      setError('Fix budget errors before saving');
+      return;
     }
 
     // Build slot configuration
@@ -96,25 +130,58 @@ function SavePuzzleDialogInner() {
       waveform: slot.direction === 'input' ? slot.waveform : undefined,
     }));
 
-    // Serialize starting nodes (only those selected by the author)
-    const initialNodes = Array.from(activeBoard.nodes.values())
-      .filter((node) => !node.id.startsWith('creative-slot-') && startingNodeIds.has(node.id))
-      .map((node) => ({
-        id: node.id,
-        type: node.type,
-        position: { col: node.position.col, row: node.position.row },
-        params: { ...node.params },
-        inputCount: node.inputCount,
-        outputCount: node.outputCount,
-        rotation: node.rotation,
+    // Serialize starting nodes (all non-CP nodes from current board)
+    const initialNodes = startingNodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      position: { col: node.position.col, row: node.position.row },
+      params: { ...node.params },
+      inputCount: node.inputCount,
+      outputCount: node.outputCount,
+      rotation: node.rotation,
+      locked: false,
+    }));
+
+    // Build mapping from creative slot IDs → loaded puzzle CP IDs
+    const creativeToLoadedId = new Map<string, string>();
+    let mappedInputCount = 0;
+    let mappedOutputCount = 0;
+    for (let i = 0; i < creativeSlots.length; i++) {
+      const slot = creativeSlots[i];
+      if (slot.direction === 'off') continue;
+      const cId = creativeSlotId(i);
+      if (slot.direction === 'input') {
+        creativeToLoadedId.set(cId, cpInputId(mappedInputCount++));
+      } else {
+        creativeToLoadedId.set(cId, cpOutputId(mappedOutputCount++));
+      }
+    }
+
+    // Capture wires, remapping creative-slot CP IDs to standard CP IDs
+    const startingNodeIds = new Set(startingNodes.map(n => n.id));
+    const initialWires: CustomPuzzle['initialWires'] = activeBoard.wires
+      .filter(w => {
+        // Include wires where both endpoints are starting nodes or CP nodes
+        const sourceOk = startingNodeIds.has(w.source.nodeId) || creativeToLoadedId.has(w.source.nodeId);
+        const targetOk = startingNodeIds.has(w.target.nodeId) || creativeToLoadedId.has(w.target.nodeId);
+        return sourceOk && targetOk;
+      })
+      .map(w => ({
+        source: {
+          nodeId: creativeToLoadedId.get(w.source.nodeId) ?? w.source.nodeId,
+          portIndex: w.source.portIndex,
+        },
+        target: {
+          nodeId: creativeToLoadedId.get(w.target.nodeId) ?? w.target.nodeId,
+          portIndex: w.target.portIndex,
+        },
       }));
 
-    const initialWires: CustomPuzzle['initialWires'] = [];
-
-    // Compute allowedNodes: null means all types allowed
-    const computedAllowed = allowedNodeSet.size === allTypeStrings.length
+    // Compute allowedNodes: if all types are -1, use null (all unlimited)
+    const allUnlimited = allNodeTypes.every(t => quantities[t.type] === -1);
+    const computedAllowed: AllowedNodes = allUnlimited
       ? null
-      : Array.from(allowedNodeSet);
+      : { ...quantities };
 
     const puzzle: CustomPuzzle = {
       id: `custom-${Date.now()}`,
@@ -122,7 +189,7 @@ function SavePuzzleDialogInner() {
       description: description.trim(),
       createdAt: Date.now(),
       slots,
-      targetSamples,
+      targetSamples: recordedTargetSamples,
       initialNodes,
       initialWires,
       allowedNodes: computedAllowed,
@@ -135,15 +202,15 @@ function SavePuzzleDialogInner() {
     title,
     description,
     activeBoard,
-    cycleResults,
+    recordedTargetSamples,
     creativeSlots,
-    outputSlots,
+    startingNodes,
     addCustomPuzzle,
     cancelAuthoring,
     closeOverlay,
-    startingNodeIds,
-    allowedNodeSet,
-    allTypeStrings,
+    quantities,
+    allNodeTypes,
+    budgetErrors,
   ]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -155,6 +222,14 @@ function SavePuzzleDialogInner() {
       handleSave();
     }
   }, [handleCancel, handleSave]);
+
+  const setAllUnlimited = useCallback(() => {
+    setQuantities(Object.fromEntries(allNodeTypes.map((t) => [t.type, -1])));
+  }, [allNodeTypes]);
+
+  const setAllNone = useCallback(() => {
+    setQuantities(Object.fromEntries(allNodeTypes.map((t) => [t.type, 0])));
+  }, [allNodeTypes]);
 
   return (
     <div className={styles.backdrop}>
@@ -222,70 +297,55 @@ function SavePuzzleDialogInner() {
                 </span>
               </div>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Cycles:</span>
-                <span className={styles.summaryValue}>256</span>
+                <span className={styles.summaryLabel}>Starting nodes:</span>
+                <span className={styles.summaryValue}>{startingNodes.length}</span>
               </div>
             </div>
           </div>
+
+          {alreadySolved && (
+            <div className={styles.warning}>
+              Starting configuration already solves the puzzle. Remove some nodes/wires first.
+            </div>
+          )}
+
+          {budgetErrors.length > 0 && (
+            <div className={styles.error}>
+              {budgetErrors.map((e, i) => <div key={i}>{e}</div>)}
+            </div>
+          )}
 
           <div className={styles.checkboxSection}>
             <h3 className={styles.summaryTitle}>
-              Allowed Nodes
-              <button
-                type="button"
-                className={styles.toggleAllButton}
-                onClick={() => {
-                  if (allowedNodeSet.size === allTypeStrings.length) {
-                    setAllowedNodeSet(new Set());
-                  } else {
-                    setAllowedNodeSet(new Set(allTypeStrings));
-                  }
-                }}
-              >
-                {allowedNodeSet.size === allTypeStrings.length ? 'None' : 'All'}
+              Node Budgets
+              <button type="button" className={styles.toggleAllButton} onClick={setAllUnlimited}>
+                All Unlimited
+              </button>
+              <button type="button" className={styles.toggleAllButton} onClick={setAllNone}>
+                None
               </button>
             </h3>
-            <div className={styles.checkboxGrid}>
+            <div>
               {allNodeTypes.map((entry) => (
-                <label key={entry.type} className={styles.checkboxItem}>
+                <div key={entry.type} className={styles.quantityRow}>
+                  <span className={styles.quantityLabel}>{entry.label}</span>
                   <input
-                    type="checkbox"
-                    checked={allowedNodeSet.has(entry.type)}
+                    type="number"
+                    className={styles.quantityInput}
+                    min={-1}
+                    value={quantities[entry.type]}
                     onChange={(e) => {
-                      const next = new Set(allowedNodeSet);
-                      if (e.target.checked) next.add(entry.type);
-                      else next.delete(entry.type);
-                      setAllowedNodeSet(next);
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= -1) {
+                        setQuantities(prev => ({ ...prev, [entry.type]: val }));
+                      }
                     }}
+                    title="-1 = unlimited, 0 = not allowed, 1+ = max count"
                   />
-                  <span>{entry.label}</span>
-                </label>
+                </div>
               ))}
             </div>
           </div>
-
-          {boardNodes.length > 0 && (
-            <div className={styles.checkboxSection}>
-              <h3 className={styles.summaryTitle}>Starting Nodes</h3>
-              <div className={styles.startingNodeList}>
-                {boardNodes.map((node) => (
-                  <label key={node.id} className={styles.checkboxItem}>
-                    <input
-                      type="checkbox"
-                      checked={startingNodeIds.has(node.id)}
-                      onChange={(e) => {
-                        const next = new Set(startingNodeIds);
-                        if (e.target.checked) next.add(node.id);
-                        else next.delete(node.id);
-                        setStartingNodeIds(next);
-                      }}
-                    />
-                    <span>{getNodeLabel(node.type)} ({node.position.col}, {node.position.row})</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className={styles.footer}>

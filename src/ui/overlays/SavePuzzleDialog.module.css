@@ -215,3 +215,45 @@
   background: rgba(255, 255, 255, 0.12);
   color: #e0e0f0;
 }
+
+.quantityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.quantityLabel {
+  font-size: 13px;
+  color: #e0e0f0;
+}
+
+.quantityInput {
+  width: 60px;
+  padding: 4px 8px;
+  background: #2a2a3e;
+  border: 1px solid #4a4a6a;
+  border-radius: 4px;
+  color: #e0e0f0;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+
+.quantityInput:focus {
+  border-color: #F5AF28;
+}
+
+.warning {
+  padding: 10px 12px;
+  background: rgba(245, 175, 40, 0.1);
+  border: 1px solid rgba(245, 175, 40, 0.3);
+  border-radius: 6px;
+  color: #F5AF28;
+  font-size: 13px;
+}
+
+.startingSummary {
+  font-size: 13px;
+  color: #9090b0;
+}

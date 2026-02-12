@@ -1,14 +1,14 @@
 /** Supported waveform shapes for puzzle inputs/outputs.
- *  Full = 256 cycles, Half = 128 cycles, Quarter = 64 cycles. */
+ *  Full = 256, Half = 128, Third ≈ 85.33, Quarter = 64, Sixth ≈ 42.67 ticks per cycle. */
 export type WaveformShape =
-  | 'sine-full' | 'sine-half' | 'sine-quarter'
-  | 'sine-full-reduced' | 'sine-half-reduced' | 'sine-quarter-reduced'
-  | 'triangle-full' | 'triangle-half' | 'triangle-quarter'
-  | 'triangle-full-reduced' | 'triangle-half-reduced' | 'triangle-quarter-reduced'
-  | 'square-full' | 'square-half' | 'square-quarter'
-  | 'square-full-reduced' | 'square-half-reduced' | 'square-quarter-reduced'
-  | 'sawtooth-full' | 'sawtooth-half' | 'sawtooth-quarter'
-  | 'sawtooth-full-reduced' | 'sawtooth-half-reduced' | 'sawtooth-quarter-reduced'
+  | 'sine-full' | 'sine-half' | 'sine-third' | 'sine-quarter' | 'sine-fifth' | 'sine-sixth'
+  | 'sine-full-reduced' | 'sine-half-reduced' | 'sine-third-reduced' | 'sine-quarter-reduced' | 'sine-fifth-reduced' | 'sine-sixth-reduced'
+  | 'triangle-full' | 'triangle-half' | 'triangle-third' | 'triangle-quarter' | 'triangle-fifth' | 'triangle-sixth'
+  | 'triangle-full-reduced' | 'triangle-half-reduced' | 'triangle-third-reduced' | 'triangle-quarter-reduced' | 'triangle-fifth-reduced' | 'triangle-sixth-reduced'
+  | 'square-full' | 'square-half' | 'square-third' | 'square-quarter' | 'square-fifth' | 'square-sixth'
+  | 'square-full-reduced' | 'square-half-reduced' | 'square-third-reduced' | 'square-quarter-reduced' | 'square-fifth-reduced' | 'square-sixth-reduced'
+  | 'sawtooth-full' | 'sawtooth-half' | 'sawtooth-third' | 'sawtooth-quarter' | 'sawtooth-fifth' | 'sawtooth-sixth'
+  | 'sawtooth-full-reduced' | 'sawtooth-half-reduced' | 'sawtooth-third-reduced' | 'sawtooth-quarter-reduced' | 'sawtooth-fifth-reduced' | 'sawtooth-sixth-reduced'
   | 'samples';
 
 /** Definition of a single waveform signal */
@@ -103,6 +103,9 @@ export interface CustomWaveformEntry {
   samples: number[]; // 256 values, each [-100, +100]
 }
 
+/** null = all nodes unlimited. Record maps node type → max count (-1 = unlimited). */
+export type AllowedNodes = Record<string, number> | null;
+
 /** Serialized node for initial puzzle state */
 export interface InitialNodeDef {
   id: string;
@@ -112,6 +115,8 @@ export interface InitialNodeDef {
   inputCount: number;
   outputCount: number;
   rotation?: 0 | 90 | 180 | 270;
+  /** If true, node cannot be moved/deleted by the player. Default: true for built-in, false for custom. */
+  locked?: boolean;
 }
 
 /** Serialized wire for initial puzzle state */
@@ -129,8 +134,8 @@ export interface PuzzleDefinition {
   activeInputs: number;
   /** Number of active output connection points (1–3) */
   activeOutputs: number;
-  /** Node types the player may use. null = all allowed */
-  allowedNodes: string[] | null;
+  /** Node types the player may use. null = all unlimited. Record maps type → max count (-1 = unlimited). */
+  allowedNodes: AllowedNodes;
   /** Test cases the player's circuit must satisfy */
   testCases: PuzzleTestCase[];
   /** Connection point configuration (derived from activeInputs/activeOutputs if not set) */

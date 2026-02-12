@@ -64,12 +64,12 @@ describe('exportCustomPuzzleAsSource', () => {
     expect(result).toContain('allowedNodes: null');
   });
 
-  it('exports allowedNodes array when set', () => {
+  it('exports allowedNodes record when set', () => {
     const puzzle = makeCustomPuzzle({
-      allowedNodes: ['invert', 'mix'],
+      allowedNodes: { invert: -1, mix: 3 },
     });
     const result = exportCustomPuzzleAsSource(puzzle);
-    expect(result).toContain("allowedNodes: ['invert', 'mix']");
+    expect(result).toContain('allowedNodes: { invert: -1, mix: 3 }');
   });
 
   it('exports initialNodes when present', () => {

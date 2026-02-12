@@ -134,9 +134,15 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
   }
 
   // Format allowedNodes value
-  const allowedNodesStr = puzzle.allowedNodes === null
-    ? 'null'
-    : `[${puzzle.allowedNodes.map((n) => `'${n}'`).join(', ')}]`;
+  let allowedNodesStr: string;
+  if (puzzle.allowedNodes === null) {
+    allowedNodesStr = 'null';
+  } else {
+    const entries = Object.entries(puzzle.allowedNodes)
+      .map(([type, count]) => `${type}: ${count}`)
+      .join(', ');
+    allowedNodesStr = `{ ${entries} }`;
+  }
 
   // Build the source
   const lines: string[] = [

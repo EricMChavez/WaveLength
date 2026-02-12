@@ -1,20 +1,20 @@
 import { defineNode } from '../framework';
 import { clamp } from '../../../shared/math';
 
-export type OffsetParams = { offset: number };
+export type AddParams = { amount: number };
 
-export const offsetNode = defineNode<OffsetParams>({
-  type: 'offset',
+export const addNode = defineNode<AddParams>({
+  type: 'add',
   category: 'math',
 
   inputs: [
     { name: 'A' },
-    { name: 'X', description: 'Offset amount', side: 'bottom', knob: 'offset' },
+    { name: 'X', description: 'Add amount', side: 'bottom', knob: 'amount' },
   ],
   outputs: [{ name: 'Out' }],
 
   params: [
-    { key: 'offset', type: 'number', default: 0, label: 'Offset', min: -100, max: 100, step: 25 },
+    { key: 'amount', type: 'number', default: 0, label: 'Amount', min: -100, max: 100, step: 25 },
   ],
 
   evaluate: ({ inputs }) => {

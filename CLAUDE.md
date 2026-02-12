@@ -26,15 +26,17 @@ A **recursive tool-building puzzle game** about signal processing. Players wire 
 - Unconnected inputs default to **0**.
 - Polarity: positive = amber (#F5AF28), negative = teal (#1ED2C3), neutral = gray.
 
-### Five Fundamental Nodes
+### Seven Fundamental Nodes
 
-| Node | Inputs | Operation | Notes |
-|------|--------|-----------|-------|
-| **Multiply** | A, B | `clamp((A * B) / 100)` | Divides by 100 to stay in range |
-| **Mix** | A, B | Mode-based: Add, Subtract, Average, Max, Min | All modes clamp output |
-| **Invert** | A | `-A` | Phase flip |
-| **Threshold** | A + param | `A > threshold ? +100 : -100` | Binary output, param range [-100,+100] |
-| **Memory** | A | Outputs previous cycle's input | 1-cycle delay, initial output 0 |
+| Node | Type ID | I/O | Operation | Notes |
+|------|---------|-----|-----------|-------|
+| **Add** | `add` | A + knob → 1 | `clamp(A + X)` | Knob: `amount`, default 0, size 4x3 |
+| **Scale** | `scale` | A + knob → 1 | `clamp(A * X / 100)` | Knob: `factor`, default 100 (unity), size 4x3 |
+| **Threshold** | `threshold` | A + knob → 1 | `A >= X ? +100 : -100` | Knob: `level`, default 0, size 4x3 |
+| **Max** | `max` | A, B → 1 | `max(A, B)` | No params, size 2x2 |
+| **Min** | `min` | A, B → 1 | `min(A, B)` | No params, size 2x2 |
+| **Memory** | `memory` | A → 1 | Previous cycle's input | 1-cycle delay, initial output 0, size 3x2 |
+| **Split** | `split` | A → 2 | Duplicate signal | No params, size 2x2 |
 
 ### Two Custom Node Types
 
@@ -289,7 +291,7 @@ SIGNAL: [-100, +100], tolerance ±5
 CYCLES: 256 per evaluation, playpoint sweeps at 16 cycles/sec
 HISTORY: ~50 entries max
 METERS: 256 samples (flat array), 12 rows x 10 cols per meter
-NODE SIZES: Fundamental 3x2, Puzzle 3xN, Utility 5x3
+NODE SIZES: Variable per definition (4x3 knob nodes, 2x2 max/min/split, 3x2 memory), Puzzle 3xN, Utility 5x3
 ```
 
 ---

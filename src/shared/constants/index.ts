@@ -1,7 +1,7 @@
 /** Gameboard layout styling */
 export const GAMEBOARD_STYLE = {
   /** Corner radius ratio (multiplied by cellSize at render time) */
-  CORNER_RADIUS_RATIO: 0.5,
+  CORNER_RADIUS_RATIO: 0,
 } as const;
 
 /** Ratio-based node styling (multiplied by cellSize at render time) */
@@ -63,19 +63,13 @@ export const COLORS = {
 
 /** Display labels for node types (derived from registry for v2 nodes) */
 export const NODE_TYPE_LABELS: Record<string, string> = {
-  // v2 nodes
-  inverter: 'Inverter',
-  mixer: 'Mixer',
-  amp: 'Amp',
-  diverter: 'Diverter',
-  polarizer: 'Polarizer',
-  offset: 'Offset',
+  add: 'Add',
+  scale: 'Scale',
+  threshold: 'Threshold',
+  max: 'Max',
+  min: 'Min',
+  split: 'Split',
   memory: 'Memory',
   // Custom blank (unsaved utility node)
   'custom-blank': 'Custom',
-  // Legacy v1 nodes (for migration period)
-  multiply: 'Multiply',
-  mix: 'Mix',
-  invert: 'Invert',
-  threshold: 'Threshold',
 };

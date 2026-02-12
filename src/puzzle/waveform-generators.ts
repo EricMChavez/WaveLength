@@ -20,23 +20,35 @@ function generateShape(shape: WaveformShape, tick: number, period: number, phase
   switch (baseShape) {
     case 'sine-full':
     case 'sine-half':
+    case 'sine-third':
     case 'sine-quarter':
+    case 'sine-fifth':
+    case 'sine-sixth':
       raw = Math.sin(2 * Math.PI * t);
       break;
     case 'square-full':
     case 'square-half':
+    case 'square-third':
     case 'square-quarter':
+    case 'square-fifth':
+    case 'square-sixth':
       raw = t < 0.5 ? 1 : -1;
       break;
     case 'triangle-full':
     case 'triangle-half':
+    case 'triangle-third':
     case 'triangle-quarter':
+    case 'triangle-fifth':
+    case 'triangle-sixth':
       // Rises from -1 to +1 in the first half, falls from +1 to -1 in the second
       raw = t < 0.5 ? -1 + 4 * t : 3 - 4 * t;
       break;
     case 'sawtooth-full':
     case 'sawtooth-half':
+    case 'sawtooth-third':
     case 'sawtooth-quarter':
+    case 'sawtooth-fifth':
+    case 'sawtooth-sixth':
       // Rises from -1 to +1 over the period
       raw = -1 + 2 * t;
       break;
@@ -65,12 +77,15 @@ export function generateWaveformValue(tick: number, def: WaveformDef): number {
   return clamp(scaled);
 }
 
-/** Get the canonical period for a waveform shape.
- *  Full = 256 cycles, Half = 128 cycles, Quarter = 64 cycles. */
+/** Get the canonical period for a waveform shape. */
 export function getShapePeriod(shape: WaveformShape): number {
   // Strip -reduced suffix for period calculation
   const baseShape = shape.endsWith('-reduced') ? shape.replace(/-reduced$/, '') : shape;
   if (baseShape.endsWith('-full')) return 256;
   if (baseShape.endsWith('-half')) return 128;
-  return 64; // quarter or samples
+  if (baseShape.endsWith('-third')) return 256 / 3;
+  if (baseShape.endsWith('-quarter')) return 64;
+  if (baseShape.endsWith('-fifth')) return 256 / 5;
+  if (baseShape.endsWith('-sixth')) return 256 / 6;
+  return 64; // samples fallback
 }

@@ -25,9 +25,9 @@ function makePuzzle(overrides: Partial<CustomPuzzle> = {}): CustomPuzzle {
 }
 
 describe('custom-puzzle-slice serialization', () => {
-  it('serializes and hydrates allowedNodes', () => {
+  it('serializes and hydrates allowedNodes (Record format)', () => {
     const puzzles = new Map<string, CustomPuzzle>();
-    const puzzle = makePuzzle({ allowedNodes: ['invert', 'mixer'] });
+    const puzzle = makePuzzle({ allowedNodes: { invert: -1, mixer: 3 } });
     puzzles.set(puzzle.id, puzzle);
 
     // Create a minimal store-like API for getSerializableCustomPuzzles
@@ -45,13 +45,48 @@ describe('custom-puzzle-slice serialization', () => {
     const serialized = slice.getSerializableCustomPuzzles();
 
     expect(serialized.length).toBe(1);
-    expect(serialized[0].allowedNodes).toEqual(['invert', 'mixer']);
+    expect(serialized[0].allowedNodes).toEqual({ invert: -1, mixer: 3 });
 
     // Hydrate back
     slice.hydrateCustomPuzzles(serialized);
     const hydrated = state.customPuzzles.get('test-puzzle');
     expect(hydrated).toBeDefined();
-    expect(hydrated!.allowedNodes).toEqual(['invert', 'mixer']);
+    expect(hydrated!.allowedNodes).toEqual({ invert: -1, mixer: 3 });
+  });
+
+  it('migrates legacy string[] allowedNodes to Record format', () => {
+    const serialized: SerializedCustomPuzzle[] = [{
+      id: 'legacy-puzzle',
+      title: 'Legacy',
+      description: '',
+      createdAt: 1000,
+      slots: [
+        { direction: 'input' },
+        { direction: 'off' },
+        { direction: 'off' },
+        { direction: 'output' },
+        { direction: 'off' },
+        { direction: 'off' },
+      ],
+      targetSamples: [[3, [50]]],
+      initialNodes: [],
+      initialWires: [],
+      allowedNodes: ['add', 'scale'],
+    }];
+
+    let state = { customPuzzles: new Map<string, CustomPuzzle>() };
+    const get = () => state;
+    const set = (fn: any) => {
+      const result = typeof fn === 'function' ? fn(state) : fn;
+      state = { ...state, ...result };
+    };
+    const slice = createCustomPuzzleSlice(set as any, get as any, {} as any);
+
+    slice.hydrateCustomPuzzles(serialized);
+    const hydrated = state.customPuzzles.get('legacy-puzzle');
+    expect(hydrated).toBeDefined();
+    // Legacy string[] should be migrated to Record<string, -1>
+    expect(hydrated!.allowedNodes).toEqual({ add: -1, scale: -1 });
   });
 
   it('hydrates allowedNodes as null when missing (backward compat)', () => {
@@ -92,7 +127,7 @@ describe('custom-puzzle-slice serialization', () => {
     const puzzle = makePuzzle({
       initialNodes: [{
         id: 'n1',
-        type: 'invert',
+        type: 'add',
         position: { col: 10, row: 5 },
         params: {},
         inputCount: 1,

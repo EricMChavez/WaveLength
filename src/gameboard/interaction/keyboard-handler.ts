@@ -8,6 +8,7 @@ import type { PortRef, NodeState, Wire } from '../../shared/types/index.ts';
 import type { GridPoint } from '../../shared/grid/types.ts';
 import type { PuzzleDefinition } from '../../puzzle/types.ts';
 import type { InteractionMode } from '../../store/slices/interaction-slice.ts';
+import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import type { ActiveOverlay } from '../../store/slices/overlay-slice.ts';
 import { PLAYABLE_START, PLAYABLE_END, GRID_ROWS } from '../../shared/grid/index.ts';
 import {
@@ -130,7 +131,8 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
         return { type: 'enter-node', nodeId: focus.nodeId };
       }
       // Fundamental with editable params → open parameter popover
-      if (node.type === 'mix' || node.type === 'threshold') {
+      const def = getNodeDefinition(node.type);
+      if (def && (def.params?.length ?? 0) > 0) {
         return { type: 'open-params', nodeId: focus.nodeId };
       }
     }

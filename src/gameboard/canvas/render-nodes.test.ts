@@ -127,7 +127,7 @@ function createMockCtx() {
 
 describe('getNodePixelRect', () => {
   it('returns body covering full grid footprint for fundamental node', () => {
-    const node = makeNode('n1', 'invert', 5, 3);
+    const node = makeNode('n1', 'memory', 5, 3);
     const cellSize = 40;
     const rect = getNodePixelRect(node, cellSize);
     // Single port at row 1, but grid is 2 rows tall → body covers full grid
@@ -169,8 +169,8 @@ describe('drawNodes', () => {
 
   it('calls roundRect for each non-CP node', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
-    nodes.set('n2', makeNode('n2', 'multiply', 10, 6));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
+    nodes.set('n2', makeNode('n2', 'memory', 10, 6));
     // CP nodes are skipped
     nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 0, 0, 1));
 
@@ -184,7 +184,7 @@ describe('drawNodes', () => {
 
   it('creates linear gradient using surfaceNode and surfaceNodeBottom stops', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
 
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
@@ -199,7 +199,7 @@ describe('drawNodes', () => {
 
   it('hover state produces brighter gradient', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
 
     const state = makeState({ nodes, hoveredNodeId: 'n1' });
     drawNodes(mock.ctx, tokens, state, 40);
@@ -215,7 +215,7 @@ describe('drawNodes', () => {
 
   it('selected state uses colorSelection stroke', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
 
     const state = makeState({ nodes, selectedNodeId: 'n1' });
     drawNodes(mock.ctx, tokens, state, 40);
@@ -226,7 +226,7 @@ describe('drawNodes', () => {
 
   it('drop shadow is applied (shadowBlur > 0)', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
 
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
@@ -239,7 +239,7 @@ describe('drawNodes', () => {
 
   it('label font family matches NODE_STYLE.LABEL_FONT_FAMILY', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
 
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
@@ -247,22 +247,10 @@ describe('drawNodes', () => {
     expect(mock.fontHistory.some(f => f.includes(NODE_STYLE.LABEL_FONT_FAMILY))).toBe(true);
   });
 
-  it('sublabel font family matches NODE_STYLE.PARAM_FONT_FAMILY for param nodes', () => {
-    const nodes = new Map<string, NodeState>();
-    const mixNode = makeNode('n1', 'mix', 5, 3, 2, 1);
-    mixNode.params = { mode: 'Multiply' };
-    nodes.set('n1', mixNode);
-
-    const state = makeState({ nodes });
-    drawNodes(mock.ctx, tokens, state, 40);
-
-    expect(mock.fontHistory.some(f => f.includes(NODE_STYLE.PARAM_FONT_FAMILY))).toBe(true);
-  });
-
   it('selection highlight draws on second pass (after all nodes)', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 5, 3));
-    nodes.set('n2', makeNode('n2', 'multiply', 10, 6));
+    nodes.set('n1', makeNode('n1', 'memory', 5, 3));
+    nodes.set('n2', makeNode('n2', 'memory', 10, 6));
 
     const state = makeState({ nodes, selectedNodeId: 'n1' });
 

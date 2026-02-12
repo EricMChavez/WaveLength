@@ -110,8 +110,8 @@ describe('drawGrid', () => {
       expect(playableCall[1]).toBe(0);
       expect(playableCall[2]).toBe(expectedWidth);
       expect(playableCall[3]).toBe(expectedHeight);
-      // Corner radius should be defined
-      expect(playableCall[4]).toBeGreaterThan(0);
+      // Corner radius should be zero (no rounding)
+      expect(playableCall[4]).toBe(0);
     });
 
     it('meter zones are transparent (no fill in drawGrid)', () => {
@@ -165,9 +165,9 @@ describe('drawGrid', () => {
       expect(ctx.fill).toHaveBeenCalledTimes(2);
     });
 
-    it('stroke is only called once for the board border', () => {
+    it('stroke is not called (no board border)', () => {
       drawGrid(ctx, tokens, {}, 40);
-      expect(ctx.stroke).toHaveBeenCalledTimes(1);
+      expect(ctx.stroke).not.toHaveBeenCalled();
     });
 
     it('uses gridLine color as fill style', () => {

@@ -114,22 +114,22 @@ describe('getKeyboardAction', () => {
   });
 
   it('ArrowUp returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowUp', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
+    const action = getKeyboardAction('ArrowUp', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: 0, row: -1 } });
   });
 
   it('ArrowDown returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowDown', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
+    const action = getKeyboardAction('ArrowDown', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: 0, row: 1 } });
   });
 
   it('ArrowLeft returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowLeft', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
+    const action = getKeyboardAction('ArrowLeft', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: -1, row: 0 } });
   });
 
   it('ArrowRight returns move-ghost in placing-node mode', () => {
-    const action = getKeyboardAction('ArrowRight', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
+    const action = getKeyboardAction('ArrowRight', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 } }));
     expect(action).toEqual({ type: 'move-ghost', delta: { col: 1, row: 0 } });
   });
 
@@ -171,7 +171,7 @@ describe('getKeyboardAction', () => {
   });
 
   it('Enter in placing-node mode places node', () => {
-    const action = getKeyboardAction('Enter', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
+    const action = getKeyboardAction('Enter', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 } }));
     expect(action).toEqual({ type: 'place-node' });
   });
 
@@ -186,7 +186,7 @@ describe('getKeyboardAction', () => {
 
   it('Enter on focused param node returns open-params', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'mix', 3, 2, 2, 1));
+    nodes.set('n1', makeNode('n1', 'scale', 3, 2, 2, 1));
     setFocusTarget({ type: 'node', nodeId: 'n1' });
 
     const action = getKeyboardAction('Enter', makeKeyEvent(), makeState({ activeBoard: { nodes, wires: [] } }));
@@ -243,13 +243,13 @@ describe('getKeyboardAction', () => {
   });
 
   it('N returns noop when not idle', () => {
-    const action = getKeyboardAction('n', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'invert', rotation: 0 } }));
+    const action = getKeyboardAction('n', makeKeyEvent(), makeState({ interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 } }));
     expect(action.type).toBe('noop');
   });
 
   it('Delete on locked focused node returns noop', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', { ...makeNode('n1', 'invert', 10, 5), locked: true });
+    nodes.set('n1', { ...makeNode('n1', 'memory', 10, 5), locked: true });
     setFocusTarget({ type: 'node', nodeId: 'n1' });
     const action = getKeyboardAction('Delete', makeKeyEvent(), makeState({ activeBoard: { nodes, wires: [] } }));
     expect(action.type).toBe('noop');
@@ -257,7 +257,7 @@ describe('getKeyboardAction', () => {
 
   it('Backspace on locked focused node returns noop', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', { ...makeNode('n1', 'invert', 10, 5), locked: true });
+    nodes.set('n1', { ...makeNode('n1', 'memory', 10, 5), locked: true });
     setFocusTarget({ type: 'node', nodeId: 'n1' });
     const action = getKeyboardAction('Backspace', makeKeyEvent(), makeState({ activeBoard: { nodes, wires: [] } }));
     expect(action.type).toBe('noop');
@@ -343,8 +343,8 @@ describe('executeKeyboardAction', () => {
 
   it('start-wiring calls startKeyboardWiring with valid targets', () => {
     const nodes = new Map<string, NodeState>();
-    nodes.set('n1', makeNode('n1', 'invert', 3, 2));
-    nodes.set('n2', makeNode('n2', 'multiply', 10, 5, 2, 1));
+    nodes.set('n1', makeNode('n1', 'memory', 3, 2));
+    nodes.set('n2', makeNode('n2', 'max', 10, 5, 2, 1));
 
     const exec = makeExecutor({ activeBoard: { nodes, wires: [] } });
     const portRef: PortRef = { nodeId: 'n1', portIndex: 0, side: 'output' };

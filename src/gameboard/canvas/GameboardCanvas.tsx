@@ -617,12 +617,6 @@ export function GameboardCanvas() {
     const { w, h } = getCanvasLogicalSize(canvas);
     const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
 
-    // Right-click on input port still opens constant value editor
-    if (hit.type === 'port' && hit.portRef.side === 'input') {
-      state.startEditingPort(hit.portRef.nodeId, hit.portRef.portIndex, hit.position);
-      return;
-    }
-
     if (hit.type === 'node') {
       const node = state.activeBoard.nodes.get(hit.nodeId);
       state.openOverlay({

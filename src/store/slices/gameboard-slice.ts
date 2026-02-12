@@ -50,12 +50,13 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
   occupancy: createOccupancyGrid(),
 
   setActiveBoard: (board) =>
-    set({
+    set((state) => ({
       activeBoard: board,
       activeBoardId: board.id,
       portConstants: new Map(),
       occupancy: recomputeOccupancy(board.nodes),
-    }),
+      graphVersion: state.graphVersion + 1,
+    })),
 
   addNode: (node) =>
     set((state) => {
@@ -175,12 +176,13 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
     }),
 
   restoreBoard: (board, portConstants) =>
-    set({
+    set((state) => ({
       activeBoard: board,
       activeBoardId: board.id,
       portConstants,
       occupancy: recomputeOccupancy(board.nodes),
-    }),
+      graphVersion: state.graphVersion + 1,
+    })),
 
   updateCreativeSlotNode: (slotIndex, direction) =>
     set((state) => {

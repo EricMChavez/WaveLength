@@ -98,6 +98,16 @@
   background: #2a3a5e;
 }
 
+.item.depleted {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.item.depleted:hover,
+.item.depleted:focus {
+  background: none;
+}
+
 .emptyMsg {
   padding: 16px;
   color: #6a6a8a;

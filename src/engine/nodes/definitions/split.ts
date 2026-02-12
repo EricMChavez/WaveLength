@@ -1,8 +1,8 @@
 import { defineNode } from '../framework';
 
 /** Duplicates the input to two outputs */
-export const splitterNode = defineNode({
-  type: 'splitter',
+export const splitNode = defineNode({
+  type: 'split',
   category: 'routing',
 
   inputs: [
@@ -15,11 +15,8 @@ export const splitterNode = defineNode({
 
   evaluate: ({ inputs }) => {
     const [a] = inputs;
-    const y = a;
-    const z = a;
-    return [y, z];
+    return [a, a];
   },
 
-  size: { width: 2, height: 2
-   },
+  size: { width: 2, height: 2 },
 });

@@ -43,7 +43,7 @@ export function PalettePanel() {
 
   // Filter fundamental nodes by allowedNodes constraint
   const visibleFundamentals = allowedNodes
-    ? nodeRegistry.all.filter((def) => allowedNodes.includes(def.type))
+    ? nodeRegistry.all.filter((def) => def.type in allowedNodes)
     : nodeRegistry.all;
 
   return (
@@ -77,7 +77,7 @@ export function PalettePanel() {
       </div>
 
       {/* Custom node creation and user nodes - only shown when 'custom' is allowed */}
-      {(!allowedNodes || allowedNodes.includes('custom')) && (
+      {(!allowedNodes || 'custom' in allowedNodes) && (
         <>
           <button className={`${styles.item} ${styles.createCustomBtn}`} onClick={handleCreateCustom}>
             + Create Custom Node

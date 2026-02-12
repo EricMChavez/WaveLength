@@ -96,12 +96,6 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
           state.removeWire(target.wireId);
         }
         break;
-      case 'set-params':
-        if (target.type === 'node') {
-          state.selectNode(target.nodeId);
-          state.openOverlay({ type: 'parameter-popover', nodeId: target.nodeId });
-        }
-        break;
       case 'inspect':
         if (target.type === 'node') {
           captureAndStartLidOpen(state);

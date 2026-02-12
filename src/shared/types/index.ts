@@ -33,12 +33,13 @@ export interface Wire {
 
 /** The type of a fundamental node */
 export type FundamentalNodeType =
-  | 'multiply'
-  | 'mix'
-  | 'invert'
+  | 'add'
+  | 'scale'
   | 'threshold'
+  | 'max'
+  | 'min'
   | 'memory'
-  | 'constant';
+  | 'split';
 
 /** State of a single node on a gameboard */
 export interface NodeState {

@@ -58,10 +58,6 @@ function getNodeVisualState(nodeId: string, state: RenderNodesState): NodeVisual
 }
 
 function getParamDisplay(node: NodeState): string {
-  // Legacy v1 nodes (no registered definition)
-  if (node.type === 'mix') return String(node.params['mode'] ?? 'Add');
-  if (node.type === 'threshold') return `thr: ${node.params['threshold'] ?? 0}`;
-
   const def = getNodeDefinition(node.type);
   if (!def) return '';
 

@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
-import type { NodeState, GameboardState } from '../../shared/types/index.ts';
-import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition } from '../../puzzle/types.ts';
+import type { NodeState, GameboardState, Wire } from '../../shared/types/index.ts';
+import { createWire } from '../../shared/types/index.ts';
+import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition, AllowedNodes } from '../../puzzle/types.ts';
 import { createConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { PLAYABLE_START } from '../../shared/grid/index.ts';
@@ -27,14 +28,15 @@ export interface CustomPuzzle {
     inputCount: number;
     outputCount: number;
     rotation?: 0 | 90 | 180 | 270;
+    locked?: boolean;
   }>;
   /** Initial wires (serialized) */
   initialWires: Array<{
     source: { nodeId: string; portIndex: number };
     target: { nodeId: string; portIndex: number };
   }>;
-  /** Which fundamental node types are available in the palette. null = all allowed */
-  allowedNodes: string[] | null;
+  /** Node type budgets. null = all unlimited. Record maps type → max count (-1 = unlimited). */
+  allowedNodes: AllowedNodes;
 }
 
 /** Serialized format for localStorage */
@@ -51,8 +53,8 @@ export interface SerializedCustomPuzzle {
   targetSamples: Array<[number, number[]]>;
   initialNodes: CustomPuzzle['initialNodes'];
   initialWires: CustomPuzzle['initialWires'];
-  /** Which fundamental node types are available. null = all. Optional for backward compat. */
-  allowedNodes?: string[] | null;
+  /** Node type budgets. Accepts legacy string[] or new Record<string, number>. null = all. */
+  allowedNodes?: string[] | Record<string, number> | null;
 }
 
 export interface CustomPuzzleSlice {
@@ -154,18 +156,29 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
           inputCount: sn.inputCount,
           outputCount: sn.outputCount,
           rotation: sn.rotation,
-          locked: true,
+          locked: sn.locked ?? false,
         };
         nodes.set(startingNode.id, startingNode);
         currentCol += nodeWidths[i] + 1;
       }
     }
 
+    // Build initial wires from puzzle definition
+    const wires: Wire[] = [];
+    for (const wireDef of puzzle.initialWires) {
+      const wireId = `wire-${wireDef.source.nodeId}-${wireDef.source.portIndex}-${wireDef.target.nodeId}-${wireDef.target.portIndex}`;
+      wires.push(createWire(
+        wireId,
+        { nodeId: wireDef.source.nodeId, portIndex: wireDef.source.portIndex, side: 'output' },
+        { nodeId: wireDef.target.nodeId, portIndex: wireDef.target.portIndex, side: 'input' },
+      ));
+    }
+
     // Create gameboard
     const board: GameboardState = {
       id: `custom-puzzle-${puzzle.id}`,
       nodes,
-      wires: [],
+      wires,
     };
 
     // Build test case with inputs (from slot waveforms) and expected outputs (from samples)
@@ -222,9 +235,10 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       connectionPoints: cpConfig,
     };
 
-    // Load into store
-    store.setActiveBoard(board);
+    // Load into store — loadPuzzle MUST come before setActiveBoard so that
+    // the cycle runner subscriber sees activePuzzle when evaluating the new board
     store.loadPuzzle(puzzleDef);
+    store.setActiveBoard(board);
     store.initializeMeters(cpConfig, 'active');
   },
 
@@ -249,6 +263,20 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
   hydrateCustomPuzzles: (serialized) => {
     const puzzles = new Map<string, CustomPuzzle>();
     for (const s of serialized) {
+      // Migrate legacy string[] → Record<string, -1>
+      let allowedNodes: AllowedNodes;
+      if (Array.isArray(s.allowedNodes)) {
+        allowedNodes = Object.fromEntries(s.allowedNodes.map(t => [t, -1]));
+      } else {
+        allowedNodes = s.allowedNodes ?? null;
+      }
+
+      // Ensure locked field defaults to false for old entries
+      const initialNodes = s.initialNodes.map(n => ({
+        ...n,
+        locked: n.locked ?? false,
+      }));
+
       puzzles.set(s.id, {
         id: s.id,
         title: s.title,
@@ -256,9 +284,9 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         createdAt: s.createdAt,
         slots: s.slots,
         targetSamples: new Map(s.targetSamples),
-        initialNodes: s.initialNodes,
+        initialNodes,
         initialWires: s.initialWires,
-        allowedNodes: s.allowedNodes ?? null,
+        allowedNodes,
       });
     }
     set({ customPuzzles: puzzles });

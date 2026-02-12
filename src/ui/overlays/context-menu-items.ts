@@ -30,10 +30,6 @@ export function buildContextMenuItems(
   if (target.type === 'node') {
     const items: ContextMenuItem[] = [];
 
-    if (hasEditableParams(target.nodeType) && !isReadOnly) {
-      items.push({ id: 'set-params', label: 'Set Parameters', action: 'set-params' });
-    }
-
     if (target.nodeType.startsWith('puzzle:')) {
       items.push({ id: 'inspect', label: 'Inspect', action: 'inspect' });
     }
@@ -56,6 +52,5 @@ export function buildContextMenuItems(
 export function hasEditableParams(nodeType: string): boolean {
   const def = getNodeDefinition(nodeType);
   if (def) return (def.params?.length ?? 0) > 0;
-  // Legacy v1 nodes (no registered definition)
-  return nodeType === 'mix' || nodeType === 'threshold';
+  return false;
 }

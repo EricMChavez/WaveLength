@@ -14,9 +14,9 @@ describe('buildContextMenuItems', () => {
     expect(items.length).toBe(0);
   });
 
-  it('returns Set Parameters and Delete for mix node', () => {
-    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'mix' });
-    expect(items.find((i) => i.action === 'set-params')).toBeTruthy();
+  it('returns Delete for max node (no Set Parameters)', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'max' });
+    expect(items.find((i) => i.action === 'set-params')).toBeFalsy();
     expect(items.find((i) => i.action === 'delete-node')).toBeTruthy();
   });
 
@@ -36,49 +36,47 @@ describe('buildContextMenuItems', () => {
     expect(items.find((i) => i.action === 'delete-node')).toBeTruthy();
   });
 
-  it('omits Set Parameters and Delete in read-only mode', () => {
-    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'mix' }, true);
-    expect(items.find((i) => i.action === 'set-params')).toBeFalsy();
+  it('omits Delete in read-only mode', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'max' }, true);
     expect(items.find((i) => i.action === 'delete-node')).toBeFalsy();
   });
 
-  it('returns only Delete for invert node (no params)', () => {
-    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'invert' });
+  it('returns only Delete for min node (no params)', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'min' });
     expect(items.length).toBe(1);
     expect(items[0].action).toBe('delete-node');
   });
 
-  it('returns Delete for multiply node', () => {
-    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'multiply' });
+  it('returns Delete for memory node', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'memory' });
     expect(items.find((i) => i.action === 'delete-node')).toBeTruthy();
     expect(items.find((i) => i.action === 'set-params')).toBeFalsy();
   });
 
   it('omits Delete for locked node', () => {
-    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'invert', locked: true });
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'min', locked: true });
     expect(items.find((i) => i.action === 'delete-node')).toBeFalsy();
   });
 
-  it('shows Set Parameters for locked node with editable params', () => {
-    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'mix', locked: true });
-    expect(items.find((i) => i.action === 'set-params')).toBeTruthy();
+  it('omits Delete for locked node with editable params', () => {
+    const items = buildContextMenuItems({ type: 'node', nodeId: 'n1', nodeType: 'scale', locked: true });
+    expect(items.find((i) => i.action === 'set-params')).toBeFalsy();
     expect(items.find((i) => i.action === 'delete-node')).toBeFalsy();
   });
 });
 
 describe('hasEditableParams', () => {
   it('returns true for parameterized node types', () => {
-    expect(hasEditableParams('mix')).toBe(true);
     expect(hasEditableParams('threshold')).toBe(true);
-    expect(hasEditableParams('mixer')).toBe(true);
-    expect(hasEditableParams('amp')).toBe(true);
-    expect(hasEditableParams('diverter')).toBe(true);
-    expect(hasEditableParams('offset')).toBe(true);
+    expect(hasEditableParams('scale')).toBe(true);
+    expect(hasEditableParams('add')).toBe(true);
   });
 
   it('returns false for non-parameterized types', () => {
-    expect(hasEditableParams('inverter')).toBe(false);
-    expect(hasEditableParams('polarizer')).toBe(false);
+    expect(hasEditableParams('max')).toBe(false);
+    expect(hasEditableParams('min')).toBe(false);
+    expect(hasEditableParams('split')).toBe(false);
+    expect(hasEditableParams('memory')).toBe(false);
     expect(hasEditableParams('puzzle:abc')).toBe(false);
   });
 });

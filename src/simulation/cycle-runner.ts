@@ -218,6 +218,13 @@ export function initCycleRunner(store: {
       return;
     }
 
+    // Re-evaluate when puzzle loads/unloads
+    if (state.activePuzzle !== prev.activePuzzle && state.activeBoard) {
+      initializeMeters(state);
+      runCycleEvaluation();
+      return;
+    }
+
     // Re-evaluate when test case changes
     if (state.activeTestCaseIndex !== prev.activeTestCaseIndex && state.activePuzzle) {
       initializeMeters(state);

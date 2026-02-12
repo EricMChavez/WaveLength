@@ -10,7 +10,7 @@ import styles from './WaveformSelectorOverlay.module.css';
 
 type WizardStep = 'direction' | 'shape' | 'frequency' | 'amplitude';
 type BaseShape = 'sine' | 'triangle' | 'square' | 'sawtooth';
-type Frequency = 'full' | 'half' | 'quarter';
+type Frequency = 'full' | 'half' | 'third' | 'quarter' | 'fifth' | 'sixth';
 
 const SHAPES: Array<{ base: BaseShape; label: string }> = [
   { base: 'sine', label: 'Sine' },
@@ -22,7 +22,10 @@ const SHAPES: Array<{ base: BaseShape; label: string }> = [
 const FREQUENCIES: Array<{ freq: Frequency; label: string; cycles: string }> = [
   { freq: 'full', label: 'Full', cycles: '1 cycle' },
   { freq: 'half', label: 'Half', cycles: '2 cycles' },
+  { freq: 'third', label: 'Third', cycles: '3 cycles' },
   { freq: 'quarter', label: 'Quarter', cycles: '4 cycles' },
+  { freq: 'fifth', label: 'Fifth', cycles: '5 cycles' },
+  { freq: 'sixth', label: 'Sixth', cycles: '6 cycles' },
 ];
 
 const AMPLITUDES: Array<{ value: number; label: string }> = [
@@ -32,7 +35,7 @@ const AMPLITUDES: Array<{ value: number; label: string }> = [
   { value: 25, label: '25%' },
 ];
 
-const PERIOD_MAP: Record<Frequency, number> = { full: 256, half: 128, quarter: 64 };
+const PERIOD_MAP: Record<Frequency, number> = { full: 256, half: 128, third: 256 / 3, quarter: 64, fifth: 256 / 5, sixth: 256 / 6 };
 
 /** Mini SVG preview of a waveform shape */
 function WaveformIcon({ shape, amplitude = 1 }: { shape: BaseShape | 'output' | 'off' | 'custom'; amplitude?: number }) {
@@ -132,7 +135,8 @@ function FrequencyIcon({ base, freq }: { base: BaseShape; freq: Frequency }) {
   const height = 16;
   const mid = height / 2;
   const amp = 6;
-  const cycles = freq === 'full' ? 0.5 : freq === 'half' ? 1 : 2;
+  const cycleMap: Record<Frequency, number> = { full: 0.5, half: 1, third: 1.5, quarter: 2, fifth: 2.5, sixth: 3 };
+  const cycles = cycleMap[freq];
   const usable = width - 4;
   const x0 = 2;
 

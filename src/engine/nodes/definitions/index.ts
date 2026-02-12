@@ -1,10 +1,8 @@
 // Node definitions barrel export
-export { inverterNode } from './inverter';
-export { mixerNode, type MixerParams } from './mixer';
-export { ampNode, type AmpParams } from './amp';
-export { diverterNode, type DiverterParams } from './diverter';
-export { polarizerNode } from './polarizer';
-export { offsetNode, type OffsetParams } from './offset';
-export { splitterNode } from './splitter';
-export { averageNode } from './average';
+export { addNode, type AddParams } from './add';
+export { scaleNode, type ScaleParams } from './scale';
+export { thresholdNode, type ThresholdParams } from './threshold';
+export { maxNode } from './max';
+export { minNode } from './min';
+export { splitNode } from './split';
 export { memoryNode, createMemoryState, type MemoryState } from './memory';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/index.ts';
-import { buildPaletteItems, filterPaletteItems } from './palette-items.ts';
+import { buildPaletteItems, computeRemainingBudgets, filterPaletteItems } from './palette-items.ts';
 import type { PaletteItem } from './palette-items.ts';
 import styles from './PaletteModal.module.css';
 
@@ -16,6 +16,7 @@ function PaletteModalInner() {
   const deleteUtilityNode = useGameStore((s) => s.deleteUtilityNode);
   const utilityNodes = useGameStore((s) => s.utilityNodes);
   const activePuzzle = useGameStore((s) => s.activePuzzle);
+  const activeBoard = useGameStore((s) => s.activeBoard);
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -24,7 +25,11 @@ function PaletteModalInner() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const allowedNodes = activePuzzle?.allowedNodes ?? null;
-  const allItems = buildPaletteItems(allowedNodes, utilityNodes);
+  const remainingBudgets = computeRemainingBudgets(
+    allowedNodes,
+    activeBoard?.nodes ?? new Map(),
+  );
+  const allItems = buildPaletteItems(allowedNodes, utilityNodes, remainingBudgets);
   const filtered = filterPaletteItems(allItems, query);
 
   // Auto-focus search input
@@ -43,6 +48,7 @@ function PaletteModalInner() {
   }, [query]);
 
   const handleSelect = useCallback((item: PaletteItem) => {
+    if (!item.canPlace) return;
     closeOverlay();
     startPlacingNode(item.nodeType);
   }, [closeOverlay, startPlacingNode]);
@@ -112,6 +118,13 @@ function PaletteModalInner() {
                 const isUtility = item.section === 'utility';
                 const utilityId = isUtility ? item.id.replace('utility:', '') : null;
                 const isConfirming = utilityId !== null && confirmingDeleteId === utilityId;
+                const depleted = !item.canPlace;
+
+                // Build display label with remaining count
+                let displayLabel = item.label;
+                if (item.remaining !== null && item.remaining !== -1) {
+                  displayLabel = `${item.label} (${item.remaining} left)`;
+                }
 
                 if (isConfirming) {
                   return (
@@ -142,11 +155,12 @@ function PaletteModalInner() {
                   return (
                     <div key={item.id} className={styles.utilityRow}>
                       <button
-                        className={`${styles.item} ${idx === activeIndex ? styles.active : ''}`}
+                        className={`${styles.item} ${idx === activeIndex ? styles.active : ''} ${depleted ? styles.depleted : ''}`}
                         onClick={() => handleSelect(item)}
+                        disabled={depleted}
                         data-palette-item
                       >
-                        {item.label}
+                        {displayLabel}
                       </button>
                       <button
                         className={styles.deleteBtn}
@@ -166,11 +180,12 @@ function PaletteModalInner() {
                 return (
                   <button
                     key={item.id}
-                    className={`${styles.item} ${idx === activeIndex ? styles.active : ''}`}
+                    className={`${styles.item} ${idx === activeIndex ? styles.active : ''} ${depleted ? styles.depleted : ''}`}
                     onClick={() => handleSelect(item)}
+                    disabled={depleted}
                     data-palette-item
                   >
-                    {item.label}
+                    {displayLabel}
                   </button>
                 );
               })}

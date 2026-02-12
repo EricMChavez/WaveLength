@@ -73,7 +73,7 @@ function makeState(overrides: Partial<RenderPlacementGhostState> = {}): RenderPl
   }
 
   return {
-    interactionMode: { type: 'placing-node', nodeType: 'multiply', rotation: 0 },
+    interactionMode: { type: 'placing-node', nodeType: 'memory', rotation: 0 },
     mousePosition: { x: 400, y: 400 },
     occupancy,
     puzzleNodes: new Map(),
@@ -117,7 +117,7 @@ describe('renderPlacementGhost', () => {
     // Mouse at pixel (480, 365) → grid (12, 9) at cellSize 40
     const state = makeState({ mousePosition: { x: 480, y: 365 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    // multiply node: 3 cols x 2 rows, rotation 0
+    // memory node: 3 cols x 2 rows, rotation 0
     // getNodeBodyPixelRect: bodyTop=-0.5, bodyBottom=1.5 → y=(9-0.5)*40=340, h=80
     expect(ctx.roundRect).toHaveBeenCalledWith(
       480, 340, 120, 80, expect.any(Number),
@@ -150,7 +150,7 @@ describe('renderPlacementGhost', () => {
     const ctx = makeCtx();
     const state = makeState();
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    expect(ctx.fillText).toHaveBeenCalledWith('Multiply', expect.any(Number), expect.any(Number));
+    expect(ctx.fillText).toHaveBeenCalledWith('Memory', expect.any(Number), expect.any(Number));
   });
 
   it('uses puzzle node title for puzzle type', () => {
