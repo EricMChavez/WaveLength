@@ -111,6 +111,8 @@ function createMockCtx() {
     restore: vi.fn(),
     translate: vi.fn(),
     rotate: vi.fn(),
+    clip: vi.fn(),
+    rect: vi.fn(),
     createLinearGradient: vi.fn(() => mockGradient),
   } as unknown as CanvasRenderingContext2D;
 
@@ -177,9 +179,9 @@ describe('drawNodes', () => {
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
 
-    // roundRect called for body fill + body stroke for each of 2 real nodes = 4 calls
+    // roundRect called for body fill + body stroke + highlight streak clip for each of 2 real nodes = 6 calls
     const roundRectCalls = (mock.ctx.roundRect as ReturnType<typeof vi.fn>).mock.calls;
-    expect(roundRectCalls.length).toBe(4);
+    expect(roundRectCalls.length).toBe(6);
   });
 
   it('creates linear gradient using surfaceNode and surfaceNodeBottom stops', () => {
@@ -189,8 +191,8 @@ describe('drawNodes', () => {
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
 
-    // Gradient should have two stops
-    expect(mock.gradientStops.length).toBe(2);
+    // Body gradient has two stops (first gradient); highlight streak adds more
+    expect(mock.gradientStops.length).toBeGreaterThanOrEqual(2);
     expect(mock.gradientStops[0].offset).toBe(0);
     expect(mock.gradientStops[0].color).toBe(tokens.surfaceNode);
     expect(mock.gradientStops[1].offset).toBe(1);
@@ -204,8 +206,8 @@ describe('drawNodes', () => {
     const state = makeState({ nodes, hoveredNodeId: 'n1' });
     drawNodes(mock.ctx, tokens, state, 40);
 
-    // Gradient should have two stops, but NOT be the raw token values (lerped toward white)
-    expect(mock.gradientStops.length).toBe(2);
+    // Body gradient has two stops (first gradient), but NOT raw token values (lerped toward white)
+    expect(mock.gradientStops.length).toBeGreaterThanOrEqual(2);
     expect(mock.gradientStops[0].color).not.toBe(tokens.surfaceNode);
     expect(mock.gradientStops[1].color).not.toBe(tokens.surfaceNodeBottom);
     // Should be rgb() strings from lerpColor
@@ -263,11 +265,11 @@ describe('drawNodes', () => {
 
     drawNodes(mock.ctx, tokens, state, 40);
 
-    // 2 nodes * 2 roundRect (fill + stroke) = 4 calls for bodies
-    // Plus 1 roundRect for selection highlight = 5 total
-    expect(origRoundRect.mock.calls.length).toBe(5);
+    // 2 nodes * 3 roundRect (fill + stroke + highlight streak clip) = 6 calls for bodies
+    // Plus 1 roundRect for selection highlight = 7 total
+    expect(origRoundRect.mock.calls.length).toBe(7);
     // Selection highlight is the last roundRect call
-    const lastCall = origRoundRect.mock.calls[4];
+    const lastCall = origRoundRect.mock.calls[6];
     // It should have padded dimensions (wider than body)
     // Body width is FUNDAMENTAL_GRID_COLS * 40 = 120
     const bodyWidth = FUNDAMENTAL_GRID_COLS * 40;

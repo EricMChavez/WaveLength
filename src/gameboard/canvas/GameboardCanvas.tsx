@@ -29,15 +29,6 @@ import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
 
-function blendHex(a: string, b: string, t: number): string {
-  const ai = parseInt(a.slice(1), 16);
-  const bi = parseInt(b.slice(1), 16);
-  const r = Math.round(((ai >> 16) & 0xff) * (1 - t) + ((bi >> 16) & 0xff) * t);
-  const g = Math.round(((ai >> 8) & 0xff) * (1 - t) + ((bi >> 8) & 0xff) * t);
-  const bl = Math.round((ai & 0xff) * (1 - t) + (bi & 0xff) * t);
-  return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, '0')}`;
-}
-
 function getCanvasLogicalSize(canvas: HTMLCanvasElement) {
   const cellSize = parseInt(canvas.dataset.cellSize || '0', 10);
   if (cellSize > 0) {
@@ -211,14 +202,9 @@ export function GameboardCanvas() {
     function updateParentBackground(parent: HTMLElement) {
       const devOverrides = getDevOverrides();
       if (devOverrides.enabled) {
-        const edge = devOverrides.colors.pageBackground;
-        const center = devOverrides.colors.pageBackgroundCenter;
-        // Blend an intermediate stop halfway between edge and center for a smooth 5-stop gradient
-        const mid = blendHex(edge, center, 0.5);
-        parent.style.background = `linear-gradient(to right, ${edge}, ${mid}, ${center}, ${mid}, ${edge})`;
+        parent.style.background = devOverrides.colors.pageBackground;
       } else {
-        parent.style.background =
-          'linear-gradient(to right, #121216, #2b2c2f, #3d3e42, #2b2c2f, #121216)';
+        parent.style.background = '#121216';
       }
     }
 

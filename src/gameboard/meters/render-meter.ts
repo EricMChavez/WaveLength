@@ -8,6 +8,7 @@ import { drawNeedle, type NeedleTip } from './render-needle.ts';
 import { drawTargetOverlay } from './render-target-overlay.ts';
 
 import { getDevOverrides } from '../../dev/index.ts';
+import { drawHighlightStreakRounded } from '../canvas/render-highlight-streak.ts';
 
 /** Ratio of border radius to drawn meter height for outside corners */
 const OUTSIDE_CORNER_RADIUS_RATIO = 0.06;
@@ -364,6 +365,9 @@ function drawMeterHousing(
   ctx.beginPath();
   ctx.roundRect(left, top, width, height, radii);
   ctx.fill();
+
+  // Highlight streak on meter housing
+  drawHighlightStreakRounded(ctx, { x: left, y: top, width, height }, radii, 0.03);
 }
 
 /**

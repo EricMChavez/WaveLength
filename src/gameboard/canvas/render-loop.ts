@@ -187,7 +187,9 @@ export function startRenderLoop(
     const ceremony = state.ceremonyAnimation;
 
     // Grid zones and lines (lowest z-order)
-    drawGrid(ctx!, tokens, {}, cellSize);
+    drawGrid(ctx!, tokens, {
+      tutorialMessage: state.activePuzzle?.tutorialMessage,
+    }, cellSize);
 
     // Read cycle results and playpoint for rendering
     const cycleResults = state.cycleResults;

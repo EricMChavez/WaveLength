@@ -46,6 +46,8 @@ export interface RenderConnectionPointsState {
 export interface RenderGridState {
   /** Optional opacity multiplier (0-1) for grid dimming during zoom animations */
   gridOpacity?: number;
+  /** Optional tutorial message to render on the gameboard surface */
+  tutorialMessage?: string;
 }
 
 /** State needed by meter rendering */

@@ -34,8 +34,7 @@ export function DevTools() {
   const pageColorValues = useControls(
     'Page Colors',
     {
-      pageBackground: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackground, label: 'BG Edge' },
-      pageBackgroundCenter: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackgroundCenter, label: 'BG Center' },
+      pageBackground: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackground, label: 'BG Color' },
     },
     { collapsed: true }
   );
@@ -44,8 +43,6 @@ export function DevTools() {
   const gridColorValues = useControls(
     'Grid Colors',
     {
-      gridAreaEdge: { value: DEFAULT_DEV_OVERRIDES.colors.gridAreaEdge, label: 'Area Edge' },
-      gridAreaCenter: { value: DEFAULT_DEV_OVERRIDES.colors.gridAreaCenter, label: 'Area Center' },
       gridLine: { value: DEFAULT_DEV_OVERRIDES.colors.gridLine, label: 'Grid Dots' },
       boardBorder: { value: DEFAULT_DEV_OVERRIDES.colors.boardBorder, label: 'Board Border' },
     },
@@ -140,8 +137,6 @@ export function DevTools() {
     'Grid Style',
     {
       lineOpacity: { value: DEFAULT_DEV_OVERRIDES.gridStyle.lineOpacity, min: 0, max: 1, step: 0.05, label: 'Dot Opacity' },
-      insetDepthTop: { value: DEFAULT_DEV_OVERRIDES.gridStyle.insetDepthTop, min: 0, max: 1, step: 0.05, label: 'Inset Depth (Top)' },
-      insetDepthSide: { value: DEFAULT_DEV_OVERRIDES.gridStyle.insetDepthSide, min: 0, max: 1, step: 0.05, label: 'Inset Depth (Side)' },
       showGridLabels: { value: DEFAULT_DEV_OVERRIDES.gridStyle.showGridLabels, label: 'Grid Labels' },
     },
     { collapsed: true }

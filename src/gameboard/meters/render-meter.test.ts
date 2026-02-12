@@ -86,11 +86,11 @@ describe('drawMeter', () => {
     const state: RenderMeterState = { slot, signalValues: null, targetValues: null, playpoint: 0 };
     drawMeter(ctx, mockTokens, state, testRect);
 
-    // Housing + interior use roundRect+fill; dimmed overlay uses fillRect
+    // Housing + interior use roundRect+fill; highlight streak + dimmed overlay use fillRect
     const fillRectCalls = ctx._calls.filter((c) => c.startsWith('fillRect'));
-    expect(fillRectCalls.length).toBe(1); // dimmed overlay only
+    expect(fillRectCalls.length).toBe(2); // highlight streak + dimmed overlay
     const roundRectCalls = ctx._calls.filter((c) => c.startsWith('roundRect'));
-    expect(roundRectCalls.length).toBe(2); // housing + interior
+    expect(roundRectCalls.length).toBe(3); // housing + highlight streak clip + interior
     const beginPathCalls = ctx._calls.filter((c) => c.startsWith('beginPath'));
     expect(beginPathCalls.length).toBeGreaterThanOrEqual(3); // housing + interior cutout clip + interior fill
   });

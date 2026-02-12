@@ -11,6 +11,7 @@ import { gridToPixel, getNodeGridSize } from '../../shared/grid/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { drawKnob } from './render-knob.ts';
 import { signalToColor, signalToGlow } from './render-wires.ts';
+import { drawHighlightStreakRounded } from './render-highlight-streak.ts';
 
 // ---------------------------------------------------------------------------
 // Color utilities
@@ -167,6 +168,9 @@ function drawNodeBody(
   ctx.beginPath();
   ctx.roundRect(rect.x, rect.y, rect.width, rect.height, borderRadius);
   ctx.stroke();
+
+  // --- Highlight streak ---
+  drawHighlightStreakRounded(ctx, rect, borderRadius, 0.06);
 
   // --- Label (rotated with node) ---
   const labelFontSize = Math.round(NODE_STYLE.LABEL_FONT_RATIO * cellSize);

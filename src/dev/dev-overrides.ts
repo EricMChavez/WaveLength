@@ -25,8 +25,6 @@ export interface WireStyleOverrides {
 
 export interface GridStyleOverrides {
   lineOpacity: number;
-  insetDepthTop: number;
-  insetDepthSide: number;
   showGridLabels: boolean;
 }
 
@@ -37,10 +35,7 @@ export interface MeterStyleOverrides {
 export interface ColorOverrides {
   // Page background (GameboardCanvas.tsx)
   pageBackground: string;
-  pageBackgroundCenter: string;
   // Grid (render-grid.ts)
-  gridAreaEdge: string;
-  gridAreaCenter: string;
   gridLine: string;
   boardBorder: string;
   // Nodes (render-nodes.ts)
@@ -88,20 +83,15 @@ export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
   },
   gridStyle: {
     lineOpacity: 0.8,
-    insetDepthTop: 1,
-    insetDepthSide: 1,
     showGridLabels: false,
   },
   meterStyle: {
     needleGlow: 10,
   },
   colors: {
-    // Page background (matches hardcoded gradient in GameboardCanvas.tsx)
+    // Page background (flat color in GameboardCanvas.tsx)
     pageBackground: '#121216',
-    pageBackgroundCenter: '#3d3e42',
     // Grid
-    gridAreaEdge: '#000000',
-    gridAreaCenter: '#0a0b0d',
     gridLine: '#16161a',
     boardBorder: '#3d3e42',
     // Nodes
