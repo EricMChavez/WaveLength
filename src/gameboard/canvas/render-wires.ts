@@ -8,17 +8,23 @@ import { getDevOverrides } from '../../dev/index.ts';
 
 type RGB = [number, number, number];
 
-/** Parse a CSS hex color (#rgb or #rrggbb) to an RGB triple. */
+const _hexToRgbCache = new Map<string, RGB>();
+
+/** Parse a CSS hex color (#rgb or #rrggbb) to an RGB triple (cached). */
 export function hexToRgb(hex: string): RGB {
+  let cached = _hexToRgbCache.get(hex);
+  if (cached) return cached;
   let h = hex.replace('#', '');
   if (h.length === 3) {
     h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
   }
-  return [
+  cached = [
     parseInt(h.slice(0, 2), 16),
     parseInt(h.slice(2, 4), 16),
     parseInt(h.slice(4, 6), 16),
   ];
+  _hexToRgbCache.set(hex, cached);
+  return cached;
 }
 
 /** Linearly interpolate between two RGB colours; return an `rgb()` string. */

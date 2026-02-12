@@ -47,6 +47,7 @@ export const createHistorySlice: StateCreator<GameStore, [], [], HistorySlice> =
       activeBoard: restored.board,
       portConstants: restored.portConstants,
       graphVersion: state.graphVersion + 1,
+      routingVersion: state.routingVersion + 1,
     });
     isRestoring = false;
   },
@@ -70,6 +71,7 @@ export const createHistorySlice: StateCreator<GameStore, [], [], HistorySlice> =
       activeBoard: restored.board,
       portConstants: restored.portConstants,
       graphVersion: state.graphVersion + 1,
+      routingVersion: state.routingVersion + 1,
     });
     isRestoring = false;
   },
@@ -92,6 +94,9 @@ export function initHistory(store: {
       store.setState({ undoStack: [], redoStack: [] });
       return;
     }
+
+    // Suppress history during knob drag (final value captured on commit)
+    if (state.interactionMode.type === 'adjusting-knob') return;
 
     // Auto-capture snapshot when graph is mutated
     if (state.graphVersion !== prev.graphVersion && prev.activeBoard) {

@@ -15,6 +15,9 @@ import { drawWireBlips } from './render-wire-blips.ts';
 import { renderConnectionPoints } from './render-connection-points.ts';
 import { renderWirePreview } from './render-wire-preview.ts';
 import { drawGrid } from './render-grid.ts';
+import { drawHighlightStreak } from './render-highlight-streak.ts';
+import { HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
+import { getDevOverrides } from '../../dev/index.ts';
 import { renderPlacementGhost } from './render-placement-ghost.ts';
 import { drawLidAnimation, computeProgress, parseDurationMs, drawVictoryBurst, drawNameReveal } from '../animation/index.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
@@ -94,6 +97,49 @@ let cachedWireAnim: WireAnimationCache | null = null;
 let cachedWireAnimResults: CycleResults | null = null;
 let cachedWireAnimPlaypoint = -1;
 
+// --- Performance caches ---
+
+// Cache: meter signal arrays (rebuild only when data changes)
+let _meterSignalCache: ReadonlyMap<string, number[]> = new Map();
+let _meterSignalCycleResults: CycleResults | null = null;
+let _meterSignalPuzzleId: string | null = null;
+let _meterSignalTestIndex = -1;
+let _meterSignalCreativeSlots: unknown = null;
+let _meterSignalIsCreative = false;
+
+// Cache: meter target arrays (rebuild only when puzzle/test case changes)
+let _meterTargetCache: ReadonlyMap<string, number[]> = new Map();
+let _meterTargetPuzzleId: string | null = null;
+let _meterTargetTestIndex = -1;
+
+// Cache: CP signals map (rebuild only when meter arrays or playpoint change)
+let _cpSignalsCache: ReadonlyMap<string, number> = new Map();
+let _cpSignalsMeterArrays: ReadonlyMap<string, number[]> | null = null;
+let _cpSignalsPlaypoint = -1;
+
+// Cache: port signals map (rebuild only when cycleResults, playpoint, or wires change)
+let _portSignalsCache: ReadonlyMap<string, number> = new Map();
+let _portSignalsCycleResults: CycleResults | null = null;
+let _portSignalsPlaypoint = -1;
+let _portSignalsWires: ReadonlyArray<Wire> | null = null;
+
+// Cache: wire values map (rebuild only when cycleResults, playpoint, or wires change)
+let _wireValuesCache: ReadonlyMap<string, number> = new Map();
+let _wireValuesCycleResults: CycleResults | null = null;
+let _wireValuesPlaypoint = -1;
+let _wireValuesWires: ReadonlyArray<Wire> | null = null;
+
+// Cache: knob wire lookup map (rebuild only when wires change)
+let _knobWireLookup: Map<string, Wire> = new Map();
+let _knobWireLookupWires: ReadonlyArray<Wire> | null = null;
+
+// Cache: knob values map (rebuild only when inputs change)
+let _knobValuesCache: ReadonlyMap<string, KnobInfo> = new Map();
+let _knobValuesNodes: ReadonlyMap<string, NodeState> | null = null;
+let _knobValuesWires: ReadonlyArray<Wire> | null = null;
+let _knobValuesCycleResults: CycleResults | null = null;
+let _knobValuesPlaypoint = -1;
+
 /**
  * Start the requestAnimationFrame render loop.
  * Reads Zustand via getState() each frame — NOT React hooks.
@@ -106,6 +152,7 @@ let cachedWireAnimPlaypoint = -1;
 export function startRenderLoop(
   canvas: HTMLCanvasElement,
   getCellSize: () => number,
+  getOffset: () => { x: number; y: number },
 ): () => void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
@@ -153,11 +200,17 @@ export function startRenderLoop(
 
     // Derive logical dimensions from grid cell size
     const cellSize = getCellSize();
+    const offset = getOffset();
     const logicalWidth = GRID_COLS * cellSize;
     const logicalHeight = GRID_ROWS * cellSize;
 
-    // Clear canvas with opaque base (meter zones need an opaque backing)
-    ctx!.clearRect(0, 0, logicalWidth, logicalHeight);
+    // Viewport dimensions (canvas is viewport-sized)
+    const dpr = window.devicePixelRatio || 1;
+    const vpWidth = canvas.width / dpr;
+    const vpHeight = canvas.height / dpr;
+
+    // Clear full viewport canvas
+    ctx!.clearRect(0, 0, vpWidth, vpHeight);
 
     // During legacy zoom transition, keep canvas cleared and skip drawing
     // so the snapshot overlay is the only thing visible.
@@ -186,10 +239,29 @@ export function startRenderLoop(
     // --- Ceremony animation: read state ---
     const ceremony = state.ceremonyAnimation;
 
+    // === Viewport-level rendering (before grid translate) ===
+    const devOverrides = getDevOverrides();
+    const bgColor = devOverrides.enabled ? devOverrides.colors.pageBackground : '#0d0f14';
+
+    // Fill page background across entire viewport
+    ctx!.fillStyle = bgColor;
+    ctx!.fillRect(0, 0, vpWidth, vpHeight);
+
+    // Page background highlight streak (covers entire viewport, behind everything)
+    const pageHard = devOverrides.enabled ? devOverrides.highlightStyle.pageHard : 0.035;
+    const pageSoft = devOverrides.enabled ? devOverrides.highlightStyle.pageSoft : 0.2;
+    const pageFade = devOverrides.enabled ? devOverrides.highlightStyle.verticalFadeRatio : HIGHLIGHT_STREAK.VERTICAL_FADE_RATIO;
+    drawHighlightStreak(ctx!, { x: 0, y: 0, width: vpWidth, height: vpHeight }, pageHard, pageSoft, pageFade);
+
+    // === Grid-level rendering (translated to grid origin) ===
+    ctx!.translate(offset.x, offset.y);
+
     // Grid zones and lines (lowest z-order)
-    drawGrid(ctx!, tokens, {
-      tutorialMessage: state.activePuzzle?.tutorialMessage,
-    }, cellSize);
+    // Show authoring draft during configuring-start/saving, otherwise show puzzle's message
+    const tutorialMessage = (state.authoringPhase !== 'idle' && state.tutorialMessageDraft)
+      ? state.tutorialMessageDraft
+      : state.activePuzzle?.tutorialMessage;
+    drawGrid(ctx!, tokens, { tutorialMessage }, cellSize);
 
     // Read cycle results and playpoint for rendering
     const cycleResults = state.cycleResults;
@@ -197,9 +269,34 @@ export function startRenderLoop(
 
     // Draw meters in side zones
     const perSampleMatch = getPerSampleMatch();
-    // Build flat arrays for meter rendering from cycleResults + puzzle
-    const meterSignalArrays = buildMeterSignalArrays(cycleResults, state);
-    const meterTargetArrays = buildMeterTargetArrays(state);
+    // Build flat arrays for meter rendering from cycleResults + puzzle (cached)
+    const puzzleId = state.activePuzzle?.id ?? null;
+    const testIndex = state.activeTestCaseIndex;
+    const isCreative = state.isCreativeMode;
+    const creativeSlots = isCreative ? state.creativeSlots : null;
+
+    if (
+      cycleResults !== _meterSignalCycleResults ||
+      puzzleId !== _meterSignalPuzzleId ||
+      testIndex !== _meterSignalTestIndex ||
+      isCreative !== _meterSignalIsCreative ||
+      creativeSlots !== _meterSignalCreativeSlots
+    ) {
+      _meterSignalCache = buildMeterSignalArrays(cycleResults, state);
+      _meterSignalCycleResults = cycleResults;
+      _meterSignalPuzzleId = puzzleId;
+      _meterSignalTestIndex = testIndex;
+      _meterSignalIsCreative = isCreative;
+      _meterSignalCreativeSlots = creativeSlots;
+    }
+    const meterSignalArrays = _meterSignalCache;
+
+    if (puzzleId !== _meterTargetPuzzleId || testIndex !== _meterTargetTestIndex) {
+      _meterTargetCache = buildMeterTargetArrays(state);
+      _meterTargetPuzzleId = puzzleId;
+      _meterTargetTestIndex = testIndex;
+    }
+    const meterTargetArrays = _meterTargetCache;
 
     // Calculate meter starting offset (meters fill the full height)
     const meterTopMargin = 0; // in grid rows
@@ -253,11 +350,28 @@ export function startRenderLoop(
       }
     }
 
-    // Compute signal values for port/CP coloring from meter signal arrays
-    const cpSignals = computeCpSignals(meterSignalArrays, playpoint);
-    const portSignals = state.activeBoard
-      ? computePortSignals(cycleResults, playpoint, state.activeBoard.wires)
-      : new Map<string, number>();
+    // Compute signal values for port/CP coloring from meter signal arrays (cached)
+    if (meterSignalArrays !== _cpSignalsMeterArrays || playpoint !== _cpSignalsPlaypoint) {
+      _cpSignalsCache = computeCpSignals(meterSignalArrays, playpoint);
+      _cpSignalsMeterArrays = meterSignalArrays;
+      _cpSignalsPlaypoint = playpoint;
+    }
+    const cpSignals = _cpSignalsCache;
+
+    const boardWires = state.activeBoard?.wires ?? null;
+    if (
+      cycleResults !== _portSignalsCycleResults ||
+      playpoint !== _portSignalsPlaypoint ||
+      boardWires !== _portSignalsWires
+    ) {
+      _portSignalsCache = boardWires
+        ? computePortSignals(cycleResults, playpoint, boardWires)
+        : new Map<string, number>();
+      _portSignalsCycleResults = cycleResults;
+      _portSignalsPlaypoint = playpoint;
+      _portSignalsWires = boardWires;
+    }
+    const portSignals = _portSignalsCache;
 
     if (state.activeBoard) {
       // Wire rendering: branch on pause state for blip animation
@@ -276,12 +390,33 @@ export function startRenderLoop(
           drawWireBlips(ctx!, tokens, state.activeBoard.wires, state.activeBoard.nodes, cellSize, cachedWireAnim, pauseProgress);
         }
       } else {
-        const wireValues = computeWireValues(cycleResults, playpoint, state.activeBoard.wires);
-        drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, wireValues);
+        if (
+          cycleResults !== _wireValuesCycleResults ||
+          playpoint !== _wireValuesPlaypoint ||
+          state.activeBoard.wires !== _wireValuesWires
+        ) {
+          _wireValuesCache = computeWireValues(cycleResults, playpoint, state.activeBoard.wires);
+          _wireValuesCycleResults = cycleResults;
+          _wireValuesPlaypoint = playpoint;
+          _wireValuesWires = state.activeBoard.wires;
+        }
+        drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, _wireValuesCache);
       }
 
-      // Compute knob values from cycle results
-      const knobValues = computeKnobValues(state.activeBoard.nodes, state.activeBoard.wires, cycleResults, playpoint);
+      // Compute knob values from cycle results (cached)
+      if (
+        state.activeBoard.nodes !== _knobValuesNodes ||
+        state.activeBoard.wires !== _knobValuesWires ||
+        cycleResults !== _knobValuesCycleResults ||
+        playpoint !== _knobValuesPlaypoint
+      ) {
+        _knobValuesCache = computeKnobValues(state.activeBoard.nodes, state.activeBoard.wires, cycleResults, playpoint);
+        _knobValuesNodes = state.activeBoard.nodes;
+        _knobValuesWires = state.activeBoard.wires;
+        _knobValuesCycleResults = cycleResults;
+        _knobValuesPlaypoint = playpoint;
+      }
+      const knobValues = _knobValuesCache;
 
       drawNodes(ctx!, tokens, {
         puzzleNodes: state.puzzleNodes,
@@ -376,11 +511,16 @@ export function startRenderLoop(
       drawNameReveal(ctx!, tokens, revealProgress, puzzleName, puzzleDesc, logicalWidth, logicalHeight);
 
       if (revealProgress >= 1) {
-        // Capture OffscreenCanvas snapshot for zoom-out
-        const snapshot = new OffscreenCanvas(logicalWidth, logicalHeight);
+        // Capture grid-area snapshot for zoom-out (canvas is viewport-sized)
+        const snapDpr = window.devicePixelRatio || 1;
+        const bitmapX = Math.round(offset.x * snapDpr);
+        const bitmapY = Math.round(offset.y * snapDpr);
+        const bitmapW = Math.round(logicalWidth * snapDpr);
+        const bitmapH = Math.round(logicalHeight * snapDpr);
+        const snapshot = new OffscreenCanvas(bitmapW, bitmapH);
         const snapshotCtx = snapshot.getContext('2d');
         if (snapshotCtx) {
-          snapshotCtx.drawImage(canvas, 0, 0, logicalWidth, logicalHeight);
+          snapshotCtx.drawImage(canvas, bitmapX, bitmapY, bitmapW, bitmapH, 0, 0, bitmapW, bitmapH);
         }
         state.startCeremonyZoomOut(snapshot);
       }
@@ -406,8 +546,11 @@ export function startRenderLoop(
     const ceremonyActive = ceremony.type !== 'inactive';
     if (overlayActive && !lidActive && !ceremonyActive) {
       ctx!.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx!.fillRect(0, 0, logicalWidth, logicalHeight);
+      ctx!.fillRect(-offset.x, -offset.y, vpWidth, vpHeight);
     }
+
+    // Reset transform (remove grid translate, keep DPR scale)
+    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     animationId = requestAnimationFrame(render);
   }
@@ -520,8 +663,24 @@ function buildMeterTargetArrays(
 }
 
 /**
+ * Build a wire lookup map: "nodeId:portIndex" → Wire for wire targets.
+ * Rebuilt only when the wires array reference changes.
+ */
+function getWireTargetLookup(wires: ReadonlyArray<Wire>): Map<string, Wire> {
+  if (wires === _knobWireLookupWires) return _knobWireLookup;
+
+  _knobWireLookup = new Map();
+  for (const wire of wires) {
+    _knobWireLookup.set(`${wire.target.nodeId}:${wire.target.portIndex}`, wire);
+  }
+  _knobWireLookupWires = wires;
+  return _knobWireLookup;
+}
+
+/**
  * Compute knob display values for all knob-equipped nodes on the active board.
  * Uses cycle results for wired knobs, or node params for unwired knobs.
+ * Uses a cached wire lookup map to avoid O(nodes × wires) search per frame.
  */
 function computeKnobValues(
   nodes: ReadonlyMap<string, NodeState>,
@@ -530,6 +689,7 @@ function computeKnobValues(
   playpoint: number,
 ): ReadonlyMap<string, KnobInfo> {
   const result = new Map<string, KnobInfo>();
+  const wireLookup = getWireTargetLookup(wires);
 
   for (const node of nodes.values()) {
     const knobConfig = getKnobConfig(getNodeDefinition(node.type));
@@ -537,10 +697,8 @@ function computeKnobValues(
 
     const { portIndex, paramKey } = knobConfig;
 
-    // Check if the knob port is wired
-    const wire = wires.find(
-      w => w.target.nodeId === node.id && w.target.portIndex === portIndex,
-    );
+    // O(1) lookup instead of O(wires) linear search
+    const wire = wireLookup.get(`${node.id}:${portIndex}`);
 
     if (wire) {
       // Read value from cycle results at current playpoint

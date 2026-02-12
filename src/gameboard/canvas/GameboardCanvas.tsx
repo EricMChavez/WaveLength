@@ -134,6 +134,30 @@ function connectionPointToPortRef(
   return null;
 }
 
+/**
+ * Create a snapshot of just the grid area from a viewport-sized canvas.
+ * The canvas includes margin area; this crops to the grid content.
+ */
+function createGridSnapshot(
+  canvas: HTMLCanvasElement,
+  offset: { x: number; y: number },
+  cellSize: number,
+): OffscreenCanvas | null {
+  const dpr = window.devicePixelRatio || 1;
+  const gridW = GRID_COLS * cellSize;
+  const gridH = GRID_ROWS * cellSize;
+  const bitmapX = Math.round(offset.x * dpr);
+  const bitmapY = Math.round(offset.y * dpr);
+  const bitmapW = Math.round(gridW * dpr);
+  const bitmapH = Math.round(gridH * dpr);
+  if (bitmapW <= 0 || bitmapH <= 0) return null;
+  const snapshot = new OffscreenCanvas(bitmapW, bitmapH);
+  const snapCtx = snapshot.getContext('2d');
+  if (!snapCtx) return null;
+  snapCtx.drawImage(canvas, bitmapX, bitmapY, bitmapW, bitmapH, 0, 0, bitmapW, bitmapH);
+  return snapshot;
+}
+
 // Drag detection constants
 const DRAG_THRESHOLD_PX = 5;
 const DRAG_DELAY_MS = 150;
@@ -141,7 +165,17 @@ const DRAG_DELAY_MS = 150;
 export function GameboardCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cellSizeRef = useRef(0);
+  const offsetRef = useRef({ x: 0, y: 0 });
   const [tooSmall, setTooSmall] = useState(false);
+
+  // Hit test cache: skip hitTest when cursor stays in the same grid cell
+  const hitCacheRef = useRef<{
+    col: number;
+    row: number;
+    hoveredNodeId: string | null;
+    nodesRef: ReadonlyMap<string, import('../../shared/types/index.ts').NodeState> | null;
+    wiresRef: ReadonlyArray<import('../../shared/types/index.ts').Wire> | null;
+  }>({ col: -1, row: -1, hoveredNodeId: null, nodesRef: null, wiresRef: null });
 
   // Drag detection refs
   const potentialDragRef = useRef<{
@@ -175,22 +209,19 @@ export function GameboardCanvas() {
       // Check minimum cell size
       setTooSmall(cellSize < MIN_CELL_SIZE);
 
-      // Gameboard dimensions from grid
-      const gbW = GRID_COLS * cellSize;
-      const gbH = GRID_ROWS * cellSize;
+      // Canvas covers full viewport so page streak extends into margins
+      canvas!.width = viewportW * dpr;
+      canvas!.height = viewportH * dpr;
+      canvas!.style.width = `${viewportW}px`;
+      canvas!.style.height = `${viewportH}px`;
+      canvas!.style.left = '0px';
+      canvas!.style.top = '0px';
 
-      // Canvas covers only the gameboard area
-      canvas!.width = gbW * dpr;
-      canvas!.height = gbH * dpr;
-      canvas!.style.width = `${gbW}px`;
-      canvas!.style.height = `${gbH}px`;
-
-      // Center canvas in parent (letterbox)
+      // Grid offset within the viewport-sized canvas
       const offset = computeCenterOffset(viewportW, viewportH, cellSize);
-      canvas!.style.left = `${offset.x}px`;
-      canvas!.style.top = `${offset.y}px`;
+      offsetRef.current = offset;
 
-      // Parent background is the letterbox color
+      // Parent background as fallback (canvas covers it in normal operation)
       updateParentBackground(parent);
 
       const ctx = canvas!.getContext('2d');
@@ -204,7 +235,7 @@ export function GameboardCanvas() {
       if (devOverrides.enabled) {
         parent.style.background = devOverrides.colors.pageBackground;
       } else {
-        parent.style.background = '#121216';
+        parent.style.background = '#0d0f14';
       }
     }
 
@@ -226,7 +257,8 @@ export function GameboardCanvas() {
     window.addEventListener('resize', onResize);
     window.addEventListener('dev-overrides-changed', onDevOverridesChanged);
     const getCellSize = () => cellSizeRef.current;
-    const stopLoop = startRenderLoop(canvas, getCellSize);
+    const getOffset = () => offsetRef.current;
+    const stopLoop = startRenderLoop(canvas, getCellSize, getOffset);
 
     return () => {
       stopLoop();
@@ -247,12 +279,8 @@ export function GameboardCanvas() {
         if (action === 'zoom-out') {
           const canvas = canvasRef.current;
           if (canvas) {
-            const snapshot = new OffscreenCanvas(canvas.width, canvas.height);
-            const snapCtx = snapshot.getContext('2d');
-            if (snapCtx) {
-              snapCtx.drawImage(canvas, 0, 0);
-              state.startLidClose(snapshot);
-            }
+            const snapshot = createGridSnapshot(canvas, offsetRef.current, cellSizeRef.current);
+            if (snapshot) state.startLidClose(snapshot);
           }
         }
 
@@ -291,12 +319,8 @@ export function GameboardCanvas() {
         onEnterNode: (nodeId: string) => {
           const canvas = canvasRef.current;
           if (canvas) {
-            const snapshot = new OffscreenCanvas(canvas.width, canvas.height);
-            const snapCtx = snapshot.getContext('2d');
-            if (snapCtx) {
-              snapCtx.drawImage(canvas, 0, 0);
-              state.startLidOpen(snapshot);
-            }
+            const snapshot = createGridSnapshot(canvas, offsetRef.current, cellSizeRef.current);
+            if (snapshot) state.startLidOpen(snapshot);
           }
           state.zoomIntoNode(nodeId);
         },
@@ -382,8 +406,8 @@ export function GameboardCanvas() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = e.clientX - rect.left - offsetRef.current.x;
+    const y = e.clientY - rect.top - offsetRef.current.y;
     const { w, h } = getCanvasLogicalSize(canvas);
 
     const state = useGameStore.getState();
@@ -598,8 +622,8 @@ export function GameboardCanvas() {
     if (!state.activeBoard || state.interactionMode.type !== 'idle') return;
 
     const rect = canvas.getBoundingClientRect();
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
+    const cx = e.clientX - rect.left - offsetRef.current.x;
+    const cy = e.clientY - rect.top - offsetRef.current.y;
     const { w, h } = getCanvasLogicalSize(canvas);
     const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
 
@@ -637,8 +661,8 @@ export function GameboardCanvas() {
     if (!state.activeBoard) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = e.clientX - rect.left - offsetRef.current.x;
+    const y = e.clientY - rect.top - offsetRef.current.y;
     const { w, h } = getCanvasLogicalSize(canvas);
 
     const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
@@ -686,14 +710,13 @@ export function GameboardCanvas() {
         const knobConfig = node ? getKnobConfig(getNodeDefinition(node.type)) : null;
         if (knobConfig) {
           const rect = canvas.getBoundingClientRect();
-          const y = e.clientY - rect.top;
+          const y = e.clientY - rect.top - offsetRef.current.y;
           const deltaY = startY - y; // Up = positive
           const sensitivity = 32; // pixels per 50-unit step
           const rawDelta = (deltaY / sensitivity) * 50;
           const newValue = Math.round((startValue + rawDelta) / 50) * 50;
           const clampedValue = Math.max(-100, Math.min(100, newValue));
-          state.updateNodeParams(nodeId, { [knobConfig.paramKey]: clampedValue });
-          state.setPortConstant(nodeId, knobConfig.portIndex, clampedValue);
+          state.batchKnobAdjust(nodeId, knobConfig.paramKey, knobConfig.portIndex, clampedValue);
         }
       }
       state.commitKnobAdjust();
@@ -710,8 +733,8 @@ export function GameboardCanvas() {
       }
 
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = e.clientX - rect.left - offsetRef.current.x;
+      const y = e.clientY - rect.top - offsetRef.current.y;
 
       const { draggedNode, rotation } = state.interactionMode;
       const nodeType = draggedNode.type;
@@ -743,8 +766,8 @@ export function GameboardCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = e.clientX - rect.left - offsetRef.current.x;
+    const y = e.clientY - rect.top - offsetRef.current.y;
     const state = useGameStore.getState();
     state.setMousePosition({ x, y });
 
@@ -759,8 +782,7 @@ export function GameboardCanvas() {
         const rawDelta = (deltaY / sensitivity) * 50;
         const newValue = Math.round((startValue + rawDelta) / 50) * 50;
         const clampedValue = Math.max(-100, Math.min(100, newValue));
-        state.updateNodeParams(nodeId, { [knobConfig.paramKey]: clampedValue });
-        state.setPortConstant(nodeId, knobConfig.portIndex, clampedValue);
+        state.batchKnobAdjust(nodeId, knobConfig.paramKey, knobConfig.portIndex, clampedValue);
       }
       return;
     }
@@ -786,9 +808,32 @@ export function GameboardCanvas() {
 
     // Update hover state for node highlighting (skip if dragging)
     if (state.interactionMode.type !== 'dragging-node' && state.activeBoard) {
-      const { w, h } = getCanvasLogicalSize(canvas);
-      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
-      state.setHoveredNode(hit.type === 'node' ? hit.nodeId : null);
+      // Cache: skip hitTest if cursor is in the same grid cell with same board refs
+      const gridCell = pixelToGrid(x, y, cellSizeRef.current);
+      const cache = hitCacheRef.current;
+      if (
+        gridCell.col === cache.col &&
+        gridCell.row === cache.row &&
+        state.activeBoard.nodes === cache.nodesRef &&
+        state.activeBoard.wires === cache.wiresRef
+      ) {
+        // Same cell, same board — reuse cached hover result
+        if (cache.hoveredNodeId !== state.hoveredNodeId) {
+          state.setHoveredNode(cache.hoveredNodeId);
+        }
+      } else {
+        const { w, h } = getCanvasLogicalSize(canvas);
+        const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
+        const newHovered = hit.type === 'node' ? hit.nodeId : null;
+        cache.col = gridCell.col;
+        cache.row = gridCell.row;
+        cache.hoveredNodeId = newHovered;
+        cache.nodesRef = state.activeBoard.nodes;
+        cache.wiresRef = state.activeBoard.wires;
+        if (newHovered !== state.hoveredNodeId) {
+          state.setHoveredNode(newHovered);
+        }
+      }
     }
   }, []);
 

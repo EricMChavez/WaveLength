@@ -13,6 +13,8 @@ export interface GameboardSlice {
   portConstants: Map<string, number>;
   /** Incremented on structural graph mutations (add/remove node/wire, param change) */
   graphVersion: number;
+  /** Incremented only on topology-changing actions (add/remove/move node/wire). NOT incremented by param changes. */
+  routingVersion: number;
   /** Occupancy grid (66x36): true = cell occupied by a node bounding box */
   occupancy: boolean[][];
 
@@ -40,6 +42,8 @@ export interface GameboardSlice {
   updateCreativeSlotNode: (slotIndex: number, direction: 'input' | 'output' | 'off') => void;
   /** Add back a creative slot node that was previously removed (for 'off' -> other transition) */
   addCreativeSlotNode: (slotIndex: number, direction: 'input' | 'output') => void;
+  /** Batch update node params + port constant in a single set() with one graphVersion bump. Used during knob drag. */
+  batchKnobAdjust: (nodeId: NodeId, paramKey: string, portIndex: number, value: number) => void;
 }
 
 export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
@@ -47,6 +51,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
   activeBoardId: null,
   portConstants: new Map<string, number>(),
   graphVersion: 0,
+  routingVersion: 0,
   occupancy: createOccupancyGrid(),
 
   setActiveBoard: (board) =>
@@ -56,6 +61,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       portConstants: new Map(),
       occupancy: recomputeOccupancy(board.nodes),
       graphVersion: state.graphVersion + 1,
+      routingVersion: state.routingVersion + 1,
     })),
 
   addNode: (node) =>
@@ -68,6 +74,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       return {
         activeBoard: { ...state.activeBoard, nodes },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
         occupancy,
       };
     }),
@@ -88,6 +95,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       return {
         activeBoard: { ...state.activeBoard, nodes, wires },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
         occupancy,
       };
     }),
@@ -118,6 +126,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       return {
         activeBoard: { ...state.activeBoard, nodes },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
         occupancy,
       };
     }),
@@ -131,6 +140,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
           wires: [...state.activeBoard.wires, wire],
         },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
       };
     }),
 
@@ -143,6 +153,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
           wires: state.activeBoard.wires.filter((w) => w.id !== wireId),
         },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
       };
     }),
 
@@ -182,6 +193,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       portConstants,
       occupancy: recomputeOccupancy(board.nodes),
       graphVersion: state.graphVersion + 1,
+      routingVersion: state.routingVersion + 1,
     })),
 
   updateCreativeSlotNode: (slotIndex, direction) =>
@@ -202,6 +214,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
         return {
           activeBoard: { ...state.activeBoard, nodes },
           graphVersion: state.graphVersion + 1,
+          routingVersion: state.routingVersion + 1,
           occupancy,
         };
       }
@@ -217,6 +230,7 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       return {
         activeBoard: { ...state.activeBoard, nodes },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
       };
     }),
 
@@ -250,7 +264,25 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
       return {
         activeBoard: { ...state.activeBoard, nodes },
         graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
         occupancy,
+      };
+    }),
+
+  batchKnobAdjust: (nodeId, paramKey, portIndex, value) =>
+    set((state) => {
+      if (!state.activeBoard) return state;
+      const node = state.activeBoard.nodes.get(nodeId);
+      if (!node) return state;
+      const nodes = new Map(state.activeBoard.nodes);
+      nodes.set(nodeId, { ...node, params: { ...node.params, [paramKey]: value } });
+      const key = `${nodeId}:${portIndex}`;
+      const portConstants = new Map(state.portConstants);
+      portConstants.set(key, value);
+      return {
+        activeBoard: { ...state.activeBoard, nodes },
+        portConstants,
+        graphVersion: state.graphVersion + 1,
       };
     }),
 });

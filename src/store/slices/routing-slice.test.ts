@@ -122,7 +122,7 @@ describe('routing-slice', () => {
 });
 
 describe('initRouting', () => {
-  it('calls routeAllWires when graphVersion changes', () => {
+  it('calls routeAllWires when routingVersion changes', () => {
     const routeAllWiresSpy = vi.fn();
     let listener: ((state: any, prev: any) => void) | null = null;
 
@@ -137,12 +137,34 @@ describe('initRouting', () => {
     initRouting(mockStore as any);
     expect(listener).not.toBeNull();
 
-    // Simulate graphVersion change with active board
+    // Simulate routingVersion change with active board (topology change)
     listener!(
-      { graphVersion: 2, activeBoardId: 'b1', activeBoard: {} },
-      { graphVersion: 1, activeBoardId: 'b1', activeBoard: {} },
+      { routingVersion: 2, activeBoardId: 'b1', activeBoard: {} },
+      { routingVersion: 1, activeBoardId: 'b1', activeBoard: {} },
     );
     expect(routeAllWiresSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call routeAllWires when only graphVersion changes (param update)', () => {
+    const routeAllWiresSpy = vi.fn();
+    let listener: ((state: any, prev: any) => void) | null = null;
+
+    const mockStore = {
+      getState: () => ({ routeAllWires: routeAllWiresSpy }),
+      subscribe: (fn: (state: any, prev: any) => void) => {
+        listener = fn;
+        return () => {};
+      },
+    };
+
+    initRouting(mockStore as any);
+
+    // graphVersion changes but routingVersion stays the same (e.g. knob adjust)
+    listener!(
+      { graphVersion: 5, routingVersion: 1, activeBoardId: 'b1', activeBoard: {} },
+      { graphVersion: 4, routingVersion: 1, activeBoardId: 'b1', activeBoard: {} },
+    );
+    expect(routeAllWiresSpy).not.toHaveBeenCalled();
   });
 
   it('calls routeAllWires when activeBoardId changes', () => {

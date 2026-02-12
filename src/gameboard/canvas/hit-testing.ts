@@ -131,8 +131,9 @@ export function hitTest(
   }
 
   // 4. Check node bodies (using full grid footprint for hit detection)
-  const entries = Array.from(nodes.entries()).reverse();
-  for (const [id, node] of entries) {
+  // Forward iteration, keep last match for correct z-order (last = top)
+  let bodyHitId: NodeId | null = null;
+  for (const [id, node] of nodes) {
     if (isConnectionPointNode(id)) continue;
     const rect = getNodeHitRect(node, cellSize);
     if (
@@ -141,8 +142,11 @@ export function hitTest(
       y >= rect.y &&
       y <= rect.y + rect.height
     ) {
-      return { type: 'node', nodeId: id };
+      bodyHitId = id;
     }
+  }
+  if (bodyHitId !== null) {
+    return { type: 'node', nodeId: bodyHitId };
   }
 
   // 5. Check wires (path segments at gridline intersections)

@@ -2,7 +2,7 @@ import type { NodeState } from '../../shared/types/index.ts';
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { RenderNodesState } from './render-types.ts';
 import type { PixelRect } from '../../shared/grid/types.ts';
-import { NODE_STYLE, NODE_TYPE_LABELS } from '../../shared/constants/index.ts';
+import { NODE_STYLE, NODE_TYPE_LABELS, HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { getNodePortPosition, getNodeBodyPixelRect } from './port-positions.ts';
@@ -19,16 +19,22 @@ import { drawHighlightStreakRounded } from './render-highlight-streak.ts';
 
 type RGB = [number, number, number];
 
+const _hexToRgbCache = new Map<string, RGB>();
+
 function hexToRgb(hex: string): RGB {
+  let cached = _hexToRgbCache.get(hex);
+  if (cached) return cached;
   let h = hex.replace('#', '');
   if (h.length === 3) {
     h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
   }
-  return [
+  cached = [
     parseInt(h.slice(0, 2), 16),
     parseInt(h.slice(2, 4), 16),
     parseInt(h.slice(4, 6), 16),
   ];
+  _hexToRgbCache.set(hex, cached);
+  return cached;
 }
 
 function lerpColor(a: RGB, b: RGB, t: number): string {
@@ -170,7 +176,27 @@ function drawNodeBody(
   ctx.stroke();
 
   // --- Highlight streak ---
-  drawHighlightStreakRounded(ctx, rect, borderRadius, 0.06);
+  const nodeHard = useOverrides ? devOverrides.highlightStyle.nodeHard : 0.06;
+  const nodeSoft = useOverrides ? devOverrides.highlightStyle.nodeSoft : 0.0375;
+  const fadeRatio = useOverrides ? devOverrides.highlightStyle.verticalFadeRatio : HIGHLIGHT_STREAK.VERTICAL_FADE_RATIO;
+  drawHighlightStreakRounded(ctx, rect, borderRadius, nodeHard, nodeSoft, fadeRatio);
+
+  // --- Light edge (warm highlight along top inner edge) ---
+  const lightEdgeOpacity = useOverrides ? devOverrides.nodeStyle.lightEdgeOpacity : 0.3;
+  if (lightEdgeOpacity > 0) {
+    const warmTint = HIGHLIGHT_STREAK.WARM_TINT;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.width, rect.height, borderRadius);
+    ctx.clip();
+    ctx.strokeStyle = `rgba(${warmTint.r},${warmTint.g},${warmTint.b},${lightEdgeOpacity})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rect.x + borderRadius, rect.y + 0.5);
+    ctx.lineTo(rect.x + rect.width - borderRadius, rect.y + 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // --- Label (rotated with node) ---
   const labelFontSize = Math.round(NODE_STYLE.LABEL_FONT_RATIO * cellSize);

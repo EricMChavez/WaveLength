@@ -76,8 +76,8 @@ export function initRouting(store: {
       return;
     }
 
-    // Re-route after structural change (node/wire add/remove/param change)
-    if (state.graphVersion !== prev.graphVersion && state.activeBoard) {
+    // Re-route after topology change (node/wire add/remove/move — NOT param changes)
+    if (state.routingVersion !== prev.routingVersion && state.activeBoard) {
       store.getState().routeAllWires();
     }
   });
