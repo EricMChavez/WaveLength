@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { topologicalSort } from './topological-sort.ts';
+import { topologicalSort, topologicalSortWithDepths } from './topological-sort.ts';
 import { createWire } from '../../shared/types/index.ts';
 import type { Wire, NodeId } from '../../shared/types/index.ts';
 
@@ -173,6 +173,141 @@ describe('topologicalSort', () => {
       assertBefore(result.value, 'A', 'D');
       assertBefore(result.value, 'B', 'D');
       assertBefore(result.value, 'C', 'D');
+    }
+  });
+});
+
+describe('topologicalSortWithDepths', () => {
+  it('handles empty graph', () => {
+    const result = topologicalSortWithDepths([], []);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.order).toEqual([]);
+      expect(result.value.depths.size).toBe(0);
+      expect(result.value.maxDepth).toBe(0);
+    }
+  });
+
+  it('single node: depth 0', () => {
+    const result = topologicalSortWithDepths(['A'], []);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.maxDepth).toBe(0);
+    }
+  });
+
+  it('linear chain: A→B→C → depths {A:0, B:1, C:2}', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'C'],
+      [wire('A', 'B'), wire('B', 'C')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(1);
+      expect(result.value.depths.get('C')).toBe(2);
+      expect(result.value.maxDepth).toBe(2);
+    }
+  });
+
+  it('diamond: A→B, A→C, B→D, C→D → depths {A:0, B:1, C:1, D:2}', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'C', 'D'],
+      [wire('A', 'B'), wire('A', 'C'), wire('B', 'D'), wire('C', 'D')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(1);
+      expect(result.value.depths.get('C')).toBe(1);
+      expect(result.value.depths.get('D')).toBe(2);
+      expect(result.value.maxDepth).toBe(2);
+    }
+  });
+
+  it('parallel independent: {A:0, B:0, C:1, D:1}', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'C', 'D'],
+      [wire('A', 'C'), wire('B', 'D')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(0);
+      expect(result.value.depths.get('C')).toBe(1);
+      expect(result.value.depths.get('D')).toBe(1);
+      expect(result.value.maxDepth).toBe(1);
+    }
+  });
+
+  it('fan-out: A→B, A→C, A→D → depths {A:0, B:1, C:1, D:1}', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'C', 'D'],
+      [wire('A', 'B'), wire('A', 'C'), wire('A', 'D')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(1);
+      expect(result.value.depths.get('C')).toBe(1);
+      expect(result.value.depths.get('D')).toBe(1);
+      expect(result.value.maxDepth).toBe(1);
+    }
+  });
+
+  it('fan-in: A→D, B→D, C→D → depths {A:0, B:0, C:0, D:1}', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'C', 'D'],
+      [wire('A', 'D'), wire('B', 'D'), wire('C', 'D')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(0);
+      expect(result.value.depths.get('C')).toBe(0);
+      expect(result.value.depths.get('D')).toBe(1);
+      expect(result.value.maxDepth).toBe(1);
+    }
+  });
+
+  it('longest path determines depth: A→B→D, A→C→D with A→D shortcut', () => {
+    // A→B (depth 1), B→D (depth 2), A→C (depth 1), C→D (depth 2), A→D (depth 1)
+    // D depth should be max(B+1, C+1, A+1) = 2
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'C', 'D'],
+      [wire('A', 'B'), wire('B', 'D'), wire('A', 'C'), wire('C', 'D'), wire('A', 'D')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(1);
+      expect(result.value.depths.get('C')).toBe(1);
+      expect(result.value.depths.get('D')).toBe(2);
+    }
+  });
+
+  it('disconnected node has depth 0', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B', 'X'],
+      [wire('A', 'B')],
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.depths.get('X')).toBe(0);
+      expect(result.value.depths.get('A')).toBe(0);
+      expect(result.value.depths.get('B')).toBe(1);
+    }
+  });
+
+  it('detects cycles (same as topologicalSort)', () => {
+    const result = topologicalSortWithDepths(
+      ['A', 'B'],
+      [wire('A', 'B'), wire('B', 'A')],
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toContain('Cycle detected');
     }
   });
 });

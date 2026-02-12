@@ -542,6 +542,75 @@ describe('evaluateAllCycles', () => {
     });
   });
 
+  describe('nodeDepths', () => {
+    it('assigns depths for linear chain', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+      nodes.set('inv1', makeNode('inv1', 'inverter', 1, 1));
+      nodes.set('inv2', makeNode('inv2', 'inverter', 1, 1));
+
+      const wires: Wire[] = [
+        makeWire('w1', '__cp_input_0__', 0, 'inv1', 0),
+        makeWire('w2', 'inv1', 0, 'inv2', 0),
+        makeWire('w3', 'inv2', 0, '__cp_output_0__', 0),
+      ];
+
+      const result = unwrap(evaluateAllCycles(
+        nodes, wires, new Map(), constantInputs([42]), 4,
+      ));
+
+      expect(result.nodeDepths.get('__cp_input_0__')).toBe(0);
+      expect(result.nodeDepths.get('inv1')).toBe(1);
+      expect(result.nodeDepths.get('inv2')).toBe(2);
+      expect(result.nodeDepths.get('__cp_output_0__')).toBe(3);
+      expect(result.maxDepth).toBe(3);
+    });
+
+    it('assigns same depth to parallel nodes', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+      nodes.set('__cp_output_1__', makeNode('__cp_output_1__', 'connection-output', 1, 0));
+      nodes.set('inv1', makeNode('inv1', 'inverter', 1, 1));
+      nodes.set('inv2', makeNode('inv2', 'inverter', 1, 1));
+
+      const wires: Wire[] = [
+        makeWire('w1', '__cp_input_0__', 0, 'inv1', 0),
+        makeWire('w2', '__cp_input_0__', 0, 'inv2', 0),
+        makeWire('w3', 'inv1', 0, '__cp_output_0__', 0),
+        makeWire('w4', 'inv2', 0, '__cp_output_1__', 0),
+      ];
+
+      const result = unwrap(evaluateAllCycles(
+        nodes, wires, new Map(), constantInputs([42]), 4,
+      ));
+
+      // inv1 and inv2 both depend only on input CP → same depth
+      expect(result.nodeDepths.get('inv1')).toBe(1);
+      expect(result.nodeDepths.get('inv2')).toBe(1);
+      expect(result.maxDepth).toBe(2);
+    });
+
+    it('maxDepth is 0 for CP-only graph', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+
+      const wires: Wire[] = [
+        makeWire('w1', '__cp_input_0__', 0, '__cp_output_0__', 0),
+      ];
+
+      const result = unwrap(evaluateAllCycles(
+        nodes, wires, new Map(), constantInputs([77]), 4,
+      ));
+
+      expect(result.nodeDepths.get('__cp_input_0__')).toBe(0);
+      expect(result.nodeDepths.get('__cp_output_0__')).toBe(1);
+      expect(result.maxDepth).toBe(1);
+    });
+  });
+
   describe('empty graph', () => {
     it('handles graph with no processing nodes', () => {
       const nodes = new Map<NodeId, NodeState>();

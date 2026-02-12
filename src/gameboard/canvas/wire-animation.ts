@@ -5,9 +5,8 @@
  * This module computes per-wire timing (depart/arrive phases) from the processing order.
  */
 
-import type { NodeId, Wire } from '../../shared/types/index.ts';
+import type { Wire } from '../../shared/types/index.ts';
 import type { CycleResults } from '../../engine/evaluation/index.ts';
-import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
 
 // =============================================================================
 // Types
@@ -34,28 +33,21 @@ export interface WireAnimationCache {
 /**
  * Compute per-wire blip timing from cycle results and playpoint.
  *
- * Timing algorithm:
- * - CP source wires depart at phase 0
- * - Processing node source wires depart after that node's topo-index fires
+ * Timing algorithm (depth-based wavefront):
+ * - Phase for each node = depth / maxDepth (nodes at same depth fire simultaneously)
+ * - CP source wires (depth 0) depart at phase 0
  * - CP target wires arrive at phase 1
- * - Processing node target wires arrive when that node fires
  * - Cross-cycle feedback (arrive <= depart) wraps arrive to 1
  * - Minimum gap enforced for visibility
  */
 export function computeWireAnimationCache(
   wires: ReadonlyArray<Wire>,
-  nodes: ReadonlyMap<string, unknown>,
+  _nodes: ReadonlyMap<string, unknown>,
   cycleResults: CycleResults,
   playpoint: number,
 ): WireAnimationCache {
-  const processingOrder = cycleResults.processingOrder;
-  const denominator = processingOrder.length + 1;
-
-  // Build topo-index map: nodeId → 0-based index in processing order
-  const topoIndex = new Map<NodeId, number>();
-  for (let i = 0; i < processingOrder.length; i++) {
-    topoIndex.set(processingOrder[i], i);
-  }
+  const { nodeDepths, maxDepth } = cycleResults;
+  const safeDenom = Math.max(maxDepth, 1);
 
   const timings = new Map<string, WireBlipTiming>();
 
@@ -63,23 +55,13 @@ export function computeWireAnimationCache(
     const sourceNodeId = wire.source.nodeId;
     const targetNodeId = wire.target.nodeId;
 
-    // Determine depart phase
-    let departPhase: number;
-    if (isConnectionPointNode(sourceNodeId)) {
-      departPhase = 0;
-    } else {
-      const idx = topoIndex.get(sourceNodeId);
-      departPhase = idx !== undefined ? (idx + 1) / denominator : 0;
-    }
+    // Determine depart phase from source node depth
+    const srcDepth = nodeDepths.get(sourceNodeId);
+    const departPhase = srcDepth !== undefined ? srcDepth / safeDenom : 0;
 
-    // Determine arrive phase
-    let arrivePhase: number;
-    if (isConnectionPointNode(targetNodeId)) {
-      arrivePhase = 1;
-    } else {
-      const idx = topoIndex.get(targetNodeId);
-      arrivePhase = idx !== undefined ? (idx + 1) / denominator : 1;
-    }
+    // Determine arrive phase from target node depth
+    const tgtDepth = nodeDepths.get(targetNodeId);
+    let arrivePhase = tgtDepth !== undefined ? tgtDepth / safeDenom : 1;
 
     // Cross-cycle feedback: if arrive <= depart, wrap to end
     if (arrivePhase <= departPhase) {
@@ -87,7 +69,7 @@ export function computeWireAnimationCache(
     }
 
     // Enforce minimum gap for visibility
-    const minGap = 1 / denominator;
+    const minGap = 1 / safeDenom;
     if (arrivePhase - departPhase < minGap) {
       arrivePhase = Math.min(departPhase + minGap, 1);
     }

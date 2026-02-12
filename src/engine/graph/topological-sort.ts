@@ -8,6 +8,14 @@ export interface CycleError {
   cyclePath: NodeId[];
 }
 
+export interface TopologicalResult {
+  order: NodeId[];
+  /** Longest path from any root (zero in-degree node) to each node */
+  depths: Map<NodeId, number>;
+  /** Maximum depth across all nodes */
+  maxDepth: number;
+}
+
 /**
  * Topological sort using Kahn's algorithm.
  * Returns nodes ordered so every node evaluates after its dependencies,
@@ -67,6 +75,51 @@ export function topologicalSort(
   }
 
   return ok(sorted);
+}
+
+/**
+ * Topological sort with depth tracking.
+ *
+ * Returns the same topological order as `topologicalSort`, plus a depth map
+ * where depth = longest path from any root (zero in-degree node) to each node.
+ * Nodes with no predecessors have depth 0.
+ */
+export function topologicalSortWithDepths(
+  nodeIds: NodeId[],
+  wires: Wire[],
+): Result<TopologicalResult, CycleError> {
+  const sortResult = topologicalSort(nodeIds, wires);
+  if (!sortResult.ok) return sortResult;
+
+  const order = sortResult.value;
+
+  // Build reverse adjacency: for each node, which nodes feed into it
+  const predecessors = new Map<NodeId, NodeId[]>();
+  for (const id of nodeIds) {
+    predecessors.set(id, []);
+  }
+  for (const wire of wires) {
+    predecessors.get(wire.target.nodeId)!.push(wire.source.nodeId);
+  }
+
+  // Compute depths in topological order (predecessors already processed)
+  const depths = new Map<NodeId, number>();
+  let maxDepth = 0;
+
+  for (const nodeId of order) {
+    const preds = predecessors.get(nodeId)!;
+    let depth = 0;
+    for (const pred of preds) {
+      const predDepth = depths.get(pred);
+      if (predDepth !== undefined && predDepth + 1 > depth) {
+        depth = predDepth + 1;
+      }
+    }
+    depths.set(nodeId, depth);
+    if (depth > maxDepth) maxDepth = depth;
+  }
+
+  return ok({ order, depths, maxDepth });
 }
 
 /**

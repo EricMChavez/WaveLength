@@ -9,6 +9,8 @@ function makeCycleResults(outputValues: number[][]): CycleResults {
     nodeOutputs: new Map(),
     crossCycleState: new Map(),
     processingOrder: [],
+    nodeDepths: new Map(),
+    maxDepth: 0,
   };
 }
 

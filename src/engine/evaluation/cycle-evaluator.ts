@@ -9,7 +9,7 @@
 import type { NodeId, NodeState, Wire } from '../../shared/types/index.ts';
 import type { Result } from '../../shared/result/index.ts';
 import { ok, err } from '../../shared/result/index.ts';
-import { topologicalSort } from '../graph/topological-sort.ts';
+import { topologicalSortWithDepths } from '../graph/topological-sort.ts';
 import { getNodeDefinition } from '../nodes/registry.ts';
 import type { NodeRuntimeState } from '../nodes/framework.ts';
 import { clamp } from '../../shared/math/index.ts';
@@ -39,6 +39,10 @@ export interface CycleResults {
   crossCycleState: Map<string, number>;
   /** Non-CP nodes in topological evaluation order */
   processingOrder: NodeId[];
+  /** Depth (longest path from roots) for all nodes including CPs */
+  nodeDepths: Map<NodeId, number>;
+  /** Maximum depth across all nodes */
+  maxDepth: number;
 }
 
 /** Error from cycle evaluation. */
@@ -93,26 +97,20 @@ export function evaluateAllCycles(
 
   // ─── Topological sort on signal wires only ────────────────────────────────
   const nodeIds = Array.from(nodes.keys());
-  const sortResult = topologicalSort(nodeIds, signalWires);
+  const sortResult = topologicalSortWithDepths(nodeIds, signalWires);
   if (!sortResult.ok) {
     return err({
       message: sortResult.error.message,
       cyclePath: sortResult.error.cyclePath,
     });
   }
-  const topoOrder = sortResult.value;
+  const { order: topoOrder, depths: nodeDepths, maxDepth } = sortResult.value;
 
-  // Build topo index map for parameter wire classification
-  const topoIndex = new Map<NodeId, number>();
-  for (let i = 0; i < topoOrder.length; i++) {
-    topoIndex.set(topoOrder[i], i);
-  }
-
-  // ─── Classify parameter wires ─────────────────────────────────────────────
+  // ─── Classify parameter wires using depth comparison ──────────────────────
   const paramWireInfos: ParamWireInfo[] = parameterWires.map((wire) => {
-    const srcIdx = topoIndex.get(wire.source.nodeId) ?? -1;
-    const tgtIdx = topoIndex.get(wire.target.nodeId) ?? -1;
-    const kind: ParamWireKind = srcIdx < tgtIdx ? 'same-cycle' : 'cross-cycle';
+    const srcDepth = nodeDepths.get(wire.source.nodeId) ?? 0;
+    const tgtDepth = nodeDepths.get(wire.target.nodeId) ?? 0;
+    const kind: ParamWireKind = srcDepth < tgtDepth ? 'same-cycle' : 'cross-cycle';
     return { wire, kind };
   });
 
@@ -335,6 +333,8 @@ export function evaluateAllCycles(
     nodeOutputs: nodeOutputsMap,
     crossCycleState: crossCycleValues,
     processingOrder,
+    nodeDepths,
+    maxDepth,
   });
 }
 
