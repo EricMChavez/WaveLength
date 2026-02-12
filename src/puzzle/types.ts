@@ -144,4 +144,6 @@ export interface PuzzleDefinition {
   initialNodes?: InitialNodeDef[];
   /** Wires pre-connected when the puzzle starts */
   initialWires?: InitialWireDef[];
+  /** Optional tutorial message rendered on the gameboard surface (under dots and streak) */
+  tutorialMessage?: string;
 }

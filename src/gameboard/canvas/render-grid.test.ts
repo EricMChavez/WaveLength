@@ -28,7 +28,7 @@ function makeTokens(overrides: Partial<ThemeTokens> = {}): ThemeTokens {
     meterNeedle: '',
     depthRaised: '',
     depthSunken: '',
-    textPrimary: '',
+    textPrimary: '#ffffff',
     textSecondary: '',
     colorSelection: '',
     wireWidthBase: '',
@@ -42,6 +42,10 @@ function makeTokens(overrides: Partial<ThemeTokens> = {}): ThemeTokens {
     animEasingBounce: '',
     animCeremonyBurstDuration: '',
     animCeremonyRevealDuration: '',
+    colorValidationMatch: '',
+    colorError: '',
+    meterBorder: '',
+    boardBorder: '',
     ...overrides,
   };
 }
@@ -66,6 +70,7 @@ function createMockCtx() {
     save: vi.fn(() => { alphaStack.push(ctx.globalAlpha); }),
     restore: vi.fn(() => { if (alphaStack.length) ctx.globalAlpha = alphaStack.pop()!; }),
     clip: vi.fn(),
+    rect: vi.fn(),
     roundRect: vi.fn(),
     createLinearGradient: vi.fn(() => mockGradient),
     font: '',
@@ -88,17 +93,13 @@ describe('drawGrid', () => {
   });
 
   describe('zone backgrounds', () => {
-    it('fills playable area with gradient using rounded rectangle', () => {
+    it('fills playable area with flat color using rounded rectangle', () => {
       const cellSize = 40;
       drawGrid(ctx, tokens, {}, cellSize);
-
-      // Background uses a linear gradient
-      expect(ctx.createLinearGradient).toHaveBeenCalled();
 
       const roundRectCalls = (ctx.roundRect as ReturnType<typeof vi.fn>).mock.calls;
       // First roundRect call is the playable area background
       const playableCall = roundRectCalls[0];
-      expect(ctx.fillStyle).toBeDefined();
 
       // Check the playable area rectangle
       const expectedX = PLAYABLE_START * cellSize;
@@ -114,21 +115,27 @@ describe('drawGrid', () => {
       expect(playableCall[4]).toBe(0);
     });
 
-    it('meter zones are transparent (no fill in drawGrid)', () => {
+    it('meter zones are transparent (no meter fills in drawGrid)', () => {
       const cellSize = 40;
       drawGrid(ctx, tokens, {}, cellSize);
 
       const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls;
-      // Shadow gradients only (4 calls), no meter zone fills
-      expect(fillRectCalls.length).toBe(4);
+      // Highlight streak uses fillRect (1 call), no shadow or meter zone fills
+      expect(fillRectCalls.length).toBe(1);
     });
 
-    it('renders playable area background with rounded corners plus depth shadow effects', () => {
+    it('renders playable area background with rounded corners and highlight streak', () => {
       drawGrid(ctx, tokens, {}, 40);
       // Playable area uses roundRect + fill
       expect(ctx.roundRect).toHaveBeenCalled();
-      // Shadow gradients still use fillRect (4 calls)
-      expect(ctx.fillRect).toHaveBeenCalledTimes(4);
+      // Highlight streak uses fillRect (1 call, no more shadow fillRects)
+      expect(ctx.fillRect).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses flat fill instead of gradient for background', () => {
+      drawGrid(ctx, tokens, {}, 40);
+      // Background now uses flat fill — gradient is only for the highlight streak
+      expect(ctx.createLinearGradient).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -218,6 +225,21 @@ describe('drawGrid', () => {
       const state: RenderGridState = { gridOpacity: 0.3 };
       drawGrid(ctx, tokens, state, 40);
       expect(ctx.globalAlpha).toBe(0.7);
+    });
+  });
+
+  describe('tutorial text', () => {
+    it('renders tutorial text when tutorialMessage is provided', () => {
+      const state: RenderGridState = { tutorialMessage: 'Connect input to output' };
+      drawGrid(ctx, tokens, state, 40);
+      // Tutorial text uses fillText
+      expect(ctx.fillText).toHaveBeenCalled();
+    });
+
+    it('does not render tutorial text when no message', () => {
+      drawGrid(ctx, tokens, {}, 40);
+      // No fillText calls without tutorial message
+      expect(ctx.fillText).not.toHaveBeenCalled();
     });
   });
 });

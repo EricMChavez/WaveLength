@@ -12,14 +12,19 @@ import {
 } from '../../shared/grid/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { GAMEBOARD_STYLE } from '../../shared/constants/index.ts';
+import { drawHighlightStreak } from './render-highlight-streak.ts';
+import { drawTutorialText } from './render-tutorial-text.ts';
 
 /**
  * Draw the gameboard grid zones and grid lines.
  * Called first in the render loop (lowest z-order).
  *
- * Zones:
- * - Left/right meter zones: transparent (gradient background shows through)
- * - Playable area (cols 10-55): tokens.gridArea background + grid lines
+ * Layer order within this function:
+ * 1. Flat background fill
+ * 2. Tutorial text (engraved appearance, under dots)
+ * 3. Dot matrix at grid intersections
+ * 4. Highlight streak (diagonal light band, on top of everything)
+ * 5. Debug grid labels (dev only)
  */
 export function drawGrid(
   ctx: CanvasRenderingContext2D,
@@ -31,12 +36,8 @@ export function drawGrid(
   const useOverrides = devOverrides.enabled;
 
   // Get style values (use dev overrides if enabled)
-  const gridAreaEdge = useOverrides ? devOverrides.colors.gridAreaEdge : '#000000';
-  const gridAreaCenter = useOverrides ? devOverrides.colors.gridAreaCenter : '#0a0b0d';
   const gridLineColor = useOverrides ? devOverrides.colors.gridLine : tokens.gridLine;
   const lineOpacity = useOverrides ? devOverrides.gridStyle.lineOpacity : 0.8;
-  const insetDepthTop = useOverrides ? devOverrides.gridStyle.insetDepthTop : 1;
-  const insetDepthSide = useOverrides ? devOverrides.gridStyle.insetDepthSide : 1;
 
   const prevAlpha = ctx.globalAlpha;
   if (state.gridOpacity !== undefined) {
@@ -46,60 +47,23 @@ export function drawGrid(
   const totalHeight = GRID_ROWS * cellSize;
   const cornerRadius = cellSize * GAMEBOARD_STYLE.CORNER_RADIUS_RATIO;
 
-  // 1. Playable area gradient background
+  // 1. Playable area flat background
   const playableX = PLAYABLE_START * cellSize;
   const playableCols = PLAYABLE_END - PLAYABLE_START + 1;
   const playableWidth = playableCols * cellSize;
-  const bgGradient = ctx.createLinearGradient(playableX, 0, playableX + playableWidth, 0);
-  bgGradient.addColorStop(0, gridAreaEdge);
-  bgGradient.addColorStop(0.5, gridAreaCenter);
-  bgGradient.addColorStop(1, gridAreaEdge);
-  ctx.fillStyle = bgGradient;
+  ctx.fillStyle = tokens.gridArea;
   ctx.beginPath();
   ctx.roundRect(playableX, 0, playableWidth, totalHeight, cornerRadius);
   ctx.fill();
 
   // Meter zones are transparent — each meter draws its own opaque backing
 
-  // 2. Recessed depth effect for grid area (inset shadow)
-  const gridX = PLAYABLE_START * cellSize;
-  const gridWidth = playableCols * cellSize;
-  ctx.save();
-  // Clip to rounded rect so shadows don't spill outside
-  ctx.beginPath();
-  ctx.roundRect(gridX, 0, gridWidth, totalHeight, cornerRadius);
-  ctx.clip();
+  // 2. Tutorial text (under dots and streak, over flat fill)
+  if (state.tutorialMessage) {
+    drawTutorialText(ctx, tokens, state.tutorialMessage, cellSize);
+  }
 
-  // Top shadow (darker, stronger)
-  const topGradient = ctx.createLinearGradient(0, 0, 0, cellSize * 1.5);
-  topGradient.addColorStop(0, `rgba(0, 0, 0, ${insetDepthTop})`);
-  topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = topGradient;
-  ctx.fillRect(gridX, 0, gridWidth, cellSize * 1.5);
-
-  // Bottom shadow (lighter highlight)
-  const bottomGradient = ctx.createLinearGradient(0, totalHeight - cellSize, 0, totalHeight);
-  bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  bottomGradient.addColorStop(1, `rgba(0, 0, 0, ${insetDepthTop * 0.625})`);
-  ctx.fillStyle = bottomGradient;
-  ctx.fillRect(gridX, totalHeight - cellSize, gridWidth, cellSize);
-
-  // Left edge shadow
-  const leftGradient = ctx.createLinearGradient(gridX, 0, gridX + cellSize, 0);
-  leftGradient.addColorStop(0, `rgba(0, 0, 0, ${insetDepthSide})`);
-  leftGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = leftGradient;
-  ctx.fillRect(gridX, 0, cellSize, totalHeight);
-
-  // Right edge shadow
-  const rightGradient = ctx.createLinearGradient(gridX + gridWidth - cellSize, 0, gridX + gridWidth, 0);
-  rightGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  rightGradient.addColorStop(1, `rgba(0, 0, 0, ${insetDepthSide})`);
-  ctx.fillStyle = rightGradient;
-  ctx.fillRect(gridX + gridWidth - cellSize, 0, cellSize, totalHeight);
-  ctx.restore();
-
-  // 5. Dot matrix at grid intersections in the playable area
+  // 3. Dot matrix at grid intersections in the playable area
   ctx.save();
   // Clip to rounded rect so dots don't appear in corners
   ctx.beginPath();
@@ -125,7 +89,15 @@ export function drawGrid(
   ctx.fill();
   ctx.restore();
 
-  // 6. Debug grid labels (dev override only)
+  // 4. Highlight streak across playable area (on top of dots)
+  drawHighlightStreak(ctx, {
+    x: playableX,
+    y: 0,
+    width: playableWidth,
+    height: totalHeight,
+  });
+
+  // 5. Debug grid labels (dev override only)
   const showLabels = devOverrides.enabled && devOverrides.gridStyle.showGridLabels;
   if (showLabels) {
     ctx.save();

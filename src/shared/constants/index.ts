@@ -61,6 +61,32 @@ export const COLORS = {
   TARGET_WAVEFORM: '#c8c8d8',
 } as const;
 
+/** Highlight streak (diagonal light band) configuration */
+export const HIGHLIGHT_STREAK = {
+  /** Angle in degrees from vertical (tilted right) */
+  ANGLE_DEG: 10,
+  /** Opacity of the white band (0-1) */
+  OPACITY: 0.04,
+  /** Width of the streak band as a fraction of the gradient span */
+  BAND_WIDTH_RATIO: 0.08,
+  /** Position of streak center along the gradient span (0 = start, 1 = end) */
+  CENTER_POSITION: 0.35,
+} as const;
+
+/** Tutorial text rendering configuration */
+export const TUTORIAL_TEXT = {
+  /** Font size as a ratio of cellSize */
+  FONT_SIZE_RATIO: 0.55,
+  /** Opacity of the tutorial text (subtle, engraved look) */
+  OPACITY: 0.08,
+  /** Vertical center as fraction of total gameboard height */
+  VERTICAL_CENTER: 0.5,
+  /** Maximum width as fraction of playable area width */
+  MAX_WIDTH_RATIO: 0.7,
+  /** Line height multiplier */
+  LINE_HEIGHT: 1.4,
+} as const;
+
 /** Display labels for node types (derived from registry for v2 nodes) */
 export const NODE_TYPE_LABELS: Record<string, string> = {
   add: 'Add',
