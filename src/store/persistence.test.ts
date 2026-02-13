@@ -240,7 +240,7 @@ describe('localStorage adapter', () => {
   });
 
   it('loadFromStorage returns null on corrupt data', () => {
-    storage['logic-puzzle-save'] = 'corrupt{{{';
+    storage['wavelength-save'] = 'corrupt{{{';
     expect(loadFromStorage()).toBeNull();
   });
 

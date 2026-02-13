@@ -3,7 +3,7 @@ import type { GameStore } from './index.ts';
 import type { SerializedCustomPuzzle } from './slices/custom-puzzle-slice.ts';
 
 /** LocalStorage key for custom puzzles */
-const CUSTOM_PUZZLES_KEY = 'logic-puzzle-custom-puzzles';
+const CUSTOM_PUZZLES_KEY = 'wavelength-custom-puzzles';
 
 /** Save custom puzzles to localStorage */
 export function saveCustomPuzzles(puzzles: SerializedCustomPuzzle[]): void {

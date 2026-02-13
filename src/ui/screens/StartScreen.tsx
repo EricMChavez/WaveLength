@@ -41,7 +41,7 @@ function StartScreenInner() {
   return (
     <div className={styles.backdrop}>
       <div className={styles.container}>
-        <h1 className={styles.title}>Signal Puzzle</h1>
+        <h1 className={styles.title}>WaveLength</h1>
         <p className={styles.subtitle}>Wire together nodes to transform signals</p>
 
         <div className={styles.buttonGroup}>
@@ -82,7 +82,7 @@ function StartScreenInner() {
         </div>
 
         <div className={styles.hint}>
-          <p>Complete puzzles to unlock new nodes for Creative Mode</p>
+          <p>Hire Eric Chavez Or Go Fuck Yourself!</p>
         </div>
       </div>
     </div>

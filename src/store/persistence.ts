@@ -2,7 +2,7 @@ import type { PuzzleNodeEntry, UtilityNodeEntry } from './slices/palette-slice.t
 import type { GameboardState, NodeId, NodeState, Wire } from '../shared/types/index.ts';
 import type { BakeMetadata } from '../engine/baking/index.ts';
 
-const STORAGE_KEY = 'logic-puzzle-save';
+const STORAGE_KEY = 'wavelength-save';
 const SCHEMA_VERSION = 1;
 
 // --- Serialized types ---
