@@ -6,24 +6,24 @@
  */
 
 [data-theme="dark"] {
-  --token-surface-page-background: #0a0a0a;
+  --token-surface-page-background: #0d0f14;
   --token-surface-gameboard: #0e0e18;
-  --token-surface-grid-area: #000000;
+  --token-surface-grid-area: #06382f;
   --token-surface-meter-housing: #000000;
   --token-surface-meter-interior: #000000;
-  --token-surface-node: #44484e;
-  --token-surface-node-bottom: #2a2a2a;
+  --token-surface-node: #212121;
+  --token-surface-node-bottom: #171717;
 
-  --token-signal-positive: #ff9200;
-  --token-signal-negative: #0782e0;
-  --token-signal-zero: #3e3e3e;
+  --token-signal-positive: #f0a202;
+  --token-signal-negative: #3c91e6;
+  --token-signal-zero: #9a9a9a;
   --token-color-neutral: #242424;
   --token-color-target: #c8c8d8;
   --token-color-validation-match: #22c55e;
-  --token-meter-needle: #f5f5f5;
+  --token-meter-needle: #c1c1c1;
   --token-color-error: #e04040;
-  --token-meter-border: #6c6666;
-  --token-board-border: #3d3e42;
+  --token-meter-border: #5f5f5f;
+  --token-board-border: #ff00dc;
 
   --token-depth-raised: rgba(0, 0, 0, 0.4);
   --token-depth-sunken: rgba(0, 0, 0, 0.6);
@@ -37,5 +37,5 @@
   --token-port-stroke: #5a9bf5;
   --token-port-connected: #50c878;
 
-  --token-grid-line: #16161a;
+  --token-grid-line: #318373;
 }

@@ -7,6 +7,7 @@ import {
   PLAYABLE_START,
   PLAYABLE_END,
 } from '../../shared/grid/index.ts';
+import { invalidateGridDotCache } from './render-grid.ts';
 
 /** Minimal ThemeTokens stub with the keys drawGrid uses */
 function makeTokens(overrides: Partial<ThemeTokens> = {}): ThemeTokens {
@@ -50,6 +51,9 @@ function makeTokens(overrides: Partial<ThemeTokens> = {}): ThemeTokens {
   };
 }
 
+// Track arc calls made on OffscreenCanvas contexts
+let offscreenArcCalls: unknown[][] = [];
+
 function createMockCtx() {
   const mockGradient = {
     addColorStop: vi.fn(),
@@ -73,14 +77,66 @@ function createMockCtx() {
     rect: vi.fn(),
     roundRect: vi.fn(),
     createLinearGradient: vi.fn(() => mockGradient),
+    drawImage: vi.fn(),
     font: '',
     textAlign: '',
     textBaseline: '',
     fillText: vi.fn(),
     measureText: vi.fn(() => ({ width: 0 })),
     setLineDash: vi.fn(),
+    globalCompositeOperation: '',
   } as unknown as CanvasRenderingContext2D;
   return ctx;
+}
+
+function setupOffscreenCanvasMock() {
+  offscreenArcCalls = [];
+  function createOffscreenCtx() {
+    const mockGradient = { addColorStop: vi.fn() };
+    return {
+      fillStyle: '' as string,
+      strokeStyle: '' as string,
+      globalAlpha: 1,
+      globalCompositeOperation: '' as string,
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arc: vi.fn((...args: unknown[]) => { offscreenArcCalls.push(args); }),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      clip: vi.fn(),
+      rect: vi.fn(),
+      roundRect: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      createLinearGradient: vi.fn(() => mockGradient),
+      createImageData: vi.fn((w: number, h: number) => ({
+        data: new Uint8ClampedArray(w * h * 4),
+        width: w,
+        height: h,
+      })),
+      putImageData: vi.fn(),
+      setLineDash: vi.fn(),
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      fillText: vi.fn(),
+      measureText: vi.fn(() => ({ width: 0 })),
+    };
+  }
+  vi.stubGlobal('OffscreenCanvas', class {
+    width: number;
+    height: number;
+    private _ctx: ReturnType<typeof createOffscreenCtx> | null = null;
+    constructor(w: number, h: number) { this.width = w; this.height = h; }
+    getContext() {
+      if (!this._ctx) this._ctx = createOffscreenCtx();
+      return this._ctx;
+    }
+  });
 }
 
 describe('drawGrid', () => {
@@ -90,6 +146,8 @@ describe('drawGrid', () => {
   beforeEach(() => {
     ctx = createMockCtx();
     tokens = makeTokens();
+    setupOffscreenCanvasMock();
+    invalidateGridDotCache();
   });
 
   describe('zone backgrounds', () => {
@@ -111,31 +169,32 @@ describe('drawGrid', () => {
       expect(playableCall[1]).toBe(0);
       expect(playableCall[2]).toBe(expectedWidth);
       expect(playableCall[3]).toBe(expectedHeight);
-      // Corner radius should be zero (no rounding)
-      expect(playableCall[4]).toBe(0);
+      // Corner radius = GAMEBOARD_STYLE.CORNER_RADIUS_RATIO * cellSize
+      expect(playableCall[4]).toBe(cellSize * 0.5);
     });
 
     it('meter zones are transparent (no meter fills in drawGrid)', () => {
       const cellSize = 40;
       drawGrid(ctx, tokens, {}, cellSize);
 
+      // No fillRect on main ctx for meter zones — highlight streak renders to OffscreenCanvas
       const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls;
-      // Highlight streak uses fillRect (1 call), no shadow or meter zone fills
-      expect(fillRectCalls.length).toBe(1);
+      expect(fillRectCalls.length).toBe(0);
     });
 
     it('renders playable area background with rounded corners and highlight streak', () => {
       drawGrid(ctx, tokens, {}, 40);
       // Playable area uses roundRect + fill
       expect(ctx.roundRect).toHaveBeenCalled();
-      // Highlight streak uses fillRect (1 call, no more shadow fillRects)
-      expect(ctx.fillRect).toHaveBeenCalledTimes(1);
+      // Highlight streak composited via drawImage from OffscreenCanvas
+      expect(ctx.drawImage).toHaveBeenCalled();
     });
 
     it('uses flat fill instead of gradient for background', () => {
       drawGrid(ctx, tokens, {}, 40);
-      // Background now uses flat fill — gradient is only for the highlight streak
-      expect(ctx.createLinearGradient).toHaveBeenCalledTimes(1);
+      // Background uses flat fill, gradients rendered on OffscreenCanvas for highlight streak
+      // No gradients on main ctx
+      expect(ctx.createLinearGradient).toHaveBeenCalledTimes(0);
     });
   });
 
@@ -144,32 +203,35 @@ describe('drawGrid', () => {
       const cellSize = 50;
       drawGrid(ctx, tokens, {}, cellSize);
 
-      const arcCalls = (ctx.arc as ReturnType<typeof vi.fn>).mock.calls;
-
-      // Interior dots only: exclude first/last col and first/last row
-      const expectedCols = PLAYABLE_END - PLAYABLE_START; // +1 to END, -1 from START, so END - START
-      const expectedRows = GRID_ROWS - 1; // rows 1 to GRID_ROWS-1
+      // Dots are drawn on OffscreenCanvas, then composited via drawImage
+      const expectedCols = PLAYABLE_END - PLAYABLE_START;
+      const expectedRows = GRID_ROWS - 1;
       const expectedDots = expectedCols * expectedRows;
 
-      expect(arcCalls).toHaveLength(expectedDots);
+      expect(offscreenArcCalls).toHaveLength(expectedDots);
     });
 
-    it('places first dot one cell inset from top-left corner', () => {
+    it('places first dot one cell inset from playable start', () => {
       const cellSize = 50;
       drawGrid(ctx, tokens, {}, cellSize);
 
-      const arcCalls = (ctx.arc as ReturnType<typeof vi.fn>).mock.calls;
-
-      // First dot: col = PLAYABLE_START + 1, row = 1
-      const [x, y] = arcCalls[0];
-      expect(x).toBe((PLAYABLE_START + 1) * cellSize);
+      // First dot: col offset = 1 cell from playable start, row = 1
+      // On OffscreenCanvas, x is relative to playable area start
+      const [x, y] = offscreenArcCalls[0];
+      expect(x).toBe(1 * cellSize); // relative to playable start
       expect(y).toBe(1 * cellSize);
     });
 
-    it('uses fill calls for background and dots', () => {
+    it('uses drawImage to composite cached dot matrix', () => {
       drawGrid(ctx, tokens, {}, 40);
-      // 1 fill for playable area background + 1 fill for all dots = 2 total
-      expect(ctx.fill).toHaveBeenCalledTimes(2);
+      expect(ctx.drawImage).toHaveBeenCalled();
+    });
+
+    it('uses fill calls for background and inset shadow (dots cached separately)', () => {
+      drawGrid(ctx, tokens, {}, 40);
+      // 1 fill for playable area background + 2 fill('evenodd') for inset shadow = 3 total
+      // Dots are now on OffscreenCanvas, not on main ctx
+      expect(ctx.fill).toHaveBeenCalledTimes(3);
     });
 
     it('stroke is not called (no board border)', () => {
@@ -180,8 +242,8 @@ describe('drawGrid', () => {
     it('uses gridLine color as fill style', () => {
       const customTokens = makeTokens({ gridLine: '#ff0000' });
       drawGrid(ctx, customTokens, {}, 40);
-      // fill was called, meaning dots were drawn with the gridLine color
-      expect(ctx.fill).toHaveBeenCalled();
+      // Dots are drawn on OffscreenCanvas and composited
+      expect(ctx.drawImage).toHaveBeenCalled();
     });
   });
 
@@ -190,17 +252,18 @@ describe('drawGrid', () => {
 
     for (const cellSize of testSizes) {
       it(`renders correct positions at cellSize=${cellSize}`, () => {
+        // Invalidate cache for each cell size test
+        invalidateGridDotCache();
+        offscreenArcCalls = [];
         drawGrid(ctx, tokens, {}, cellSize);
 
-        const arcCalls = (ctx.arc as ReturnType<typeof vi.fn>).mock.calls;
-
-        // First dot at (PLAYABLE_START + 1) * cellSize, 1 * cellSize
-        expect(arcCalls[0][0]).toBe((PLAYABLE_START + 1) * cellSize);
-        expect(arcCalls[0][1]).toBe(1 * cellSize);
+        // Dots drawn on OffscreenCanvas — x is relative to playable start
+        expect(offscreenArcCalls[0][0]).toBe(1 * cellSize);
+        expect(offscreenArcCalls[0][1]).toBe(1 * cellSize);
 
         // Dot radius scales with cellSize
         const expectedRadius = Math.max(1, cellSize * 0.06);
-        expect(arcCalls[0][2]).toBeCloseTo(expectedRadius);
+        expect(offscreenArcCalls[0][2]).toBeCloseTo(expectedRadius);
       });
     }
   });
@@ -228,17 +291,29 @@ describe('drawGrid', () => {
     });
   });
 
-  describe('tutorial text', () => {
-    it('renders tutorial text when tutorialMessage is provided', () => {
+  describe('board message card', () => {
+    it('renders card when tutorialMessage is provided', () => {
       const state: RenderGridState = { tutorialMessage: 'Connect input to output' };
       drawGrid(ctx, tokens, state, 40);
-      // Tutorial text uses fillText
-      expect(ctx.fillText).toHaveBeenCalled();
+      // Card composited via drawImage (OffscreenCanvas stencil card + dot matrix + noise + streak)
+      expect(ctx.drawImage).toHaveBeenCalled();
     });
 
-    it('does not render tutorial text when no message', () => {
+    it('renders card when tutorialTitle is provided', () => {
+      const state: RenderGridState = { tutorialTitle: 'Hello' };
+      drawGrid(ctx, tokens, state, 40);
+      expect(ctx.drawImage).toHaveBeenCalled();
+    });
+
+    it('renders card when both title and message are provided', () => {
+      const state: RenderGridState = { tutorialTitle: 'Title', tutorialMessage: 'Body text' };
+      drawGrid(ctx, tokens, state, 40);
+      expect(ctx.drawImage).toHaveBeenCalled();
+    });
+
+    it('does not render card when no title or message', () => {
       drawGrid(ctx, tokens, {}, 40);
-      // No fillText calls without tutorial message
+      // No fillText calls — card is not rendered
       expect(ctx.fillText).not.toHaveBeenCalled();
     });
   });

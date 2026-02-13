@@ -9,7 +9,7 @@ export const maxNode = defineNode({
     { name: 'A', gridPosition: 0 },
     { name: 'B', gridPosition: 1 },
   ],
-  outputs: [{ name: 'Out', gridPosition: 1 }],
+  outputs: [{ name: 'Out', gridPosition: 0 }],
 
   evaluate: ({ inputs }) => {
     const [a, b] = inputs;

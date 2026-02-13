@@ -31,6 +31,7 @@ function makeCtx() {
     fill: vi.fn(),
     stroke: vi.fn(),
     arc: vi.fn(),
+    closePath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     fillText: vi.fn(),
@@ -153,7 +154,7 @@ describe('renderPlacementGhost', () => {
     const ctx = makeCtx();
     const state = makeState();
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    expect(ctx.fillText).toHaveBeenCalledWith('Memory', expect.any(Number), expect.any(Number));
+    expect(ctx.fillText).toHaveBeenCalledWith('MEMORY', expect.any(Number), expect.any(Number));
   });
 
   it('uses puzzle node title for puzzle type', () => {
@@ -174,7 +175,7 @@ describe('renderPlacementGhost', () => {
       puzzleNodes,
     });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    expect(ctx.fillText).toHaveBeenCalledWith('Half Wave', expect.any(Number), expect.any(Number));
+    expect(ctx.fillText).toHaveBeenCalledWith('HALF WAVE', expect.any(Number), expect.any(Number));
   });
 
   it('uses utility node title for utility type', () => {
@@ -195,6 +196,6 @@ describe('renderPlacementGhost', () => {
       utilityNodes,
     });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    expect(ctx.fillText).toHaveBeenCalledWith('My Filter', expect.any(Number), expect.any(Number));
+    expect(ctx.fillText).toHaveBeenCalledWith('MY FILTER', expect.any(Number), expect.any(Number));
   });
 });

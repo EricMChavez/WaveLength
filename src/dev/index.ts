@@ -9,5 +9,7 @@ export {
   type WireStyleOverrides,
   type GridStyleOverrides,
   type MeterStyleOverrides,
+  type HighlightStyleOverrides,
+  type DepthStyleOverrides,
   type ColorOverrides,
 } from './dev-overrides.ts';

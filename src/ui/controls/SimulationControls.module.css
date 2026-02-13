@@ -81,3 +81,25 @@
   color: #e0e0f0;
   border-color: rgba(255, 255, 255, 0.3);
 }
+
+.messageInput {
+  width: 300px;
+  padding: 6px 10px;
+  background: rgba(30, 30, 46, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #e0e0f0;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.messageInput:focus {
+  border-color: #F5AF28;
+}
+
+.messageInput::placeholder {
+  color: #6a6a8a;
+}

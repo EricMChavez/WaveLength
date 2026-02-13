@@ -8,7 +8,9 @@ import { drawNeedle, type NeedleTip } from './render-needle.ts';
 import { drawTargetOverlay } from './render-target-overlay.ts';
 
 import { getDevOverrides } from '../../dev/index.ts';
+import { HIGHLIGHT_STREAK, CONNECTION_POINT_CONFIG } from '../../shared/constants/index.ts';
 import { drawHighlightStreakRounded } from '../canvas/render-highlight-streak.ts';
+import { signalToColor, signalToGlow } from '../canvas/render-wires.ts';
 
 /** Ratio of border radius to drawn meter height for outside corners */
 const OUTSIDE_CORNER_RADIUS_RATIO = 0.06;
@@ -24,6 +26,8 @@ export interface RenderMeterState {
   matchStatus?: readonly boolean[] | null;
   /** Current playpoint cycle index (0-255) for indicator line and current value */
   playpoint: number;
+  /** Whether this meter's connection point has a wire attached */
+  isConnected: boolean;
 }
 
 /**
@@ -56,6 +60,13 @@ export function drawMeter(
 
   const devOverrides = getDevOverrides();
 
+  // Drop shadow (meters are top depth level — stronger shadow than nodes)
+  const shadowBlurRatio = devOverrides.enabled ? devOverrides.meterStyle.shadowBlurRatio : 0.075;
+  const shadowOffsetRatio = devOverrides.enabled ? devOverrides.meterStyle.shadowOffsetRatio : 0.015;
+  if (shadowBlurRatio > 0) {
+    drawMeterShadow(ctx, waveformRect, levelBarRect, slot.side, rect.height, shadowBlurRatio, shadowOffsetRatio);
+  }
+
   // Opaque backing behind the meter (matches border bounds exactly)
   // Needed because canvas is transparent — without this, meter content is invisible
   const housingColor = devOverrides.enabled
@@ -69,12 +80,17 @@ export function drawMeter(
     : tokens.meterInterior;
   drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout, slot.side);
 
+  // Pre-compute streak params (used after both dimmed and active paths)
+  const meterHard = devOverrides.enabled ? devOverrides.highlightStyle.meterHard : 0.05;
+  const meterSoft = devOverrides.enabled ? devOverrides.highlightStyle.meterSoft : 0.03;
+
   if (slot.visualState === 'dimmed') {
-    // Dimmed: draw a semi-transparent overlay and return
+    // Dimmed: draw a semi-transparent overlay, then streak on top
     ctx.fillStyle = tokens.depthSunken;
     ctx.globalAlpha = 0.5;
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     ctx.globalAlpha = 1.0;
+    drawMeterStreak(ctx, waveformRect, levelBarRect, slot.side, meterHard, meterSoft);
     return;
   }
 
@@ -110,8 +126,7 @@ export function drawMeter(
     drawWaveformChannel(ctx, tokens, signalValues, waveformRect, playpoint);
   }
 
-  drawLevelBar(ctx, tokens, currentValue, levelBarRect, cutout);
-  const needleTip = drawNeedle(ctx, tokens, currentValue, needleRect, slot.side);
+  drawLevelBar(ctx, tokens, currentValue, levelBarRect, cutout, slot.side);
 
   // Target overlay for output meters
   if (targetValues && slot.direction === 'output') {
@@ -119,7 +134,6 @@ export function drawMeter(
   }
 
   // Playpoint indicator line (vertical line at current cycle position)
-  // and connector line from needle tip to playpoint indicator
   if (signalValues && signalValues.length > 0) {
     const wfCenterY = rect.y + rect.height / 2;
     const halfHeight = (waveformRect.height * VERTICAL_HEIGHT_RATIO) / 2;
@@ -133,15 +147,65 @@ export function drawMeter(
     ctx.lineTo(indicatorX, wfCenterY + halfHeight);
     ctx.stroke();
     ctx.restore();
-
-    // Faint horizontal connector from needle tip to playpoint indicator
-    drawNeedleConnector(ctx, needleTip, indicatorX, slot.side);
   }
 
   ctx.restore();
 
-  // Draw meter border (3 sides, not facing gameboard) - uses same constrained height as interior
+  // Draw meter border - uses same constrained height as interior
   drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, slot.side);
+
+  // Needle and connector drawn after border so they render on top.
+  // Input meters (providing signal) always show needle.
+  // Output meters (recording signal) only show needle when connected.
+  const showNeedle = slot.direction === 'input' || state.isConnected;
+  if (showNeedle) {
+    const needleTip = drawNeedle(ctx, tokens, currentValue, needleRect, slot.side);
+    if (signalValues && signalValues.length > 0) {
+      const indicatorX = waveformRect.x + (playpoint / METER_BUFFER_CAPACITY) * waveformRect.width;
+      drawNeedleConnector(ctx, needleTip, indicatorX, slot.side);
+    }
+  }
+
+  // Light edge (warm highlight along outer top edge)
+  const meterLightEdgeOpacity = devOverrides.enabled ? devOverrides.meterStyle.lightEdgeOpacity : 0.3;
+  if (meterLightEdgeOpacity > 0) {
+    drawMeterLightEdge(ctx, waveformRect, levelBarRect, slot.side, meterLightEdgeOpacity);
+  }
+
+  // Highlight streak on top of everything
+  drawMeterStreak(ctx, waveformRect, levelBarRect, slot.side, meterHard, meterSoft);
+
+  // Draw a filled port circle at the connection point for recording (output) meters
+  // Drawn last so it renders on top of the meter housing, streak, and needle
+  if (slot.direction === 'output' && state.isConnected) {
+    const eyeX = slot.side === 'left'
+      ? needleRect.x + needleRect.width
+      : needleRect.x;
+    const eyeY = needleRect.y + needleRect.height / 2;
+    drawConnectionDot(ctx, tokens, eyeX, eyeY, currentValue);
+  }
+}
+
+/** Draw highlight streak on top of meter (uses housing bounds). */
+function drawMeterStreak(
+  ctx: CanvasRenderingContext2D,
+  waveformRect: PixelRect,
+  levelBarRect: PixelRect,
+  side: 'left' | 'right',
+  hardOpacity: number,
+  softOpacity: number,
+): void {
+  const left = Math.min(waveformRect.x, levelBarRect.x);
+  const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
+  const width = right - left;
+  const centerY = waveformRect.y + waveformRect.height / 2;
+  const halfH = (waveformRect.height * VERTICAL_HEIGHT_RATIO) / 2;
+  const top = centerY - halfH;
+  const height = halfH * 2;
+  const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
+  const devOverrides = getDevOverrides();
+  const fadeRatio = devOverrides.enabled ? devOverrides.highlightStyle.verticalFadeRatio : HIGHLIGHT_STREAK.VERTICAL_FADE_RATIO;
+  drawHighlightStreakRounded(ctx, { x: left, y: top, width, height }, [r, r, r, r], hardOpacity, softOpacity, fadeRatio);
 }
 
 /**
@@ -175,27 +239,7 @@ function drawMeterBorder(
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
-
-  if (side === 'left') {
-    // Draw top, left, bottom (skip right edge facing gameboard)
-    // Outside corners: top-left, bottom-left
-    ctx.moveTo(left + width, top);
-    ctx.lineTo(left + r, top);
-    ctx.arcTo(left, top, left, top + r, r);
-    ctx.lineTo(left, top + height - r);
-    ctx.arcTo(left, top + height, left + r, top + height, r);
-    ctx.lineTo(left + width, top + height);
-  } else {
-    // Draw top, right, bottom (skip left edge facing gameboard)
-    // Outside corners: top-right, bottom-right
-    ctx.moveTo(left, top);
-    ctx.lineTo(left + width - r, top);
-    ctx.arcTo(left + width, top, left + width, top + r, r);
-    ctx.lineTo(left + width, top + height - r);
-    ctx.arcTo(left + width, top + height, left + width - r, top + height, r);
-    ctx.lineTo(left, top + height);
-  }
-
+  ctx.roundRect(left, top, width, height, [r, r, r, r]);
   ctx.stroke();
 }
 
@@ -327,12 +371,11 @@ function drawMeterInterior(
   ctx.arc(cutout.centerX, cutout.centerY, cutout.radius, 0, Math.PI * 2, true);
   ctx.clip('evenodd');
 
-  // Fill the interior with rounded outside corners
+  // Fill the interior with rounded corners on all sides
   const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
-  const radii: [number, number, number, number] = side === 'left' ? [r, 0, 0, r] : [0, r, r, 0];
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(left, top, width, height, radii);
+  ctx.roundRect(left, top, width, height, [r, r, r, r]);
   ctx.fill();
 
   ctx.restore();
@@ -358,16 +401,124 @@ function drawMeterHousing(
   const height = halfHeight * 2;
 
   const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
-  // [topLeft, topRight, bottomRight, bottomLeft]
-  const radii: [number, number, number, number] = side === 'left' ? [r, 0, 0, r] : [0, r, r, 0];
 
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(left, top, width, height, radii);
+  ctx.roundRect(left, top, width, height, [r, r, r, r]);
   ctx.fill();
 
-  // Highlight streak on meter housing
-  drawHighlightStreakRounded(ctx, { x: left, y: top, width, height }, radii, 0.03);
+}
+
+/**
+ * Draw a drop shadow behind the meter housing.
+ * Uses the housing shape with shadowBlur/shadowOffsetY.
+ * Ratios are relative to rect.height so we don't need a cellSize param.
+ */
+function drawMeterShadow(
+  ctx: CanvasRenderingContext2D,
+  waveformRect: PixelRect,
+  levelBarRect: PixelRect,
+  _side: 'left' | 'right',
+  meterHeight: number,
+  blurRatio: number,
+  offsetRatio: number,
+): void {
+  const left = Math.min(waveformRect.x, levelBarRect.x);
+  const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
+  const width = right - left;
+  const centerY = waveformRect.y + waveformRect.height / 2;
+  const halfHeight = (waveformRect.height * VERTICAL_HEIGHT_RATIO) / 2;
+  const top = centerY - halfHeight;
+  const height = halfHeight * 2;
+  const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = meterHeight * blurRatio;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = meterHeight * offsetRatio;
+  ctx.fillStyle = 'rgba(0,0,0,0)'; // Transparent fill — only the shadow draws
+  ctx.beginPath();
+  ctx.roundRect(left, top, width, height, [r, r, r, r]);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draw a warm light-edge highlight along the outer top edge of the meter.
+ */
+function drawMeterLightEdge(
+  ctx: CanvasRenderingContext2D,
+  waveformRect: PixelRect,
+  levelBarRect: PixelRect,
+  _side: 'left' | 'right',
+  opacity: number,
+): void {
+  const left = Math.min(waveformRect.x, levelBarRect.x);
+  const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
+  const width = right - left;
+  const centerY = waveformRect.y + waveformRect.height / 2;
+  const halfH = (waveformRect.height * VERTICAL_HEIGHT_RATIO) / 2;
+  const top = centerY - halfH;
+  const height = halfH * 2;
+  const r = Math.round(height * OUTSIDE_CORNER_RADIUS_RATIO);
+
+  const warmTint = HIGHLIGHT_STREAK.WARM_TINT;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(left, top, width, height, [r, r, r, r]);
+  ctx.clip();
+  ctx.strokeStyle = `rgba(${warmTint.r},${warmTint.g},${warmTint.b},${opacity})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(left + r, top + 0.5);
+  ctx.lineTo(left + width - r, top + 0.5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw a filled circle at the meter's connection point (needle eye position).
+ * Matches the style of port circles on nodes — polarity-colored with optional glow.
+ */
+function drawConnectionDot(
+  ctx: CanvasRenderingContext2D,
+  tokens: ThemeTokens,
+  x: number,
+  y: number,
+  signalValue: number,
+): void {
+  const radius = CONNECTION_POINT_CONFIG.RADIUS;
+  const color = signalToColor(signalValue, tokens);
+  const glow = signalToGlow(signalValue);
+
+  // Glow ring for strong signals
+  if (glow > 0) {
+    const glowAlpha = Math.abs(signalValue) >= 100 ? 1 : (Math.abs(signalValue) - 75) / 25;
+    ctx.save();
+    ctx.globalAlpha = glowAlpha;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Filled circle with polarity color
+  ctx.save();
+  ctx.globalAlpha = 1.0;
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = tokens.depthRaised;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**

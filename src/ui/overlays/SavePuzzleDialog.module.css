@@ -253,6 +253,12 @@
   font-size: 13px;
 }
 
+.hint {
+  font-size: 11px;
+  color: #6a6a8a;
+  margin-top: 2px;
+}
+
 .startingSummary {
   font-size: 13px;
   color: #9090b0;

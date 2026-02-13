@@ -3,11 +3,11 @@ import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { RenderNodesState } from './render-types.ts';
 import type { PixelRect } from '../../shared/grid/types.ts';
 import { NODE_STYLE, NODE_TYPE_LABELS, HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
+import { CARD_BODY_FONT } from '../../shared/fonts/font-ready.ts';
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
-import { getNodePortPosition, getNodeBodyPixelRect } from './port-positions.ts';
+import { getNodePortPosition, getNodeBodyPixelRect, getPortPhysicalSide } from './port-positions.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
-import { gridToPixel, getNodeGridSize } from '../../shared/grid/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { drawKnob } from './render-knob.ts';
 import { signalToColor, signalToGlow } from './render-wires.ts';
@@ -81,6 +81,22 @@ function getParamDisplay(node: NodeState): string {
 }
 
 // ---------------------------------------------------------------------------
+// Socket / plug helpers
+// ---------------------------------------------------------------------------
+
+type PortShape = { type: 'plug' } | { type: 'socket'; openingDirection: 'left' | 'right' | 'top' | 'bottom' };
+
+/** Map a physical side direction to the angle (in radians) for the C-shape gap center. */
+function directionToAngle(dir: 'left' | 'right' | 'top' | 'bottom'): number {
+  switch (dir) {
+    case 'right': return 0;
+    case 'bottom': return Math.PI / 2;
+    case 'left': return Math.PI;
+    case 'top': return -Math.PI / 2;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Draw functions
 // ---------------------------------------------------------------------------
 
@@ -95,7 +111,7 @@ export function drawNodes(
   for (const node of state.nodes.values()) {
     if (isConnectionPointNode(node.id)) continue;
     drawNodeBody(ctx, tokens, state, node, cellSize);
-    drawNodePorts(ctx, tokens, node, cellSize, state.portSignals);
+    drawNodePorts(ctx, tokens, node, cellSize, state.portSignals, state.connectedInputPorts);
   }
 
   // Second pass: draw selection highlight on top of all nodes
@@ -198,7 +214,7 @@ function drawNodeBody(
     ctx.restore();
   }
 
-  // --- Label (rotated with node) ---
+  // --- Label (rotated with node, aligned with output port 0) ---
   const labelFontSize = Math.round(NODE_STYLE.LABEL_FONT_RATIO * cellSize);
 
   let label = NODE_TYPE_LABELS[node.type] ?? node.type;
@@ -213,6 +229,7 @@ function drawNodeBody(
     const entry = state.utilityNodes.get(utilityId);
     if (entry) label = entry.title;
   }
+  label = label.toUpperCase();
 
   const paramText = getParamDisplay(node);
   const rotation = node.rotation ?? 0;
@@ -227,14 +244,18 @@ function drawNodeBody(
   ctx.rotate(rotationRad);
 
   ctx.fillStyle = tokens.textPrimary;
-  ctx.font = `${labelFontSize}px ${NODE_STYLE.LABEL_FONT_FAMILY}`;
+  ctx.font = `bold ${labelFontSize}px ${CARD_BODY_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.letterSpacing = `${Math.round(cellSize * NODE_STYLE.LABEL_LETTER_SPACING_RATIO)}px`;
 
-  // Offset label up if there's a param sublabel or knob (relative to rotated center)
-  const hasKnob = !!getKnobConfig(getNodeDefinition(node.type));
-  const labelOffsetY = hasKnob ? -cellSize * 0.7 : paramText ? -labelFontSize * 0.4 : 0;
+  // Align label vertically with the top port position (row 0 of node grid),
+  // even if no port actually exists there.
+  const topPortY = node.position.row * cellSize;
+  const labelOffsetY = topPortY - centerY;
   ctx.fillText(label, 0, labelOffsetY);
+
+  ctx.letterSpacing = '0px';
 
   // --- Parameter sublabel ---
   if (paramText) {
@@ -250,7 +271,7 @@ function drawNodeBody(
   if (state.knobValues.has(node.id)) {
     const knobInfo = state.knobValues.get(node.id);
     if (knobInfo) {
-      const knobRadius = 0.55 * cellSize;
+      const knobRadius = 1 * cellSize;
       // Place knob below the label
       const knobY = centerY + labelFontSize * 0.5;
       const isRejected = state.rejectedKnobNodeId === node.id;
@@ -293,6 +314,7 @@ function drawNodePorts(
   node: NodeState,
   cellSize: number,
   portSignals: ReadonlyMap<string, number>,
+  connectedInputPorts: ReadonlySet<string>,
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
@@ -302,13 +324,24 @@ function drawNodePorts(
   for (let i = 0; i < node.inputCount; i++) {
     const pos = getNodePortPosition(node, 'input', i, cellSize);
     const signalValue = portSignals.get(`${node.id}:input:${i}`) ?? 0;
-    drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue);
+
+    // Unconnected input ports show as sockets; connected inputs show as plugs
+    const isConnected = connectedInputPorts.has(`${node.id}:${i}`);
+    let shape: PortShape;
+    if (!isConnected) {
+      const physicalSide = getPortPhysicalSide(node, 'input', i);
+      shape = { type: 'socket', openingDirection: physicalSide };
+    } else {
+      shape = { type: 'plug' };
+    }
+
+    drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, shape);
   }
 
   for (let i = 0; i < node.outputCount; i++) {
     const pos = getNodePortPosition(node, 'output', i, cellSize);
     const signalValue = portSignals.get(`${node.id}:output:${i}`) ?? 0;
-    drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue);
+    drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, { type: 'plug' });
   }
 }
 
@@ -319,6 +352,7 @@ function drawPort(
   y: number,
   radius: number,
   signalValue: number,
+  shape: PortShape = { type: 'plug' },
 ): void {
   const color = signalToColor(signalValue, tokens);
   const glow = signalToGlow(signalValue);
@@ -336,13 +370,31 @@ function drawPort(
     ctx.restore();
   }
 
-  ctx.fillStyle = color;
-  ctx.strokeStyle = tokens.depthRaised;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  if (shape.type === 'socket') {
+    // Half-circle divot cut into the node body — dark recessed socket
+    const gapCenter = directionToAngle(shape.openingDirection);
+    const startAngle = gapCenter + Math.PI / 2;
+    const endAngle = gapCenter - Math.PI / 2;
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius, startAngle, endAngle, false);
+    ctx.closePath();
+    ctx.fillStyle = tokens.depthSunken;
+    ctx.fill();
+
+    ctx.strokeStyle = tokens.depthRaised;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  } else {
+    // Standard filled circle (plug)
+    ctx.fillStyle = color;
+    ctx.strokeStyle = tokens.depthRaised;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 }
 
 /** Draw a single node (body + ports) without selection highlight. Used by ghost preview. */
@@ -354,7 +406,7 @@ export function drawSingleNode(
   cellSize: number,
 ): void {
   drawNodeBody(ctx, tokens, state, node, cellSize);
-  drawNodePorts(ctx, tokens, node, cellSize, state.portSignals);
+  drawNodePorts(ctx, tokens, node, cellSize, state.portSignals, state.connectedInputPorts);
 }
 
 function drawSelectionHighlight(

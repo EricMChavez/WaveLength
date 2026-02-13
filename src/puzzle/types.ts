@@ -146,4 +146,6 @@ export interface PuzzleDefinition {
   initialWires?: InitialWireDef[];
   /** Optional tutorial message rendered on the gameboard surface (under dots and streak) */
   tutorialMessage?: string;
+  /** Optional card title (rendered in Bungee font above tutorialMessage) */
+  tutorialTitle?: string;
 }

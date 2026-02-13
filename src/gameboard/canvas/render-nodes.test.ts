@@ -3,7 +3,7 @@ import { drawNodes, getNodePixelRect } from './render-nodes.ts';
 import type { ThemeTokens } from '../../shared/tokens/index.ts';
 import type { RenderNodesState } from './render-types.ts';
 import type { NodeState } from '../../shared/types/index.ts';
-import { NODE_STYLE } from '../../shared/constants/index.ts'; // for font family assertions
+// NODE_STYLE no longer needed — label uses CARD_TITLE_FONT (Bungee)
 import {
   FUNDAMENTAL_GRID_COLS,
   FUNDAMENTAL_GRID_ROWS,
@@ -61,6 +61,8 @@ function makeState(overrides: Partial<RenderNodesState> = {}): RenderNodesState 
     hoveredNodeId: null,
     knobValues: new Map(),
     portSignals: new Map(),
+    rejectedKnobNodeId: null,
+    connectedInputPorts: new Set(),
     ...overrides,
   };
 }
@@ -103,6 +105,7 @@ function createMockCtx() {
       fontHistory.push(ctx.font as string);
     }),
     arc: vi.fn(),
+    closePath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     save: vi.fn(() => {
@@ -179,9 +182,9 @@ describe('drawNodes', () => {
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
 
-    // roundRect called for body fill + body stroke + highlight streak clip for each of 2 real nodes = 6 calls
+    // roundRect called for body fill + body stroke + highlight streak clip + light edge clip for each of 2 real nodes = 8 calls
     const roundRectCalls = (mock.ctx.roundRect as ReturnType<typeof vi.fn>).mock.calls;
-    expect(roundRectCalls.length).toBe(6);
+    expect(roundRectCalls.length).toBe(8);
   });
 
   it('creates linear gradient using surfaceNode and surfaceNodeBottom stops', () => {
@@ -239,14 +242,14 @@ describe('drawNodes', () => {
     expect(mock.ctx.restore).toHaveBeenCalled();
   });
 
-  it('label font family matches NODE_STYLE.LABEL_FONT_FAMILY', () => {
+  it('label font family uses bold Space Grotesk (CARD_BODY_FONT)', () => {
     const nodes = new Map<string, NodeState>();
     nodes.set('n1', makeNode('n1', 'memory', 5, 3));
 
     const state = makeState({ nodes });
     drawNodes(mock.ctx, tokens, state, 40);
 
-    expect(mock.fontHistory.some(f => f.includes(NODE_STYLE.LABEL_FONT_FAMILY))).toBe(true);
+    expect(mock.fontHistory.some(f => f.includes('bold') && f.includes('Space Grotesk'))).toBe(true);
   });
 
   it('selection highlight draws on second pass (after all nodes)', () => {
@@ -265,11 +268,11 @@ describe('drawNodes', () => {
 
     drawNodes(mock.ctx, tokens, state, 40);
 
-    // 2 nodes * 3 roundRect (fill + stroke + highlight streak clip) = 6 calls for bodies
-    // Plus 1 roundRect for selection highlight = 7 total
-    expect(origRoundRect.mock.calls.length).toBe(7);
+    // 2 nodes * 4 roundRect (fill + stroke + highlight streak clip + light edge clip) = 8 calls for bodies
+    // Plus 1 roundRect for selection highlight = 9 total
+    expect(origRoundRect.mock.calls.length).toBe(9);
     // Selection highlight is the last roundRect call
-    const lastCall = origRoundRect.mock.calls[6];
+    const lastCall = origRoundRect.mock.calls[8];
     // It should have padded dimensions (wider than body)
     // Body width is FUNDAMENTAL_GRID_COLS * 40 = 120
     const bodyWidth = FUNDAMENTAL_GRID_COLS * 40;

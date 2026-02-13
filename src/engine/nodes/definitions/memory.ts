@@ -30,5 +30,5 @@ export const memoryNode = defineNode({
     return [output];
   },
 
-  size: { width: 3, height: 2 },
+  size: { width: 3, height: 1 },
 });

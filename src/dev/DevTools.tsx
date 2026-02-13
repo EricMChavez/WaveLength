@@ -9,6 +9,8 @@ import {
   setWireStyleOverrides,
   setGridStyleOverrides,
   setMeterStyleOverrides,
+  setHighlightStyleOverrides,
+  setDepthStyleOverrides,
   setColorOverrides,
   resetDevOverrides,
 } from './dev-overrides.ts';
@@ -30,11 +32,12 @@ export function DevTools() {
     window.dispatchEvent(new Event('dev-overrides-changed'));
   }, [enabled]);
 
-  // ── Page background (GameboardCanvas.tsx) ──────────────────────────────────
+  // ── Page background (GameboardCanvas.tsx) & gameboard background (render-grid.ts) ──
   const pageColorValues = useControls(
     'Page Colors',
     {
-      pageBackground: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackground, label: 'BG Color' },
+      pageBackground: { value: DEFAULT_DEV_OVERRIDES.colors.pageBackground, label: 'Page BG' },
+      gameboardBackground: { value: DEFAULT_DEV_OVERRIDES.colors.gameboardBackground, label: 'Board BG' },
     },
     { collapsed: true }
   );
@@ -107,6 +110,7 @@ export function DevTools() {
       hoverBrightness: { value: DEFAULT_DEV_OVERRIDES.nodeStyle.hoverBrightness, min: 0, max: 0.5, step: 0.01, label: 'Hover Brightness' },
       borderWidth: { value: DEFAULT_DEV_OVERRIDES.nodeStyle.borderWidth, min: 0, max: 5, step: 0.1, label: 'Border Width' },
       portRadius: { value: DEFAULT_DEV_OVERRIDES.nodeStyle.portRadius, min: 0.05, max: 0.25, step: 0.01, label: 'Port Radius' },
+      lightEdgeOpacity: { value: DEFAULT_DEV_OVERRIDES.nodeStyle.lightEdgeOpacity, min: 0, max: 0.3, step: 0.01, label: 'Light Edge' },
     },
     { collapsed: true }
   );
@@ -138,6 +142,8 @@ export function DevTools() {
     {
       lineOpacity: { value: DEFAULT_DEV_OVERRIDES.gridStyle.lineOpacity, min: 0, max: 1, step: 0.05, label: 'Dot Opacity' },
       showGridLabels: { value: DEFAULT_DEV_OVERRIDES.gridStyle.showGridLabels, label: 'Grid Labels' },
+      noiseOpacity: { value: DEFAULT_DEV_OVERRIDES.gridStyle.noiseOpacity, min: 0, max: 0.1, step: 0.005, label: 'Noise Opacity' },
+      noiseTileSize: { value: DEFAULT_DEV_OVERRIDES.gridStyle.noiseTileSize, min: 1, max: 4, step: 1, label: 'Noise Tile Size' },
     },
     { collapsed: true }
   );
@@ -146,11 +152,16 @@ export function DevTools() {
     if (enabled) setGridStyleOverrides(gridValues);
   }, [enabled, gridValues]);
 
-  // ── Meter style (render-needle.ts) ────────────────────────────────────────
+  // ── Meter style (render-meter.ts, render-needle.ts, render-knob.ts) ───────
   const meterValues = useControls(
     'Meter Style',
     {
       needleGlow: { value: DEFAULT_DEV_OVERRIDES.meterStyle.needleGlow, min: 0, max: 20, step: 1, label: 'Needle Glow' },
+      shadowBlurRatio: { value: DEFAULT_DEV_OVERRIDES.meterStyle.shadowBlurRatio, min: 0, max: 0.1, step: 0.005, label: 'Shadow Blur' },
+      shadowOffsetRatio: { value: DEFAULT_DEV_OVERRIDES.meterStyle.shadowOffsetRatio, min: 0, max: 0.05, step: 0.005, label: 'Shadow Offset' },
+      lightEdgeOpacity: { value: DEFAULT_DEV_OVERRIDES.meterStyle.lightEdgeOpacity, min: 0, max: 0.3, step: 0.01, label: 'Light Edge' },
+      knobShadowBlur: { value: DEFAULT_DEV_OVERRIDES.meterStyle.knobShadowBlur, min: 0, max: 0.5, step: 0.01, label: 'Knob Shadow' },
+      knobHighlightOpacity: { value: DEFAULT_DEV_OVERRIDES.meterStyle.knobHighlightOpacity, min: 0, max: 0.3, step: 0.01, label: 'Knob Highlight' },
     },
     { collapsed: true }
   );
@@ -158,6 +169,51 @@ export function DevTools() {
   useEffect(() => {
     if (enabled) setMeterStyleOverrides(meterValues);
   }, [enabled, meterValues]);
+
+  // ── Highlight streak (render-highlight-streak.ts, render-grid.ts, render-nodes.ts, render-meter.ts) ──
+  const highlightValues = useControls(
+    'Highlight Streak',
+    {
+      angle: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.angle, min: 0, max: 360, step: 1, label: 'Angle' },
+      hardBandWidth: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.hardBandWidth, min: 0.01, max: 0.3, step: 0.01, label: 'Hard Width' },
+      softBandWidth: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.softBandWidth, min: 0.05, max: 1.6, step: 0.05, label: 'Soft Width' },
+      useBlendModes: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.useBlendModes, label: 'Blend Modes' },
+      warmTint: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.warmTint, label: 'Warm Tint' },
+      pageHard: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.pageHard, min: 0, max: 0.2, step: 0.005, label: 'Page Hard' },
+      pageSoft: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.pageSoft, min: 0, max: 0.2, step: 0.005, label: 'Page Soft' },
+      gameboardHard: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.gameboardHard, min: 0, max: 0.2, step: 0.005, label: 'Board Hard' },
+      gameboardSoft: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.gameboardSoft, min: 0, max: 0.2, step: 0.005, label: 'Board Soft' },
+      nodeHard: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.nodeHard, min: 0, max: 0.2, step: 0.005, label: 'Node Hard' },
+      nodeSoft: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.nodeSoft, min: 0, max: 0.2, step: 0.005, label: 'Node Soft' },
+      meterHard: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.meterHard, min: 0, max: 0.2, step: 0.005, label: 'Meter Hard' },
+      meterSoft: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.meterSoft, min: 0, max: 0.2, step: 0.005, label: 'Meter Soft' },
+      verticalFadeRatio: { value: DEFAULT_DEV_OVERRIDES.highlightStyle.verticalFadeRatio, min: 0, max: 0.5, step: 0.01, label: 'Vertical Fade' },
+    },
+    { collapsed: true }
+  );
+
+  useEffect(() => {
+    if (enabled) setHighlightStyleOverrides(highlightValues);
+  }, [enabled, highlightValues]);
+
+  // ── Depth (render-grid.ts inset shadow) ───────────────────────────────────
+  const depthValues = useControls(
+    'Depth',
+    {
+      gameboardInsetEnabled: { value: DEFAULT_DEV_OVERRIDES.depthStyle.gameboardInsetEnabled, label: 'Inset Shadow' },
+      darkBlur: { value: DEFAULT_DEV_OVERRIDES.depthStyle.darkBlur, min: 0, max: 30, step: 1, label: 'Dark Blur' },
+      darkOffset: { value: DEFAULT_DEV_OVERRIDES.depthStyle.darkOffset, min: 0, max: 15, step: 1, label: 'Dark Offset' },
+      darkColor: { value: DEFAULT_DEV_OVERRIDES.depthStyle.darkColor, label: 'Dark Color' },
+      lightBlur: { value: DEFAULT_DEV_OVERRIDES.depthStyle.lightBlur, min: 0, max: 20, step: 1, label: 'Light Blur' },
+      lightOffset: { value: DEFAULT_DEV_OVERRIDES.depthStyle.lightOffset, min: 0, max: 10, step: 1, label: 'Light Offset' },
+      lightOpacity: { value: DEFAULT_DEV_OVERRIDES.depthStyle.lightOpacity, min: 0, max: 0.1, step: 0.005, label: 'Light Opacity' },
+    },
+    { collapsed: true }
+  );
+
+  useEffect(() => {
+    if (enabled) setDepthStyleOverrides(depthValues);
+  }, [enabled, depthValues]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   useControls('Actions', {
@@ -176,6 +232,8 @@ export function DevTools() {
         wireStyle: current.wireStyle,
         gridStyle: current.gridStyle,
         meterStyle: current.meterStyle,
+        highlightStyle: current.highlightStyle,
+        depthStyle: current.depthStyle,
       };
       navigator.clipboard.writeText(JSON.stringify(settings, null, 2))
         .then(() => console.log('[DevTools] Settings exported to clipboard'))
@@ -189,5 +247,5 @@ export function DevTools() {
     }),
   });
 
-  return <Leva collapsed={true} titleBar={{ title: 'Visual Dev Tools' }} />;
+  return <Leva hidden />;
 }

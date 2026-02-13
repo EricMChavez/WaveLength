@@ -71,7 +71,7 @@ export function drawNeedle(
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
   const needleColor = useOverrides ? devOverrides.colors.meterNeedle : tokens.meterNeedle;
-  const needleGlow = useOverrides ? devOverrides.meterStyle.needleGlow : 10;
+  const needleGlow = useOverrides ? devOverrides.meterStyle.needleGlow : 0;
 
   ctx.save();
 

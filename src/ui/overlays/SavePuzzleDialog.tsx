@@ -24,6 +24,10 @@ function SavePuzzleDialogInner() {
   const activeBoard = useGameStore((s) => s.activeBoard);
   const addCustomPuzzle = useGameStore((s) => s.addCustomPuzzle);
   const cycleResults = useGameStore((s) => s.cycleResults);
+  const tutorialTitleDraft = useGameStore((s) => s.tutorialTitleDraft);
+  const setTutorialTitleDraft = useGameStore((s) => s.setTutorialTitleDraft);
+  const tutorialMessageDraft = useGameStore((s) => s.tutorialMessageDraft);
+  const setTutorialMessageDraft = useGameStore((s) => s.setTutorialMessageDraft);
 
   // Build list of all fundamental node types (including "Custom" for user-created nodes)
   const allNodeTypes = useMemo(() => {
@@ -193,6 +197,8 @@ function SavePuzzleDialogInner() {
       initialNodes,
       initialWires,
       allowedNodes: computedAllowed,
+      tutorialMessage: tutorialMessageDraft.trim() || undefined,
+      tutorialTitle: tutorialTitleDraft.trim() || undefined,
     };
 
     addCustomPuzzle(puzzle);
@@ -211,6 +217,8 @@ function SavePuzzleDialogInner() {
     quantities,
     allNodeTypes,
     budgetErrors,
+    tutorialTitleDraft,
+    tutorialMessageDraft,
   ]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -267,6 +275,37 @@ function SavePuzzleDialogInner() {
               rows={3}
               maxLength={200}
             />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="puzzle-card-title">
+              Card Title (optional)
+            </label>
+            <input
+              id="puzzle-card-title"
+              type="text"
+              className={styles.input}
+              value={tutorialTitleDraft}
+              onChange={(e) => setTutorialTitleDraft(e.target.value)}
+              placeholder="Big headline on the card"
+              maxLength={40}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="puzzle-tutorial-message">
+              Card Body (optional)
+            </label>
+            <textarea
+              id="puzzle-tutorial-message"
+              className={styles.textarea}
+              value={tutorialMessageDraft}
+              onChange={(e) => setTutorialMessageDraft(e.target.value)}
+              placeholder="Instructions or hint text..."
+              rows={2}
+              maxLength={200}
+            />
+            <span className={styles.hint}>White card with cutout text, rendered on the gameboard</span>
           </div>
 
           {error && <div className={styles.error}>{error}</div>}

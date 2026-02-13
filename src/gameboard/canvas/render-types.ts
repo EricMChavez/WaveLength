@@ -30,6 +30,8 @@ export interface RenderNodesState {
   portSignals: ReadonlyMap<string, number>;
   /** Node ID whose knob is showing a rejected-click flash (wired knob was clicked) */
   rejectedKnobNodeId: string | null;
+  /** Set of connected input port keys: `${nodeId}:${portIndex}` */
+  connectedInputPorts: ReadonlySet<string>;
 }
 
 /** State needed by renderConnectionPoints */
@@ -40,12 +42,16 @@ export interface RenderConnectionPointsState {
   editingUtilityId?: string | null;
   /** Latest signal value per CP, keyed by `${direction}:${cpIndex}` (e.g. "input:0", "output:1"). */
   cpSignals: ReadonlyMap<string, number>;
+  /** Set of connected output CP keys: `output:${cpIndex}` */
+  connectedOutputCPs: ReadonlySet<string>;
 }
 
 /** State needed by drawGrid */
 export interface RenderGridState {
   /** Optional opacity multiplier (0-1) for grid dimming during zoom animations */
   gridOpacity?: number;
+  /** Optional card title (Bungee font) for the board message card */
+  tutorialTitle?: string;
   /** Optional tutorial message to render on the gameboard surface */
   tutorialMessage?: string;
 }

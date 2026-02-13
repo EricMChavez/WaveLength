@@ -3,8 +3,6 @@ import type { NodeState, GameboardState, Wire } from '../../shared/types/index.t
 import { createWire } from '../../shared/types/index.ts';
 import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition, AllowedNodes } from '../../puzzle/types.ts';
 import { createConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
-import { getNodeDefinition } from '../../engine/nodes/registry.ts';
-import { PLAYABLE_START } from '../../shared/grid/index.ts';
 
 /** Definition of a custom puzzle created in Creative Mode */
 export interface CustomPuzzle {
@@ -37,6 +35,10 @@ export interface CustomPuzzle {
   }>;
   /** Node type budgets. null = all unlimited. Record maps type → max count (-1 = unlimited). */
   allowedNodes: AllowedNodes;
+  /** Optional tutorial message displayed on the gameboard surface */
+  tutorialMessage?: string;
+  /** Optional card title (rendered in Bungee font above message) */
+  tutorialTitle?: string;
 }
 
 /** Serialized format for localStorage */
@@ -55,6 +57,8 @@ export interface SerializedCustomPuzzle {
   initialWires: CustomPuzzle['initialWires'];
   /** Node type budgets. Accepts legacy string[] or new Record<string, number>. null = all. */
   allowedNodes?: string[] | Record<string, number> | null;
+  tutorialMessage?: string;
+  tutorialTitle?: string;
 }
 
 export interface CustomPuzzleSlice {
@@ -128,39 +132,19 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       nodes.set(node.id, node);
     }
 
-    // Place starting nodes (locked, horizontally centered in playable area)
-    const PLAYABLE_COLS = 46; // PLAYABLE_END - PLAYABLE_START
-    if (puzzle.initialNodes.length > 0) {
-      // Compute total width needed for all starting nodes
-      let totalWidth = 0;
-      const nodeWidths: number[] = [];
-      for (const sn of puzzle.initialNodes) {
-        const def = getNodeDefinition(sn.type);
-        const w = def ? def.size.width : 3;
-        nodeWidths.push(w);
-        totalWidth += w;
-      }
-      // Add 1-col gaps between nodes
-      totalWidth += Math.max(0, puzzle.initialNodes.length - 1);
-
-      let currentCol = PLAYABLE_START + Math.floor((PLAYABLE_COLS - totalWidth) / 2);
-      const startRow = 10;
-
-      for (let i = 0; i < puzzle.initialNodes.length; i++) {
-        const sn = puzzle.initialNodes[i];
-        const startingNode: NodeState = {
-          id: sn.id,
-          type: sn.type,
-          position: { col: currentCol, row: startRow },
-          params: sn.params as Record<string, number | string | boolean>,
-          inputCount: sn.inputCount,
-          outputCount: sn.outputCount,
-          rotation: sn.rotation,
-          locked: sn.locked ?? false,
-        };
-        nodes.set(startingNode.id, startingNode);
-        currentCol += nodeWidths[i] + 1;
-      }
+    // Place starting nodes at their saved positions
+    for (const sn of puzzle.initialNodes) {
+      const startingNode: NodeState = {
+        id: sn.id,
+        type: sn.type,
+        position: { col: sn.position.col, row: sn.position.row },
+        params: sn.params as Record<string, number | string | boolean>,
+        inputCount: sn.inputCount,
+        outputCount: sn.outputCount,
+        rotation: sn.rotation,
+        locked: sn.locked ?? false,
+      };
+      nodes.set(startingNode.id, startingNode);
     }
 
     // Build initial wires from puzzle definition
@@ -233,6 +217,8 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         expectedOutputs,
       }],
       connectionPoints: cpConfig,
+      tutorialMessage: puzzle.tutorialMessage,
+      tutorialTitle: puzzle.tutorialTitle,
     };
 
     // Load into store — loadPuzzle MUST come before setActiveBoard so that
@@ -255,6 +241,8 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         initialNodes: puzzle.initialNodes,
         initialWires: puzzle.initialWires,
         allowedNodes: puzzle.allowedNodes,
+        tutorialMessage: puzzle.tutorialMessage,
+        tutorialTitle: puzzle.tutorialTitle,
       });
     }
     return puzzles;
@@ -287,6 +275,8 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         initialNodes,
         initialWires: s.initialWires,
         allowedNodes,
+        tutorialMessage: s.tutorialMessage,
+        tutorialTitle: s.tutorialTitle,
       });
     }
     set({ customPuzzles: puzzles });

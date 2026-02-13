@@ -13,6 +13,7 @@ export interface NodeStyleOverrides {
   hoverBrightness: number;
   borderWidth: number;
   portRadius: number;
+  lightEdgeOpacity: number;
 }
 
 export interface WireStyleOverrides {
@@ -26,15 +27,59 @@ export interface WireStyleOverrides {
 export interface GridStyleOverrides {
   lineOpacity: number;
   showGridLabels: boolean;
+  noiseOpacity: number;
+  noiseTileSize: number;
 }
 
 export interface MeterStyleOverrides {
   needleGlow: number;
+  shadowBlurRatio: number;
+  shadowOffsetRatio: number;
+  lightEdgeOpacity: number;
+  knobShadowBlur: number;
+  knobHighlightOpacity: number;
+}
+
+export interface HighlightStyleOverrides {
+  /** Angle in degrees from vertical (tilted right) */
+  angle: number;
+  /** Width of the hard band as fraction of gradient span */
+  hardBandWidth: number;
+  /** Width of the soft wash as fraction of gradient span */
+  softBandWidth: number;
+  /** Per-surface hard band opacity */
+  pageHard: number;
+  gameboardHard: number;
+  nodeHard: number;
+  meterHard: number;
+  /** Per-surface soft wash opacity */
+  pageSoft: number;
+  gameboardSoft: number;
+  nodeSoft: number;
+  meterSoft: number;
+  /** Use canvas blend modes for more integrated lighting */
+  useBlendModes: boolean;
+  /** Warm tint hex color (parsed to RGB at usage site) */
+  warmTint: string;
+  /** Vertical fade ratio — fraction of height that fades to transparent at top/bottom (0 = no fade) */
+  verticalFadeRatio: number;
+}
+
+export interface DepthStyleOverrides {
+  gameboardInsetEnabled: boolean;
+  darkBlur: number;
+  darkOffset: number;
+  darkColor: string;
+  lightBlur: number;
+  lightOffset: number;
+  lightOpacity: number;
 }
 
 export interface ColorOverrides {
   // Page background (GameboardCanvas.tsx)
   pageBackground: string;
+  // Gameboard background (render-grid.ts playable area fill)
+  gameboardBackground: string;
   // Grid (render-grid.ts)
   gridLine: string;
   boardBorder: string;
@@ -59,6 +104,8 @@ export interface DevOverrides {
   wireStyle: WireStyleOverrides;
   gridStyle: GridStyleOverrides;
   meterStyle: MeterStyleOverrides;
+  highlightStyle: HighlightStyleOverrides;
+  depthStyle: DepthStyleOverrides;
   colors: ColorOverrides;
 }
 
@@ -68,11 +115,12 @@ export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
   nodeStyle: {
     shadowBlur: 0.29,
     shadowOffsetY: 0.12,
-    borderRadius: 0.1,
-    gradientIntensity: 1.0,
+    borderRadius: 0,
+    gradientIntensity: 1,
     hoverBrightness: 0.15,
     borderWidth: 0,
     portRadius: 0.25,
+    lightEdgeOpacity: 0.3,
   },
   wireStyle: {
     baseWidth: 6,
@@ -82,31 +130,59 @@ export const DEFAULT_DEV_OVERRIDES: DevOverrides = {
     colorRampEnd: 100,
   },
   gridStyle: {
-    lineOpacity: 0.8,
+    lineOpacity: 0.3,
     showGridLabels: false,
+    noiseOpacity: 0.045,
+    noiseTileSize: 2,
   },
   meterStyle: {
-    needleGlow: 10,
+    needleGlow: 0,
+    shadowBlurRatio: 0.075,
+    shadowOffsetRatio: 0.015,
+    lightEdgeOpacity: 0.3,
+    knobShadowBlur: 0.5,
+    knobHighlightOpacity: 0.3,
+  },
+  highlightStyle: {
+    angle: 50,
+    hardBandWidth: 0.05,
+    softBandWidth: 1.5,
+    pageHard: 0.035,
+    gameboardHard: 0.04,
+    nodeHard: 0.06,
+    meterHard: 0.05,
+    pageSoft: 0.2,
+    gameboardSoft: 0.025,
+    nodeSoft: 0.0375,
+    meterSoft: 0.03,
+    useBlendModes: true,
+    warmTint: '#fff8f0',
+    verticalFadeRatio: 0.3,
+  },
+  depthStyle: {
+    gameboardInsetEnabled: true,
+    darkBlur: 12,
+    darkOffset: 4,
+    darkColor: 'rgba(0,0,0,0.5)',
+    lightBlur: 8,
+    lightOffset: 3,
+    lightOpacity: 0.03,
   },
   colors: {
-    // Page background (flat color in GameboardCanvas.tsx)
-    pageBackground: '#121216',
-    // Grid
-    gridLine: '#16161a',
-    boardBorder: '#3d3e42',
-    // Nodes
-    surfaceNode: '#44484e',
-    surfaceNodeBottom: '#2a2a2a',
-    // Signal polarity
-    signalPositive: '#ff9200',
-    signalNegative: '#0782e0',
-    signalZero: '#d0d0d8',
+    pageBackground: '#0d0f14',
+    gameboardBackground: '#06382f',
+    gridLine: '#318373',
+    boardBorder: '#ff00dc',
+    surfaceNode: '#212121',
+    surfaceNodeBottom: '#171717',
+    signalPositive: '#f0a202',
+    signalNegative: '#3c91e6',
+    signalZero: '#9a9a9a',
     colorNeutral: '#242424',
-    // Meters
     meterInterior: '#000000',
-    meterBorder: '#6c6666',
-    meterNeedle: '#f5f5f5',
-    meterZero: '#d0d0d8',
+    meterBorder: '#5f5f5f',
+    meterNeedle: '#c1c1c1',
+    meterZero: '#1d1d1d',
   },
 };
 
@@ -135,6 +211,14 @@ export function setGridStyleOverrides(overrides: Partial<GridStyleOverrides>): v
 
 export function setMeterStyleOverrides(overrides: Partial<MeterStyleOverrides>): void {
   _devOverrides.meterStyle = { ..._devOverrides.meterStyle, ...overrides };
+}
+
+export function setHighlightStyleOverrides(overrides: Partial<HighlightStyleOverrides>): void {
+  _devOverrides.highlightStyle = { ..._devOverrides.highlightStyle, ...overrides };
+}
+
+export function setDepthStyleOverrides(overrides: Partial<DepthStyleOverrides>): void {
+  _devOverrides.depthStyle = { ..._devOverrides.depthStyle, ...overrides };
 }
 
 export function setColorOverrides(overrides: Partial<ColorOverrides>): void {

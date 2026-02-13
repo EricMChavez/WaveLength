@@ -3,6 +3,9 @@ import type { PixelRect } from '../../shared/grid/types.ts';
 import { VERTICAL_HEIGHT_RATIO } from './meter-types.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 
+/** Match the outside border radius ratio from render-meter.ts */
+const CORNER_RADIUS_RATIO = 0.06;
+
 /** Cutout configuration for creating needle visibility arc */
 export interface LevelBarCutout {
   /** X position of the cutout center (connection point / eye) */
@@ -32,6 +35,7 @@ export function drawLevelBar(
   currentValue: number,
   rect: PixelRect,
   cutout?: LevelBarCutout,
+  side?: 'left' | 'right',
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
@@ -85,12 +89,31 @@ export function drawLevelBar(
   gradient.addColorStop(1, negativeColor);
   ctx.fillStyle = gradient;
 
+  // Rounded corners on the leading edge of the bar, matching outer border radius
+  const drawnHeight = halfHeight * 2;
+  const r = Math.min(
+    Math.round(drawnHeight * CORNER_RADIUS_RATIO),
+    rect.width / 2,
+    barHeight / 2,
+  );
+
+  // Round only the needle-facing edge (away from waveform)
+  // Left meter: waveform | levelBar | needle → round right corners
+  // Right meter: needle | levelBar | waveform → round left corners
+  // [topLeft, topRight, bottomRight, bottomLeft]
+  const rL = side === 'left' ? 0 : r;  // waveform-facing on left meters
+  const rR = side === 'right' ? 0 : r; // waveform-facing on right meters
+
   if (normalized >= 0) {
-    // Fill upward from center - use original rect bounds, clip does the shaping
-    ctx.fillRect(rect.x, centerY - barHeight, rect.width, barHeight);
+    // Fill upward from center - round top corners on needle side only
+    ctx.beginPath();
+    ctx.roundRect(rect.x, centerY - barHeight, rect.width, barHeight, [rL, rR, 0, 0]);
+    ctx.fill();
   } else {
-    // Fill downward from center - use original rect bounds, clip does the shaping
-    ctx.fillRect(rect.x, centerY, rect.width, barHeight);
+    // Fill downward from center - round bottom corners on needle side only
+    ctx.beginPath();
+    ctx.roundRect(rect.x, centerY, rect.width, barHeight, [0, 0, rR, rL]);
+    ctx.fill();
   }
 
   ctx.restore();

@@ -10,7 +10,7 @@ export const splitNode = defineNode({
   ],
   outputs: [
     { name: 'X', side: 'right', gridPosition: 0 },
-    { name: 'Y', side: 'right', gridPosition: 2 },
+    { name: 'Y', side: 'right', gridPosition: 1 },
   ],
 
   evaluate: ({ inputs }) => {
@@ -18,5 +18,5 @@ export const splitNode = defineNode({
     return [a, a];
   },
 
-  size: { width: 2, height: 2 },
+  size: { width: 3, height:1},
 });

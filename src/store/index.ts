@@ -70,3 +70,6 @@ initCustomPuzzlePersistence(useGameStore);
 
 // Set up cycle runner to auto-recompute on graph changes
 initCycleRunner(useGameStore);
+
+// DEBUG: expose store for browser console inspection
+(window as unknown as Record<string, unknown>).__GAME_STORE__ = useGameStore;

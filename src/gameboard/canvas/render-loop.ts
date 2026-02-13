@@ -30,6 +30,7 @@ import type { NodeState, Wire } from '../../shared/types/index.ts';
 import type { CycleResults } from '../../engine/evaluation/index.ts';
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
+import { isConnectionInputNode, isConnectionOutputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex } from '../../puzzle/connection-point-nodes.ts';
 
 const PLAYPOINT_RATE = 16; // cycles per second
 
@@ -128,6 +129,18 @@ let _wireValuesCache: ReadonlyMap<string, number> = new Map();
 let _wireValuesCycleResults: CycleResults | null = null;
 let _wireValuesPlaypoint = -1;
 let _wireValuesWires: ReadonlyArray<Wire> | null = null;
+
+// Cache: connected input ports set (rebuild only when wires change)
+let _connectedInputPortsCache: ReadonlySet<string> = new Set();
+let _connectedInputPortsWires: ReadonlyArray<Wire> | null = null;
+
+// Cache: connected output CPs set (rebuild only when wires change)
+let _connectedOutputCPsCache: ReadonlySet<string> = new Set();
+let _connectedOutputCPsWires: ReadonlyArray<Wire> | null = null;
+
+// Cache: connected input CPs set (rebuild only when wires change)
+let _connectedInputCPsCache: ReadonlySet<string> = new Set();
+let _connectedInputCPsWires: ReadonlyArray<Wire> | null = null;
 
 // Cache: knob wire lookup map (rebuild only when wires change)
 let _knobWireLookup: Map<string, Wire> = new Map();
@@ -258,10 +271,14 @@ export function startRenderLoop(
 
     // Grid zones and lines (lowest z-order)
     // Show authoring draft during configuring-start/saving, otherwise show puzzle's message
-    const tutorialMessage = (state.authoringPhase !== 'idle' && state.tutorialMessageDraft)
+    const isAuthoring = state.authoringPhase !== 'idle';
+    const tutorialTitle = (isAuthoring && state.tutorialTitleDraft)
+      ? state.tutorialTitleDraft
+      : state.activePuzzle?.tutorialTitle;
+    const tutorialMessage = (isAuthoring && state.tutorialMessageDraft)
       ? state.tutorialMessageDraft
       : state.activePuzzle?.tutorialMessage;
-    drawGrid(ctx!, tokens, { tutorialMessage }, cellSize);
+    drawGrid(ctx!, tokens, { tutorialTitle, tutorialMessage }, cellSize);
 
     // Read cycle results and playpoint for rendering
     const cycleResults = state.cycleResults;
@@ -298,6 +315,59 @@ export function startRenderLoop(
     }
     const meterTargetArrays = _meterTargetCache;
 
+    // Read wires early so we can compute CP connection status for meters
+    const boardWires = state.activeBoard?.wires ?? null;
+
+    // Build connected output CP set (cached on wires reference)
+    // Output CPs receive signal from the graph — wires target them
+    if (boardWires !== _connectedOutputCPsWires) {
+      const set = new Set<string>();
+      if (boardWires) {
+        for (const wire of boardWires) {
+          const targetId = wire.target.nodeId;
+          if (isConnectionOutputNode(targetId)) {
+            set.add(`output:${getConnectionPointIndex(targetId)}`);
+          } else if (isCreativeSlotNode(targetId)) {
+            // Creative slot index is 0-5 (0-2=left, 3-5=right).
+            // Meters use position index 0-2 per side, so convert slot→meter index.
+            const slotIdx = getCreativeSlotIndex(targetId);
+            const meterIdx = slotIdx < 3 ? slotIdx : slotIdx - 3;
+            set.add(`output:${meterIdx}`);
+          } else if (isBidirectionalCpNode(targetId)) {
+            set.add(`output:${getBidirectionalCpIndex(targetId)}`);
+          }
+        }
+      }
+      _connectedOutputCPsCache = set;
+      _connectedOutputCPsWires = boardWires;
+    }
+    const connectedOutputCPs = _connectedOutputCPsCache;
+
+    // Build connected input CP set (cached on wires reference)
+    // Input CPs emit signal into the graph — wires source from them
+    if (boardWires !== _connectedInputCPsWires) {
+      const set = new Set<string>();
+      if (boardWires) {
+        for (const wire of boardWires) {
+          const sourceId = wire.source.nodeId;
+          if (isConnectionInputNode(sourceId)) {
+            set.add(`input:${getConnectionPointIndex(sourceId)}`);
+          } else if (isCreativeSlotNode(sourceId)) {
+            // Creative slot index is 0-5 (0-2=left, 3-5=right).
+            // Meters use position index 0-2 per side, so convert slot→meter index.
+            const slotIdx = getCreativeSlotIndex(sourceId);
+            const meterIdx = slotIdx < 3 ? slotIdx : slotIdx - 3;
+            set.add(`input:${meterIdx}`);
+          } else if (isBidirectionalCpNode(sourceId)) {
+            set.add(`input:${getBidirectionalCpIndex(sourceId)}`);
+          }
+        }
+      }
+      _connectedInputCPsCache = set;
+      _connectedInputCPsWires = boardWires;
+    }
+    const connectedInputCPs = _connectedInputCPsCache;
+
     // Calculate meter starting offset (meters fill the full height)
     const meterTopMargin = 0; // in grid rows
     const meterStride = METER_GRID_ROWS + METER_GAP_ROWS; // rows per meter + gap
@@ -316,12 +386,16 @@ export function startRenderLoop(
         }, cellSize);
         const cpIdx = leftSlot.cpIndex ?? i;
         const dir = leftSlot.direction;
+        const isConnected = dir === 'input'
+          ? connectedInputCPs.has(`input:${cpIdx}`)
+          : connectedOutputCPs.has(`output:${cpIdx}`);
         const renderState: RenderMeterState = {
           slot: leftSlot,
           signalValues: meterSignalArrays.get(`${dir}:${cpIdx}`) ?? null,
           targetValues: dir === 'output' ? (meterTargetArrays.get(`target:${cpIdx}`) ?? null) : null,
           matchStatus: dir === 'output' ? (perSampleMatch.get(`output:${cpIdx}`) ?? null) : undefined,
           playpoint,
+          isConnected,
         };
         drawMeter(ctx!, tokens, renderState, leftRect);
       }
@@ -339,12 +413,16 @@ export function startRenderLoop(
         }, cellSize);
         const cpIdxR = rightSlot.cpIndex ?? i;
         const dirR = rightSlot.direction;
+        const isConnectedR = dirR === 'input'
+          ? connectedInputCPs.has(`input:${cpIdxR}`)
+          : connectedOutputCPs.has(`output:${cpIdxR}`);
         const renderState: RenderMeterState = {
           slot: rightSlot,
           signalValues: meterSignalArrays.get(`${dirR}:${cpIdxR}`) ?? null,
           targetValues: dirR === 'output' ? (meterTargetArrays.get(`target:${cpIdxR}`) ?? null) : null,
           matchStatus: dirR === 'output' ? (perSampleMatch.get(`output:${cpIdxR}`) ?? null) : undefined,
           playpoint,
+          isConnected: isConnectedR,
         };
         drawMeter(ctx!, tokens, renderState, rightRect);
       }
@@ -358,7 +436,6 @@ export function startRenderLoop(
     }
     const cpSignals = _cpSignalsCache;
 
-    const boardWires = state.activeBoard?.wires ?? null;
     if (
       cycleResults !== _portSignalsCycleResults ||
       playpoint !== _portSignalsPlaypoint ||
@@ -372,6 +449,21 @@ export function startRenderLoop(
       _portSignalsWires = boardWires;
     }
     const portSignals = _portSignalsCache;
+
+    // Build connected input port set (cached on wires reference)
+    if (boardWires !== _connectedInputPortsWires) {
+      const set = new Set<string>();
+      if (boardWires) {
+        for (const wire of boardWires) {
+          if (wire.target.side === 'input') {
+            set.add(`${wire.target.nodeId}:${wire.target.portIndex}`);
+          }
+        }
+      }
+      _connectedInputPortsCache = set;
+      _connectedInputPortsWires = boardWires;
+    }
+    const connectedInputPorts = _connectedInputPortsCache;
 
     if (state.activeBoard) {
       // Wire rendering: branch on pause state for blip animation
@@ -427,6 +519,7 @@ export function startRenderLoop(
         knobValues,
         portSignals,
         rejectedKnobNodeId: getRejectedKnobNodeId(),
+        connectedInputPorts,
       }, cellSize);
 
       // Keyboard focus ring (after nodes, before wire preview)
@@ -445,6 +538,7 @@ export function startRenderLoop(
       perPortMatch: state.perPortMatch,
       editingUtilityId: state.editingUtilityId,
       cpSignals,
+      connectedOutputCPs,
     }, cellSize);
 
     // Wire preview during drawing-wire mode (suppressed when overlay is active)

@@ -5,6 +5,7 @@ import './assets/styles/tokens.css'
 import './assets/styles/theme-dark.css'
 import './assets/styles/theme-light.css'
 import './assets/styles/animations.css'
+import './assets/styles/fonts.css'
 import { initTheme } from './shared/tokens/index.ts'
 import App from './App.tsx'
 

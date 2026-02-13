@@ -1,4 +1,6 @@
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
+import { HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
+import { getDevOverrides } from '../../dev/index.ts';
 import { signalToColor } from './render-wires.ts';
 
 /** Knob sweep: 270 degrees (gap at bottom, from 7 o'clock to 5 o'clock) */
@@ -72,12 +74,45 @@ export function drawKnob(
     ctx.stroke();
   }
 
-  // --- Inner fill (dark circle) ---
+  // --- Inner fill (dark circle) with shadow for raised depth ---
+  const devOverrides = getDevOverrides();
+  const knobShadowBlur = devOverrides.enabled ? devOverrides.meterStyle.knobShadowBlur : 0.5;
+  const knobHighlightOpacity = devOverrides.enabled ? devOverrides.meterStyle.knobHighlightOpacity : 0.3;
+
+  ctx.save();
+  if (knobShadowBlur > 0) {
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = radius * knobShadowBlur;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = radius * 0.05;
+  }
   ctx.beginPath();
   ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
   ctx.fillStyle = tokens.surfaceNode;
   ctx.globalAlpha = 0.85;
   ctx.fill();
+  ctx.restore();
+
+  // --- Warm highlight arc along top of inner circle ---
+  if (knobHighlightOpacity > 0) {
+    const warmTint = HIGHLIGHT_STREAK.WARM_TINT;
+    ctx.save();
+    // Clip to inner circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
+    ctx.clip();
+    // Draw arc along top (~120 degrees centered at top)
+    ctx.strokeStyle = `rgba(${warmTint.r},${warmTint.g},${warmTint.b},${knobHighlightOpacity})`;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    // 120 degrees centered at top: from -150deg to -30deg (in standard canvas angles)
+    const highlightStart = (-150 * Math.PI) / 180;
+    const highlightEnd = (-30 * Math.PI) / 180;
+    ctx.arc(centerX, centerY, innerRadius - 0.5, highlightStart, highlightEnd);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // --- Indicator line ---
   const indicatorAngle = valueAngle;

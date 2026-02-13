@@ -17,6 +17,10 @@ export interface AuthoringSlice {
   recordedTargetSamples: Map<number, number[]> | null;
   /** Board state at recording time (for "Reset to Solution") */
   solutionBoardSnapshot: BoardSnapshot | null;
+  /** Draft card title shown live on the gameboard during authoring */
+  tutorialTitleDraft: string;
+  /** Draft tutorial message shown live on the gameboard during authoring */
+  tutorialMessageDraft: string;
 
   /** Capture current outputs as target, snapshot board, transition to 'configuring-start' */
   beginRecordTarget: () => void;
@@ -26,12 +30,18 @@ export interface AuthoringSlice {
   beginSaveAsPuzzle: () => void;
   /** Cancel authoring workflow, clear recorded state */
   cancelAuthoring: () => void;
+  /** Update the draft card title (live preview on gameboard) */
+  setTutorialTitleDraft: (title: string) => void;
+  /** Update the draft tutorial message (live preview on gameboard) */
+  setTutorialMessageDraft: (message: string) => void;
 }
 
 export const createAuthoringSlice: StateCreator<AuthoringSlice> = (set, get) => ({
   authoringPhase: 'idle',
   recordedTargetSamples: null,
   solutionBoardSnapshot: null,
+  tutorialTitleDraft: '',
+  tutorialMessageDraft: '',
 
   beginRecordTarget: () => {
     // Access other slices via composed store
@@ -124,5 +134,13 @@ export const createAuthoringSlice: StateCreator<AuthoringSlice> = (set, get) => 
       authoringPhase: 'idle',
       recordedTargetSamples: null,
       solutionBoardSnapshot: null,
+      tutorialTitleDraft: '',
+      tutorialMessageDraft: '',
     }),
+
+  setTutorialTitleDraft: (title: string) =>
+    set({ tutorialTitleDraft: title }),
+
+  setTutorialMessageDraft: (message: string) =>
+    set({ tutorialMessageDraft: message }),
 });
