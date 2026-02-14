@@ -1,6 +1,6 @@
 import { useGameStore } from '../../store/index.ts';
 import { NODE_TYPE_LABELS } from '../../shared/constants/index.ts';
-import { captureViewportSnapshot } from '../../gameboard/canvas/snapshot.ts';
+import { captureViewportSnapshot, captureCropSnapshot } from '../../gameboard/canvas/snapshot.ts';
 import { getNodeGridSize } from '../../shared/grid/index.ts';
 import styles from './NodeControls.module.css';
 
@@ -47,7 +47,8 @@ export function NodeControls() {
     if (snapshot) {
       const { cols, rows } = getNodeGridSize(node);
       const targetRect = { col: node.position.col, row: node.position.row, cols, rows };
-      state.startZoomCapture(snapshot, targetRect, 'in');
+      const crop = captureCropSnapshot(selectedNodeId!, targetRect) ?? undefined;
+      state.startZoomCapture(snapshot, targetRect, 'in', crop);
     }
     zoomIntoNode(selectedNodeId!);
   }

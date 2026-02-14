@@ -53,6 +53,7 @@ export interface BoardStackEntry {
   nodeIdInParent: NodeId;
   readOnly: boolean;
   meterSlots: Map<MeterKey, MeterSlotState>;
+  zoomedCrop?: OffscreenCanvas;
 }
 
 export interface NodeSwap {
@@ -195,12 +196,17 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       return;
     }
 
+    // Capture crop from current animation state (set during zoom-in trigger)
+    const animState = state.zoomTransitionState;
+    const zoomedCrop = animState.type === 'capturing' ? animState.zoomedCrop : undefined;
+
     const stackEntry: BoardStackEntry = {
       board: state.activeBoard,
       portConstants: state.portConstants,
       nodeIdInParent: nodeId,
       readOnly: state.activeBoardReadOnly,
       meterSlots: state.meterSlots,
+      zoomedCrop,
     };
 
     const newStack = [...state.boardStack, stackEntry];
@@ -242,12 +248,17 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
     const state = get();
     if (!state.activeBoard) return;
 
+    // Capture crop from current animation state (set during zoom-in trigger)
+    const animState = state.zoomTransitionState;
+    const zoomedCrop = animState.type === 'capturing' ? animState.zoomedCrop : undefined;
+
     const stackEntry: BoardStackEntry = {
       board: state.activeBoard,
       portConstants: state.portConstants,
       nodeIdInParent: (nodeIdInParent ?? '') as NodeId,
       readOnly: state.activeBoardReadOnly,
       meterSlots: state.meterSlots,
+      zoomedCrop,
     };
 
     const newStack = [...state.boardStack, stackEntry];

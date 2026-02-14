@@ -79,6 +79,17 @@ export const ZOOM_OUT_PRESET: ZoomPreset = {
   revealEnd: 1.0,
 };
 
+/** Zoom-only preset for second phase of two-part zoom-out. No reveal (portal disabled). */
+export const ZOOM_ONLY_PRESET: ZoomPreset = {
+  durationMs: 600,
+  zoomEasing: easeInOutCubic,
+  revealEasing: easeInOutCubic,
+  zoomStart: 0.0,
+  zoomEnd: 1.0,
+  revealStart: 2.0,  // Never activates
+  revealEnd: 2.0,
+};
+
 // ── Math helpers ──
 
 function lerp(a: number, b: number, t: number): number {
@@ -171,11 +182,23 @@ function drawPortal(
   revealT: number,
   vpW: number,
   vpH: number,
+  zoomedCrop?: OffscreenCanvas,
 ): void {
-  if (revealT <= 0) return;
+  if (revealT <= 0) {
+    // During zoom-only phase, draw the crop in the target rect to prevent pixelation
+    if (zoomedCrop) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(z.stx, z.sty, z.stw, z.sth);
+      ctx.clip();
+      ctx.drawImage(zoomedCrop, 0, 0, zoomedCrop.width, zoomedCrop.height,
+                    z.stx, z.sty, z.stw, z.sth);
+      ctx.restore();
+    }
+    return;
+  }
 
   const slideOff = z.sth * revealT;
-  const dpr = outerSnapshot.width / vpW;
 
   // 1. Inner snapshot revealed in the bottom portion of target rect
   ctx.save();
@@ -187,15 +210,26 @@ function drawPortal(
   ctx.restore();
 
   // 2. Outer content slides up ON TOP (extends above target rect)
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(z.stx, z.sty - slideOff, z.stw, z.sth);
-  ctx.clip();
-  // Draw the outer snapshot zoomed + shifted up
-  ctx.translate(z.tx, z.ty - slideOff);
-  ctx.scale(z.scale, z.scale);
-  ctx.drawImage(outerSnapshot, 0, 0, outerSnapshot.width, outerSnapshot.height, 0, 0, vpW, vpH);
-  ctx.restore();
+  if (zoomedCrop) {
+    // High-res pre-rendered crop — always sharp, just clip + position
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(z.stx, z.sty - slideOff, z.stw, z.sth);
+    ctx.clip();
+    ctx.drawImage(zoomedCrop, 0, 0, zoomedCrop.width, zoomedCrop.height,
+                  z.stx, z.sty - slideOff, z.stw, z.sth);
+    ctx.restore();
+  } else {
+    // Fallback: zoom-transform the outer snapshot (may pixelate at high zoom)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(z.stx, z.sty - slideOff, z.stw, z.sth);
+    ctx.clip();
+    ctx.translate(z.tx, z.ty - slideOff);
+    ctx.scale(z.scale, z.scale);
+    ctx.drawImage(outerSnapshot, 0, 0, outerSnapshot.width, outerSnapshot.height, 0, 0, vpW, vpH);
+    ctx.restore();
+  }
 }
 
 // ── Main draw function ──
@@ -223,6 +257,7 @@ export function drawZoomTransition(
   preset: ZoomPreset,
   vpW: number,
   vpH: number,
+  zoomedCrop?: OffscreenCanvas,
 ): void {
   // Reverse direction: zoom-out plays the same animation backwards
   const p = direction === 'out' ? 1 - progress : progress;
@@ -240,7 +275,7 @@ export function drawZoomTransition(
   ctx.restore();
 
   // Portal: target rect slides up to reveal inner content
-  drawPortal(ctx, outerSnapshot, innerSnapshot, z, revealT, vpW, vpH);
+  drawPortal(ctx, outerSnapshot, innerSnapshot, z, revealT, vpW, vpH, zoomedCrop);
 }
 
 // ── Grid rect to viewport pixel rect conversion ──
@@ -274,4 +309,29 @@ export function gridRectToViewport(
     width: w,
     height: h,
   };
+}
+
+// ── Reveal overlay (two-part zoom-out curtain) ──
+
+/**
+ * Draw the crop sliding down from above the viewport to cover it.
+ * Used during 'revealing' and 'reveal-paused' states.
+ *
+ * @param revealT - 1 = crop fully above (invisible), 0 = crop covers viewport
+ */
+export function drawRevealOverlay(
+  ctx: CanvasRenderingContext2D,
+  crop: OffscreenCanvas,
+  revealT: number,
+  vpW: number,
+  vpH: number,
+): void {
+  if (revealT >= 1) return;
+  const slideOff = vpH * revealT;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, -slideOff, vpW, vpH);
+  ctx.clip();
+  ctx.drawImage(crop, 0, 0, crop.width, crop.height, 0, -slideOff, vpW, vpH);
+  ctx.restore();
 }

@@ -6,8 +6,19 @@ import { getNodeGridSize } from '../../shared/grid/index.ts';
 import type { NodeSwap } from '../../store/slices/navigation-slice.ts';
 import styles from './SaveCancelDialog.module.css';
 
-/** Capture viewport and start zoom-out transition. */
+/**
+ * Start zoom-out transition.
+ * If in reveal-paused state (two-part flow), use confirmRevealAndZoom.
+ * Otherwise, capture viewport and start a combined zoom-out (fallback).
+ */
 function startZoomOut(state: ReturnType<typeof useGameStore.getState>): void {
+  // Two-part flow: reveal already completed, just confirm and zoom
+  if (state.zoomTransitionState.type === 'reveal-paused') {
+    state.confirmRevealAndZoom();
+    return;
+  }
+
+  // Fallback: combined zoom-out (when reveal wasn't triggered, e.g. no crop)
   if (state.zoomTransitionState.type !== 'idle') return;
   const snapshot = captureViewportSnapshot();
   if (!snapshot) return;
@@ -18,7 +29,7 @@ function startZoomOut(state: ReturnType<typeof useGameStore.getState>): void {
     if (parentNode) {
       const { cols, rows } = getNodeGridSize(parentNode);
       const targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
-      state.startZoomCapture(snapshot, targetRect, 'out');
+      state.startZoomCapture(snapshot, targetRect, 'out', lastEntry.zoomedCrop);
       return;
     }
   }
@@ -112,7 +123,9 @@ export function SaveCancelDialog() {
   }
 
   function handleKeepEditing() {
-    useGameStore.getState().closeOverlay();
+    const state = useGameStore.getState();
+    state.cancelReveal();
+    state.closeOverlay();
   }
 
   return (

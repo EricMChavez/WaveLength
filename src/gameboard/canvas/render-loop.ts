@@ -10,7 +10,7 @@ import type { MeterKey } from '../meters/meter-types.ts';
 import { TOTAL_SLOTS, slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
 import { buildSlotConfig, directionIndexToSlot, slotToDirectionIndex } from '../../puzzle/types.ts';
 import type { SlotConfig } from '../../puzzle/types.ts';
-import { drawNodes } from './render-nodes.ts';
+import { drawNodes, drawSingleNode } from './render-nodes.ts';
 import { drawWires } from './render-wires.ts';
 import { computeWireAnimationCache } from './wire-animation.ts';
 import type { WireAnimationCache } from './wire-animation.ts';
@@ -22,13 +22,14 @@ import { drawHighlightStreak } from './render-highlight-streak.ts';
 import { HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { renderPlacementGhost } from './render-placement-ghost.ts';
-import { drawZoomTransition, computeProgress, gridRectToViewport, ZOOM_IN_PRESET, ZOOM_OUT_PRESET } from '../animation/index.ts';
+import { drawZoomTransition, computeProgress, gridRectToViewport, drawRevealOverlay, easeInOutCubic, ZOOM_IN_PRESET, ZOOM_OUT_PRESET, ZOOM_ONLY_PRESET } from '../animation/index.ts';
+import { registerCropCapture, unregisterCropCapture } from './snapshot.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
 import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts';
 import { getRejectedKnobNodeId } from './rejected-knob.ts';
 import { drawPlaybackBar, getHoveredPlaybackButton } from './render-playback-bar.ts';
 import { getPortGridAnchor, getPortWireDirection, findPath, DIR_E } from '../../shared/routing/index.ts';
-import type { GridPoint } from '../../shared/grid/types.ts';
+import type { GridPoint, GridRect } from '../../shared/grid/types.ts';
 import type { KnobInfo } from './render-types.ts';
 import type { NodeState, Wire } from '../../shared/types/index.ts';
 import type { CycleResults } from '../../engine/evaluation/index.ts';
@@ -298,6 +299,56 @@ export function startRenderLoop(
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
 
+  // Register crop capture for high-res zoom portal curtain
+  registerCropCapture((nodeId: string, targetRect: GridRect) => {
+    const st = useGameStore.getState();
+    const tok = getThemeTokens();
+    const cs = getCellSize();
+    const off = getOffset();
+    const d = window.devicePixelRatio || 1;
+    const w = canvas.width / d;
+    const h = canvas.height / d;
+
+    const node = st.activeBoard?.nodes.get(nodeId);
+    if (!node) return null;
+
+    // Target pixel rect → final scale
+    const tpr = gridRectToViewport(targetRect, cs, off);
+    const finalScale = Math.min(w / tpr.width, h / tpr.height);
+    const zCS = cs * finalScale;
+
+    // Create viewport-sized canvas
+    const crop = new OffscreenCanvas(Math.ceil(w * d), Math.ceil(h * d));
+    const cropCtx = crop.getContext('2d');
+    if (!cropCtx) return null;
+    cropCtx.scale(d, d);
+
+    // Fill background
+    cropCtx.fillStyle = '#0d0f14';
+    cropCtx.fillRect(0, 0, w, h);
+
+    // Center node in canvas
+    const gcx = targetRect.col + targetRect.cols / 2;
+    const gcy = targetRect.row - 0.5 + targetRect.rows / 2;
+    cropCtx.translate(w / 2 - gcx * zCS, h / 2 - gcy * zCS);
+
+    // Render node at zoomed cellSize using module-level caches
+    drawSingleNode(cropCtx as unknown as CanvasRenderingContext2D, tok, node, {
+      nodes: st.activeBoard!.nodes,
+      puzzleNodes: st.puzzleNodes,
+      utilityNodes: st.utilityNodes,
+      selectedNodeId: null,
+      hoveredNodeId: null,
+      knobValues: _knobValuesCache,
+      portSignals: _portSignalsCache,
+      rejectedKnobNodeId: null,
+      connectedInputPorts: _connectedInputPortsCache,
+      liveNodeIds: _liveNodeIdsCache,
+    }, zCS);
+
+    return crop;
+  });
+
   let animationId = 0;
   let running = true;
   function render(timestamp: number) {
@@ -356,17 +407,19 @@ export function startRenderLoop(
 
     // --- Zoom transition: capturing / animating ---
     const zoomState = state.zoomTransitionState;
-    const zoomAnimating = zoomState.type === 'animating';
+    let zoomAnimating = zoomState.type === 'animating';
     let zoomProgress = 0;
 
-    if (zoomAnimating) {
-      const preset = zoomState.direction === 'in' ? ZOOM_IN_PRESET : ZOOM_OUT_PRESET;
+    if (zoomAnimating && zoomState.type === 'animating') {
+      const preset = zoomState.phase === 'zoom-only'
+        ? ZOOM_ONLY_PRESET
+        : (zoomState.direction === 'in' ? ZOOM_IN_PRESET : ZOOM_OUT_PRESET);
       zoomProgress = computeProgress(zoomState.startTime, timestamp, preset.durationMs);
 
       if (zoomProgress >= 1) {
         state.endZoomTransition();
-        animationId = requestAnimationFrame(render);
-        return;
+        zoomAnimating = false;
+        // Fall through to normal rendering — no blank frame
       }
     }
 
@@ -748,6 +801,14 @@ export function startRenderLoop(
       if (snapCtx) {
         snapCtx.drawImage(canvas, 0, 0);
       }
+
+      // Keep crop visible during capture frame to prevent one-frame flash
+      if (zoomState.zoomedCrop && zoomState.phase === 'zoom-only') {
+        ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx!.drawImage(zoomState.zoomedCrop, 0, 0, zoomState.zoomedCrop.width, zoomState.zoomedCrop.height,
+                      0, 0, vpWidth, vpHeight);
+      }
+
       state.finalizeZoomCapture(secondSnapshot);
       // The state has transitioned to 'animating' — continue to next frame
       animationId = requestAnimationFrame(render);
@@ -755,15 +816,39 @@ export function startRenderLoop(
     }
 
     // Zoom transition overlay (drawn on top of the live board)
-    if (zoomAnimating) {
-      const preset = zoomState.direction === 'in' ? ZOOM_IN_PRESET : ZOOM_OUT_PRESET;
+    // Double-check zoomState.type for TS narrowing (zoomAnimating is a let)
+    if (zoomAnimating && zoomState.type === 'animating') {
+      const preset = zoomState.phase === 'zoom-only'
+        ? ZOOM_ONLY_PRESET
+        : (zoomState.direction === 'in' ? ZOOM_IN_PRESET : ZOOM_OUT_PRESET);
       const targetPixelRect = gridRectToViewport(zoomState.targetRect, cellSize, offset);
       // Reset to viewport coords (remove grid translate) for the transition overlay
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawZoomTransition(
         ctx!, zoomState.outerSnapshot, zoomState.innerSnapshot,
         targetPixelRect, zoomState.direction, zoomProgress, preset, vpWidth, vpHeight,
+        zoomState.zoomedCrop,
       );
+    }
+
+    // Reveal overlay: curtain slides down during two-part zoom-out
+    if (zoomState.type === 'revealing') {
+      const elapsed = timestamp - zoomState.startTime;
+      const rawProgress = Math.min(elapsed / 600, 1);
+      const revealT = 1 - easeInOutCubic(rawProgress);
+
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawRevealOverlay(ctx!, zoomState.zoomedCrop, revealT, vpWidth, vpHeight);
+
+      if (rawProgress >= 1) {
+        state.completeReveal();
+      }
+    }
+
+    // Reveal-paused: crop fully covers viewport while dialog is shown
+    if (zoomState.type === 'reveal-paused') {
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawRevealOverlay(ctx!, zoomState.zoomedCrop, 0, vpWidth, vpHeight);
     }
 
     // Dim canvas when an overlay is active (but not during ceremony or zoom transition)
@@ -783,6 +868,7 @@ export function startRenderLoop(
   return () => {
     running = false;
     cancelAnimationFrame(animationId);
+    unregisterCropCapture();
   };
 }
 

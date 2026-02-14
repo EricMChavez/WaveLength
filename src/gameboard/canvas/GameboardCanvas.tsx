@@ -31,7 +31,7 @@ import {
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
-import { registerSnapshotCapture, unregisterSnapshotCapture, registerViewportCapture, unregisterViewportCapture, captureViewportSnapshot } from './snapshot.ts';
+import { registerSnapshotCapture, unregisterSnapshotCapture, registerViewportCapture, unregisterViewportCapture, captureViewportSnapshot, captureCropSnapshot } from './snapshot.ts';
 import { getNodeGridSize } from '../../shared/grid/index.ts';
 import { hitTestPlaybackBar, setHoveredPlaybackButton } from './render-playback-bar.ts';
 
@@ -374,7 +374,7 @@ export function GameboardCanvas() {
               if (parentNode) {
                 const { cols, rows } = getNodeGridSize(parentNode);
                 const targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
-                state.startZoomCapture(snapshot, targetRect, 'out');
+                state.startZoomCapture(snapshot, targetRect, 'out', lastEntry.zoomedCrop);
               }
             }
           }
@@ -423,7 +423,8 @@ export function GameboardCanvas() {
               if (snapshot) {
                 const { cols, rows } = getNodeGridSize(node);
                 const targetRect = { col: node.position.col, row: node.position.row, cols, rows };
-                state.startZoomCapture(snapshot, targetRect, 'in');
+                const crop = captureCropSnapshot(nodeId, targetRect) ?? undefined;
+                state.startZoomCapture(snapshot, targetRect, 'in', crop);
               }
             }
           }

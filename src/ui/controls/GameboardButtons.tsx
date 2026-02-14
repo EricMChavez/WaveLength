@@ -76,7 +76,23 @@ function BackButton({
     if (ceremonyType === 'it-works') {
       store.dismissCeremony();
     } else if (editingUtilityId !== null) {
-      store.openOverlay({ type: 'unsaved-changes' });
+      // Two-part zoom-out: start reveal curtain, then show dialog after it completes
+      if (store.zoomTransitionState.type !== 'idle') return;
+      const entry = store.boardStack[store.boardStack.length - 1];
+      if (entry?.zoomedCrop) {
+        const parentNode = entry.board.nodes.get(entry.nodeIdInParent);
+        let targetRect;
+        if (parentNode) {
+          const { cols, rows } = getNodeGridSize(parentNode);
+          targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
+        } else {
+          targetRect = { col: 28, row: 16, cols: 5, rows: 3 };
+        }
+        store.startReveal(entry.zoomedCrop, targetRect);
+      } else {
+        // Fallback: no crop available, open dialog directly
+        store.openOverlay({ type: 'unsaved-changes' });
+      }
     } else if (navigationDepth > 0 && activeBoardReadOnly) {
       if (store.zoomTransitionState.type !== 'idle') return;
       const snapshot = captureViewportSnapshot();
@@ -87,7 +103,7 @@ function BackButton({
           if (parentNode) {
             const { cols, rows } = getNodeGridSize(parentNode);
             const targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
-            store.startZoomCapture(snapshot, targetRect, 'out');
+            store.startZoomCapture(snapshot, targetRect, 'out', lastEntry.zoomedCrop);
           }
         }
       }
