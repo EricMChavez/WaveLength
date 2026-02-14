@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store/index.ts';
-import { captureGridSnapshot } from '../../gameboard/canvas/snapshot.ts';
+import { captureViewportSnapshot } from '../../gameboard/canvas/snapshot.ts';
+import { getNodeGridSize } from '../../shared/grid/index.ts';
 import styles from './GameboardButtons.module.css';
 
 export function GameboardButtons() {
@@ -10,8 +11,7 @@ export function GameboardButtons() {
   const activeBoardReadOnly = useGameStore((s) => s.activeBoardReadOnly);
   const ceremonyType = useGameStore((s) => s.ceremonyState.type);
   const overlayType = useGameStore((s) => s.activeOverlay.type);
-  const lidType = useGameStore((s) => s.lidAnimation.type);
-  const zoomTransition = useGameStore((s) => s.zoomTransition);
+  const zoomTransitionType = useGameStore((s) => s.zoomTransitionState.type);
 
   const canRecord = useGameStore((s) => {
     if (!s.isCreativeMode) return false;
@@ -27,11 +27,10 @@ export function GameboardButtons() {
     return false;
   });
 
-  // Both buttons hidden during overlays, lid animation, zoom transition, victory-screen
+  // Both buttons hidden during overlays, zoom transition, victory-screen
   const hidden =
     overlayType !== 'none' ||
-    lidType !== 'idle' ||
-    zoomTransition !== null ||
+    zoomTransitionType !== 'idle' ||
     ceremonyType === 'victory-screen';
 
   if (hidden) return null;
@@ -79,8 +78,19 @@ function BackButton({
     } else if (editingUtilityId !== null) {
       store.openOverlay({ type: 'unsaved-changes' });
     } else if (navigationDepth > 0 && activeBoardReadOnly) {
-      const snapshot = captureGridSnapshot();
-      if (snapshot) store.startLidClose(snapshot);
+      if (store.zoomTransitionState.type !== 'idle') return;
+      const snapshot = captureViewportSnapshot();
+      if (snapshot) {
+        const lastEntry = store.boardStack[store.boardStack.length - 1];
+        if (lastEntry) {
+          const parentNode = lastEntry.board.nodes.get(lastEntry.nodeIdInParent);
+          if (parentNode) {
+            const { cols, rows } = getNodeGridSize(parentNode);
+            const targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
+            store.startZoomCapture(snapshot, targetRect, 'out');
+          }
+        }
+      }
       store.zoomOut();
     } else if (isCreativeMode) {
       store.openOverlay({ type: 'start-screen' });

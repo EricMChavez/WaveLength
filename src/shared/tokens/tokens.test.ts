@@ -33,7 +33,7 @@ const DARK_VALUES: Record<string, string> = {
   '--token-port-stroke': '#5a9bf5',
   '--token-port-connected': '#50c878',
   '--token-grid-line': '#16161a',
-  '--token-anim-zoom-duration': '500ms',
+  '--token-anim-zoom-duration': '1200ms',
   '--token-anim-node-scale-duration': '200ms',
   '--token-anim-wire-draw-duration': '300ms',
   '--token-anim-easing-default': 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -181,7 +181,7 @@ describe('buildThemeTokens', () => {
 
   it('reads animation duration values', () => {
     const tokens = buildThemeTokens();
-    expect(tokens.animZoomDuration).toBe('500ms');
+    expect(tokens.animZoomDuration).toBe('1200ms');
     expect(tokens.animNodeScaleDuration).toBe('200ms');
     expect(tokens.animWireDrawDuration).toBe('300ms');
   });

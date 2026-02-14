@@ -4,17 +4,21 @@ import { buildContextMenuItems } from './context-menu-items.ts';
 import type { ContextMenuItem } from './context-menu-items.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
+import { captureViewportSnapshot } from '../../gameboard/canvas/snapshot.ts';
+import { getNodeGridSize } from '../../shared/grid/index.ts';
 import styles from './ContextMenu.module.css';
 
-/** Capture the canvas to an OffscreenCanvas and start the lid-open animation. */
-function captureAndStartLidOpen(state: ReturnType<typeof useGameStore.getState>): void {
-  const canvas = document.querySelector('canvas');
-  if (!canvas) return;
-  const snapshot = new OffscreenCanvas(canvas.width, canvas.height);
-  const ctx = snapshot.getContext('2d');
-  if (ctx) {
-    ctx.drawImage(canvas, 0, 0);
-    state.startLidOpen(snapshot);
+/** Capture viewport and start zoom-in transition for a node. */
+function captureAndStartZoomIn(state: ReturnType<typeof useGameStore.getState>, nodeId: string): void {
+  if (state.zoomTransitionState.type !== 'idle') return;
+  const node = state.activeBoard?.nodes.get(nodeId);
+  if (!node) return;
+
+  const snapshot = captureViewportSnapshot();
+  if (snapshot) {
+    const { cols, rows } = getNodeGridSize(node);
+    const targetRect = { col: node.position.col, row: node.position.row, cols, rows };
+    state.startZoomCapture(snapshot, targetRect, 'in');
   }
 }
 
@@ -69,15 +73,20 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
     menuRef.current?.focus();
   }, []);
 
-  // Position: flip if near viewport edge
-  const viewportW = window.innerWidth;
-  const viewportH = window.innerHeight;
-  let left = position.x;
-  let top = position.y;
+  // Position: flip if near container edge
+  // With will-change:transform on the game container, position:fixed is relative to the container
+  const container = document.querySelector<HTMLElement>('[data-game-container]');
+  const containerRect = container?.getBoundingClientRect();
+  const containerW = containerRect?.width ?? window.innerWidth;
+  const containerH = containerRect?.height ?? window.innerHeight;
+  const containerLeft = containerRect?.left ?? 0;
+  const containerTop = containerRect?.top ?? 0;
+  let left = position.x - containerLeft;
+  let top = position.y - containerTop;
   const menuW = 180;
   const menuH = items.length * 36 + 8;
-  if (left + menuW > viewportW) left = viewportW - menuW - 4;
-  if (top + menuH > viewportH) top = viewportH - menuH - 4;
+  if (left + menuW > containerW) left = containerW - menuW - 4;
+  if (top + menuH > containerH) top = containerH - menuH - 4;
   if (left < 0) left = 4;
   if (top < 0) top = 4;
 
@@ -98,7 +107,7 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
         break;
       case 'inspect':
         if (target.type === 'node') {
-          captureAndStartLidOpen(state);
+          captureAndStartZoomIn(state, target.nodeId);
           state.zoomIntoNode(target.nodeId);
         }
         break;
@@ -108,16 +117,15 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
           if (!node) break;
 
           if (node.type === 'custom-blank') {
-            // Create a fresh utility gameboard for a blank custom node
             const utilityId = generateId();
             const board = createUtilityGameboard(utilityId);
-            captureAndStartLidOpen(state);
+            captureAndStartZoomIn(state, target.nodeId);
             state.startEditingUtility(utilityId, board, target.nodeId);
           } else if (node.type.startsWith('utility:')) {
             const utilityId = node.type.slice('utility:'.length);
             const entry = state.utilityNodes.get(utilityId);
             if (entry) {
-              captureAndStartLidOpen(state);
+              captureAndStartZoomIn(state, target.nodeId);
               state.startEditingUtility(utilityId, entry.board, target.nodeId);
             }
           }

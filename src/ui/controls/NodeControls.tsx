@@ -1,5 +1,7 @@
 import { useGameStore } from '../../store/index.ts';
 import { NODE_TYPE_LABELS } from '../../shared/constants/index.ts';
+import { captureViewportSnapshot } from '../../gameboard/canvas/snapshot.ts';
+import { getNodeGridSize } from '../../shared/grid/index.ts';
 import styles from './NodeControls.module.css';
 
 export function NodeControls() {
@@ -36,8 +38,17 @@ export function NodeControls() {
 
   function handleEdit() {
     const state = useGameStore.getState();
-    const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
-    state.startZoomTransition('in', snapshot);
+    if (state.zoomTransitionState.type !== 'idle') return;
+    if (!state.activeBoard) return;
+    const node = state.activeBoard.nodes.get(selectedNodeId!);
+    if (!node) return;
+
+    const snapshot = captureViewportSnapshot();
+    if (snapshot) {
+      const { cols, rows } = getNodeGridSize(node);
+      const targetRect = { col: node.position.col, row: node.position.row, cols, rows };
+      state.startZoomCapture(snapshot, targetRect, 'in');
+    }
     zoomIntoNode(selectedNodeId!);
   }
 

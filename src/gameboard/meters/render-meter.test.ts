@@ -35,7 +35,7 @@ const mockTokens: ThemeTokens = {
   portStroke: '#59f',
   portConnected: '#5c8',
   gridLine: '#16161a',
-  animZoomDuration: '500ms',
+  animZoomDuration: '1200ms',
   animNodeScaleDuration: '300ms',
   animWireDrawDuration: '200ms',
   animEasingDefault: 'ease',

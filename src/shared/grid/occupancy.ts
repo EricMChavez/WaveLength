@@ -12,12 +12,12 @@ import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 export const FUNDAMENTAL_GRID_COLS = 3;
 export const FUNDAMENTAL_GRID_ROWS = 2;
 
-/** Utility node footprint — wider, 5:3 ratio approximates 16:9. */
-export const UTILITY_GRID_COLS = 5;
+/** Utility node footprint — wider to accommodate labels + ports. */
+export const UTILITY_GRID_COLS = 6;
 export const UTILITY_GRID_ROWS = 3;
 
-/** Puzzle node footprint — same width as fundamental, grows vertically. */
-export const PUZZLE_GRID_COLS = 3;
+/** Puzzle node footprint — wider than fundamental, grows vertically. */
+export const PUZZLE_GRID_COLS = 4;
 export const PUZZLE_MIN_GRID_ROWS = 2;
 
 /** @deprecated Use FUNDAMENTAL_GRID_COLS instead. */

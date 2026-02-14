@@ -1,15 +1,37 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { GameboardCanvas } from './gameboard/canvas/index.ts'
 import { SimulationControls } from './ui/controls/SimulationControls.tsx'
 import { GameboardButtons } from './ui/controls/GameboardButtons.tsx'
 import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
-import { ZoomTransition } from './ui/puzzle/ZoomTransition.tsx'
 import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, LevelSelectOverlay, SavePuzzleDialog, NodeCreationForm, SaveCancelDialog } from './ui/overlays/index.ts'
 import { PortConstantInput } from './ui/controls/PortConstantInput.tsx'
 import { useGameStore } from './store/index.ts'
 import type { GameboardState } from './shared/types/index.ts'
 import { StartScreen } from './ui/screens/index.ts'
 import { DevTools } from './dev/index.ts'
+
+/** Compute 16:9-fitting container dimensions from the window size. */
+function useContainerSize() {
+  const compute = useCallback(() => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const width = Math.min(vw, vh * 16 / 9);
+    const height = Math.min(vh, vw * 9 / 16);
+    return { width: Math.floor(width), height: Math.floor(height) };
+  }, []);
+
+  const [size, setSize] = useState(compute);
+
+  useEffect(() => {
+    function onResize() {
+      setSize(compute());
+    }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [compute]);
+
+  return size;
+}
 
 /** Create an empty creative mode gameboard (slot nodes added when user configures CPs) */
 function createCreativeGameboard(): GameboardState {
@@ -48,6 +70,8 @@ export function initializeCreativeMode(): void {
 }
 
 function App() {
+  const containerSize = useContainerSize();
+
   useEffect(() => {
     const store = useGameStore.getState();
 
@@ -71,23 +95,40 @@ function App() {
   }, [])
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <GameboardCanvas />
-      <GameboardButtons />
-      <SimulationControls />
-      <PortConstantInput />
-      <PaletteModal />
-      <ParameterPopover />
-      <ContextMenu />
-      <WaveformSelectorOverlay />
-      <LevelSelectOverlay />
-      <SavePuzzleDialog />
-      <SaveCancelDialog />
-      <NodeCreationForm />
-      <StartScreen />
-      <ZoomTransition />
-      <CompletionCeremony />
-      {/* {import.meta.env.DEV && <DevTools />} */}
+    <div style={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#000',
+    }}>
+      <div
+        data-game-container
+        style={{
+          width: containerSize.width,
+          height: containerSize.height,
+          position: 'relative',
+          overflow: 'hidden',
+          willChange: 'transform',
+        }}
+      >
+        <GameboardCanvas />
+        <GameboardButtons />
+        <SimulationControls />
+        <PortConstantInput />
+        <PaletteModal />
+        <ParameterPopover />
+        <ContextMenu />
+        <WaveformSelectorOverlay />
+        <LevelSelectOverlay />
+        <SavePuzzleDialog />
+        <SaveCancelDialog />
+        <NodeCreationForm />
+        <StartScreen />
+        <CompletionCeremony />
+        {/* {import.meta.env.DEV && <DevTools />} */}
+      </div>
     </div>
   )
 }

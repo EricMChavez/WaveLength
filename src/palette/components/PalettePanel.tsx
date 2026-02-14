@@ -2,6 +2,7 @@ import { useGameStore } from '../../store/index.ts';
 import { nodeRegistry, getNodeLabel } from '../../engine/nodes/registry.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
+import { captureViewportSnapshot } from '../../gameboard/canvas/snapshot.ts';
 import { LevelSelect } from '../../ui/puzzle/LevelSelect.tsx';
 import styles from './PalettePanel.module.css';
 
@@ -19,21 +20,30 @@ export function PalettePanel() {
 
   function handleCreateCustom() {
     const state = useGameStore.getState();
+    if (state.zoomTransitionState.type !== 'idle') return;
     const utilityId = generateId();
     const board = createUtilityGameboard(utilityId);
 
-    const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
-    state.startZoomTransition('in', snapshot);
+    const snapshot = captureViewportSnapshot();
+    if (snapshot) {
+      // Synthetic center rect (no specific node to zoom into)
+      const targetRect = { col: 28, row: 16, cols: 5, rows: 3 };
+      state.startZoomCapture(snapshot, targetRect, 'in');
+    }
     state.startEditingUtility(utilityId, board);
   }
 
   function handleEditUtility(utilityId: string) {
     const state = useGameStore.getState();
+    if (state.zoomTransitionState.type !== 'idle') return;
     const entry = state.utilityNodes.get(utilityId);
     if (!entry) return;
 
-    const snapshot = document.querySelector('canvas')?.toDataURL() ?? '';
-    state.startZoomTransition('in', snapshot);
+    const snapshot = captureViewportSnapshot();
+    if (snapshot) {
+      const targetRect = { col: 28, row: 16, cols: 5, rows: 3 };
+      state.startZoomCapture(snapshot, targetRect, 'in');
+    }
     state.startEditingUtility(utilityId, entry.board);
   }
 

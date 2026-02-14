@@ -55,11 +55,6 @@ export interface BoardStackEntry {
   meterSlots: Map<MeterKey, MeterSlotState>;
 }
 
-export interface ZoomTransition {
-  direction: 'in' | 'out';
-  snapshot: string;
-}
-
 export interface NodeSwap {
   nodeId: NodeId;
   newType: string;
@@ -72,14 +67,11 @@ export interface NavigationSlice {
   boardStack: BoardStackEntry[];
   activeBoardReadOnly: boolean;
   navigationDepth: number;
-  zoomTransition: ZoomTransition | null;
   editingUtilityId: string | null;
   editingNodeIdInParent: NodeId | null;
 
   zoomIntoNode: (nodeId: NodeId) => void;
   zoomOut: () => void;
-  startZoomTransition: (direction: 'in' | 'out', snapshot: string) => void;
-  endZoomTransition: () => void;
   startEditingUtility: (utilityId: string, board: GameboardState, nodeIdInParent?: NodeId) => void;
   finishEditingUtility: (nodeSwap?: NodeSwap) => void;
 }
@@ -177,17 +169,8 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
   boardStack: [],
   activeBoardReadOnly: false,
   navigationDepth: 0,
-  zoomTransition: null,
   editingUtilityId: null,
   editingNodeIdInParent: null,
-
-  startZoomTransition: (direction, snapshot) => {
-    set({ zoomTransition: { direction, snapshot } });
-  },
-
-  endZoomTransition: () => {
-    set({ zoomTransition: null });
-  },
 
   zoomIntoNode: (nodeId) => {
     const state = get();

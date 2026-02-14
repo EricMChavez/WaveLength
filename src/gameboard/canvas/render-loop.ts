@@ -22,7 +22,7 @@ import { drawHighlightStreak } from './render-highlight-streak.ts';
 import { HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { renderPlacementGhost } from './render-placement-ghost.ts';
-import { drawLidAnimation, computeProgress, parseDurationMs } from '../animation/index.ts';
+import { drawZoomTransition, computeProgress, gridRectToViewport, ZOOM_IN_PRESET, ZOOM_OUT_PRESET } from '../animation/index.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
 import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts';
 import { getRejectedKnobNodeId } from './rejected-knob.ts';
@@ -354,25 +354,17 @@ export function startRenderLoop(
     // Clear full viewport canvas
     ctx!.clearRect(0, 0, vpWidth, vpHeight);
 
-    // During legacy zoom transition, keep canvas cleared and skip drawing
-    // so the snapshot overlay is the only thing visible.
-    if (state.zoomTransition) {
-      animationId = requestAnimationFrame(render);
-      return;
-    }
+    // --- Zoom transition: capturing / animating ---
+    const zoomState = state.zoomTransitionState;
+    const zoomAnimating = zoomState.type === 'animating';
+    let zoomProgress = 0;
 
-    // --- Lid animation: advance progress and check completion ---
-    const lidAnim = state.lidAnimation;
-    const lidActive = lidAnim.type === 'opening' || lidAnim.type === 'closing';
-    let lidProgress = 0;
+    if (zoomAnimating) {
+      const preset = zoomState.direction === 'in' ? ZOOM_IN_PRESET : ZOOM_OUT_PRESET;
+      zoomProgress = computeProgress(zoomState.startTime, timestamp, preset.durationMs);
 
-    if (lidActive) {
-      const durationMs = parseDurationMs(tokens.animZoomDuration);
-      lidProgress = computeProgress(lidAnim.startTime, timestamp, durationMs);
-
-      if (lidProgress >= 1) {
-        state.endLidAnimation();
-        // Animation complete — render the live board below without overlay
+      if (zoomProgress >= 1) {
+        state.endZoomTransition();
         animationId = requestAnimationFrame(render);
         return;
       }
@@ -749,13 +741,33 @@ export function startRenderLoop(
       hoveredButton: getHoveredPlaybackButton(),
     }, cellSize);
 
-    // Lid animation overlay (drawn on top of the live board)
-    if (lidActive) {
-      drawLidAnimation(ctx!, tokens, lidAnim, lidProgress, logicalWidth, logicalHeight);
+    // Zoom transition: capture second snapshot when in 'capturing' state
+    if (zoomState.type === 'capturing') {
+      const secondSnapshot = new OffscreenCanvas(canvas.width, canvas.height);
+      const snapCtx = secondSnapshot.getContext('2d');
+      if (snapCtx) {
+        snapCtx.drawImage(canvas, 0, 0);
+      }
+      state.finalizeZoomCapture(secondSnapshot);
+      // The state has transitioned to 'animating' — continue to next frame
+      animationId = requestAnimationFrame(render);
+      return;
     }
 
-    // Dim canvas when an overlay is active (but not during ceremony or lid)
-    if (overlayActive && !lidActive && !ceremonyActive) {
+    // Zoom transition overlay (drawn on top of the live board)
+    if (zoomAnimating) {
+      const preset = zoomState.direction === 'in' ? ZOOM_IN_PRESET : ZOOM_OUT_PRESET;
+      const targetPixelRect = gridRectToViewport(zoomState.targetRect, cellSize, offset);
+      // Reset to viewport coords (remove grid translate) for the transition overlay
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawZoomTransition(
+        ctx!, zoomState.outerSnapshot, zoomState.innerSnapshot,
+        targetPixelRect, zoomState.direction, zoomProgress, preset, vpWidth, vpHeight,
+      );
+    }
+
+    // Dim canvas when an overlay is active (but not during ceremony or zoom transition)
+    if (overlayActive && !zoomAnimating && !ceremonyActive) {
       ctx!.fillStyle = 'rgba(0,0,0,0.15)';
       ctx!.fillRect(-offset.x, -offset.y, vpWidth, vpHeight);
     }

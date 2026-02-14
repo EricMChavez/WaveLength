@@ -6,7 +6,7 @@
  */
 
 :root {
-  --token-anim-zoom-duration: 500ms;
+  --token-anim-zoom-duration: 1200ms;
   --token-anim-node-scale-duration: 200ms;
   --token-anim-wire-draw-duration: 300ms;
   --token-anim-easing-default: cubic-bezier(0.4, 0, 0.2, 1);

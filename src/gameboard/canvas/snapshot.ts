@@ -20,3 +20,22 @@ export function unregisterSnapshotCapture(): void {
 export function captureGridSnapshot(): OffscreenCanvas | null {
   return _capture ? _capture() : null;
 }
+
+// ── Viewport capture (full canvas including margins) ──
+
+let _viewportCapture: (() => OffscreenCanvas | null) | null = null;
+
+/** Register the viewport capture function. Called from GameboardCanvas effect setup. */
+export function registerViewportCapture(fn: () => OffscreenCanvas | null): void {
+  _viewportCapture = fn;
+}
+
+/** Unregister the viewport capture function. Called on cleanup. */
+export function unregisterViewportCapture(): void {
+  _viewportCapture = null;
+}
+
+/** Capture a full-viewport snapshot (including margins/page bg). */
+export function captureViewportSnapshot(): OffscreenCanvas | null {
+  return _viewportCapture ? _viewportCapture() : null;
+}

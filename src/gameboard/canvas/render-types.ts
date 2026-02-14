@@ -79,7 +79,6 @@ export interface RenderLoopState {
   hoveredNodeId: string | null;
   interactionMode: InteractionMode;
   mousePosition: Vec2 | null;
-  zoomTransition: unknown;
   puzzleNodes: ReadonlyMap<string, PuzzleNodeEntry>;
   utilityNodes: ReadonlyMap<string, UtilityNodeEntry>;
   activePuzzle: PuzzleDefinition | null;

@@ -15,7 +15,6 @@ import { createOverlaySlice } from './overlay-slice.ts';
 import { createAnimationSlice } from './animation-slice.ts';
 import type { GameStore } from '../index.ts';
 
-// Stub OffscreenCanvas for test environment
 function mockOffscreenCanvas(): OffscreenCanvas {
   return { width: 1920, height: 1080 } as unknown as OffscreenCanvas;
 }
@@ -38,7 +37,7 @@ function createTestStore() {
   }));
 }
 
-describe('animation-slice', () => {
+describe('animation-slice (zoom transition)', () => {
   let store: ReturnType<typeof createTestStore>;
 
   beforeEach(() => {
@@ -47,152 +46,130 @@ describe('animation-slice', () => {
   });
 
   describe('initial state', () => {
-    it('lidAnimation starts as idle', () => {
-      expect(store.getState().lidAnimation.type).toBe('idle');
+    it('starts as idle', () => {
+      expect(store.getState().zoomTransitionState.type).toBe('idle');
     });
   });
 
-  describe('startLidOpen', () => {
-    it('transitions from idle to opening', () => {
+  describe('startZoomCapture', () => {
+    it('transitions from idle to capturing', () => {
       const snapshot = mockOffscreenCanvas();
-      store.getState().startLidOpen(snapshot);
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
+      store.getState().startZoomCapture(snapshot, rect, 'in');
 
-      const anim = store.getState().lidAnimation;
-      expect(anim.type).toBe('opening');
-      if (anim.type === 'opening') {
-        expect(anim.progress).toBe(0);
-        expect(anim.snapshot).toBe(snapshot);
-        expect(anim.startTime).toBe(1000);
+      const state = store.getState().zoomTransitionState;
+      expect(state.type).toBe('capturing');
+      if (state.type === 'capturing') {
+        expect(state.firstSnapshot).toBe(snapshot);
+        expect(state.targetRect).toEqual(rect);
+        expect(state.direction).toBe('in');
       }
     });
 
-    it('is a no-op if already opening', () => {
+    it('is a no-op if not idle', () => {
       const snap1 = mockOffscreenCanvas();
       const snap2 = mockOffscreenCanvas();
-      store.getState().startLidOpen(snap1);
-      store.getState().startLidOpen(snap2);
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
+      store.getState().startZoomCapture(snap1, rect, 'in');
+      store.getState().startZoomCapture(snap2, rect, 'out');
 
-      const anim = store.getState().lidAnimation;
-      if (anim.type === 'opening') {
-        expect(anim.snapshot).toBe(snap1);
+      const state = store.getState().zoomTransitionState;
+      if (state.type === 'capturing') {
+        expect(state.firstSnapshot).toBe(snap1);
+        expect(state.direction).toBe('in');
       }
     });
+  });
 
-    it('is a no-op if closing is in progress', () => {
+  describe('finalizeZoomCapture', () => {
+    it('transitions from capturing to animating', () => {
       const snap1 = mockOffscreenCanvas();
-      store.getState().startLidClose(snap1);
-      expect(store.getState().lidAnimation.type).toBe('closing');
+      const snap2 = mockOffscreenCanvas();
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
 
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('closing');
-    });
-  });
+      store.getState().startZoomCapture(snap1, rect, 'in');
+      store.getState().finalizeZoomCapture(snap2);
 
-  describe('startLidClose', () => {
-    it('transitions from idle to closing', () => {
-      const snapshot = mockOffscreenCanvas();
-      store.getState().startLidClose(snapshot);
-
-      const anim = store.getState().lidAnimation;
-      expect(anim.type).toBe('closing');
-      if (anim.type === 'closing') {
-        expect(anim.progress).toBe(0);
-        expect(anim.snapshot).toBe(snapshot);
-        expect(anim.startTime).toBe(1000);
+      const state = store.getState().zoomTransitionState;
+      expect(state.type).toBe('animating');
+      if (state.type === 'animating') {
+        // zoom-in: outer=first(parent), inner=second(child)
+        expect(state.outerSnapshot).toBe(snap1);
+        expect(state.innerSnapshot).toBe(snap2);
+        expect(state.direction).toBe('in');
+        expect(state.startTime).toBe(1000);
       }
     });
 
-    it('is a no-op if already closing', () => {
+    it('assigns snapshots correctly for zoom-out', () => {
       const snap1 = mockOffscreenCanvas();
-      store.getState().startLidClose(snap1);
-      store.getState().startLidClose(mockOffscreenCanvas());
+      const snap2 = mockOffscreenCanvas();
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
 
-      const anim = store.getState().lidAnimation;
-      if (anim.type === 'closing') {
-        expect(anim.snapshot).toBe(snap1);
+      store.getState().startZoomCapture(snap1, rect, 'out');
+      store.getState().finalizeZoomCapture(snap2);
+
+      const state = store.getState().zoomTransitionState;
+      if (state.type === 'animating') {
+        // zoom-out: outer=second(parent), inner=first(child)
+        expect(state.outerSnapshot).toBe(snap2);
+        expect(state.innerSnapshot).toBe(snap1);
       }
     });
 
-    it('is a no-op if opening is in progress', () => {
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('opening');
-
-      store.getState().startLidClose(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('opening');
+    it('is a no-op if not capturing', () => {
+      store.getState().finalizeZoomCapture(mockOffscreenCanvas());
+      expect(store.getState().zoomTransitionState.type).toBe('idle');
     });
   });
 
-  describe('setLidProgress', () => {
-    it('updates progress on opening animation', () => {
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      store.getState().setLidProgress(0.5);
+  describe('endZoomTransition', () => {
+    it('transitions from animating to idle', () => {
+      const snap1 = mockOffscreenCanvas();
+      const snap2 = mockOffscreenCanvas();
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
 
-      const anim = store.getState().lidAnimation;
-      if (anim.type === 'opening') {
-        expect(anim.progress).toBe(0.5);
-      }
-    });
+      store.getState().startZoomCapture(snap1, rect, 'in');
+      store.getState().finalizeZoomCapture(snap2);
+      expect(store.getState().zoomTransitionState.type).toBe('animating');
 
-    it('updates progress on closing animation', () => {
-      store.getState().startLidClose(mockOffscreenCanvas());
-      store.getState().setLidProgress(0.75);
-
-      const anim = store.getState().lidAnimation;
-      if (anim.type === 'closing') {
-        expect(anim.progress).toBe(0.75);
-      }
-    });
-
-    it('clamps progress to 1', () => {
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      store.getState().setLidProgress(1.5);
-
-      const anim = store.getState().lidAnimation;
-      if (anim.type === 'opening') {
-        expect(anim.progress).toBe(1);
-      }
-    });
-
-    it('is a no-op when idle', () => {
-      store.getState().setLidProgress(0.5);
-      expect(store.getState().lidAnimation.type).toBe('idle');
-    });
-  });
-
-  describe('endLidAnimation', () => {
-    it('transitions from opening to idle', () => {
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('opening');
-
-      store.getState().endLidAnimation();
-      expect(store.getState().lidAnimation.type).toBe('idle');
-    });
-
-    it('transitions from closing to idle', () => {
-      store.getState().startLidClose(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('closing');
-
-      store.getState().endLidAnimation();
-      expect(store.getState().lidAnimation.type).toBe('idle');
+      store.getState().endZoomTransition();
+      expect(store.getState().zoomTransitionState.type).toBe('idle');
     });
 
     it('is safe to call when already idle', () => {
-      store.getState().endLidAnimation();
-      expect(store.getState().lidAnimation.type).toBe('idle');
+      store.getState().endZoomTransition();
+      expect(store.getState().zoomTransitionState.type).toBe('idle');
     });
   });
 
-  describe('only one animation at a time', () => {
-    it('cannot start open while close is running', () => {
-      store.getState().startLidClose(mockOffscreenCanvas());
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('closing');
+  describe('only one transition at a time', () => {
+    it('cannot start capture while capturing', () => {
+      const snap1 = mockOffscreenCanvas();
+      const snap2 = mockOffscreenCanvas();
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
+
+      store.getState().startZoomCapture(snap1, rect, 'in');
+      store.getState().startZoomCapture(snap2, rect, 'out');
+
+      const state = store.getState().zoomTransitionState;
+      expect(state.type).toBe('capturing');
+      if (state.type === 'capturing') {
+        expect(state.direction).toBe('in');
+      }
     });
 
-    it('cannot start close while open is running', () => {
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      store.getState().startLidClose(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('opening');
+    it('cannot start capture while animating', () => {
+      const snap1 = mockOffscreenCanvas();
+      const snap2 = mockOffscreenCanvas();
+      const rect = { col: 10, row: 5, cols: 4, rows: 3 };
+
+      store.getState().startZoomCapture(snap1, rect, 'in');
+      store.getState().finalizeZoomCapture(snap2);
+      expect(store.getState().zoomTransitionState.type).toBe('animating');
+
+      store.getState().startZoomCapture(mockOffscreenCanvas(), rect, 'out');
+      expect(store.getState().zoomTransitionState.type).toBe('animating');
     });
   });
 });

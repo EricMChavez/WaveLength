@@ -285,6 +285,29 @@ function drawNodeBody(
     }
   }
 
+  // --- Portal border for custom nodes (zoom transition target area) ---
+  if (node.type.startsWith('puzzle:') || node.type.startsWith('utility:')) {
+    const TARGET_ASPECT = 16 / 9;
+    const targetW = rect.height * TARGET_ASPECT;
+    const bodyCenter = rect.x + rect.width / 2;
+    const targetLeft = bodyCenter - targetW / 2;
+    const targetRight = bodyCenter + targetW / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.width, rect.height, borderRadius);
+    ctx.clip();
+    ctx.fillStyle = '#000000';
+    const portalBorderW = 2;
+    if (targetLeft > rect.x) {
+      ctx.fillRect(targetLeft - portalBorderW / 2, rect.y, portalBorderW, rect.height);
+    }
+    if (targetRight < rect.x + rect.width) {
+      ctx.fillRect(targetRight - portalBorderW / 2, rect.y, portalBorderW, rect.height);
+    }
+    ctx.restore();
+  }
+
   // --- Modified indicator ---
   drawModifiedIndicator(ctx, tokens, state, node, rect);
 }

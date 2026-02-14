@@ -37,15 +37,23 @@ function ParameterPopoverInner({ nodeId }: { nodeId: string }) {
   const cellSize = getCellSize();
   const rect = getNodePixelRect(node, cellSize);
 
-  // Get canvas offset in viewport
+  // Get canvas offset relative to the game container
+  // With will-change:transform on the container, position:fixed is relative to it
   const canvas = document.querySelector('canvas');
   const canvasRect = canvas?.getBoundingClientRect();
-  const canvasOffset = canvasRect
-    ? { x: canvasRect.left, y: canvasRect.top }
-    : { x: 0, y: 0 };
+  const container = document.querySelector<HTMLElement>('[data-game-container]');
+  const containerRect = container?.getBoundingClientRect();
+  const canvasOffset = canvasRect && containerRect
+    ? { x: canvasRect.left - containerRect.left, y: canvasRect.top - containerRect.top }
+    : canvasRect
+      ? { x: canvasRect.left, y: canvasRect.top }
+      : { x: 0, y: 0 };
 
   const popoverSize = { width: 220, height: 100 };
-  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const viewport = {
+    width: containerRect?.width ?? window.innerWidth,
+    height: containerRect?.height ?? window.innerHeight,
+  };
 
   const pos = computePopoverPosition(
     { x: rect.x, y: rect.y, width: rect.width, height: rect.height },

@@ -31,7 +31,8 @@ import {
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
-import { registerSnapshotCapture, unregisterSnapshotCapture } from './snapshot.ts';
+import { registerSnapshotCapture, unregisterSnapshotCapture, registerViewportCapture, unregisterViewportCapture, captureViewportSnapshot } from './snapshot.ts';
+import { getNodeGridSize } from '../../shared/grid/index.ts';
 import { hitTestPlaybackBar, setHoveredPlaybackButton } from './render-playback-bar.ts';
 
 function getCanvasLogicalSize(canvas: HTMLCanvasElement) {
@@ -325,9 +326,19 @@ export function GameboardCanvas() {
       createGridSnapshot(canvas, offsetRef.current, cellSizeRef.current),
     );
 
+    // Register viewport capture for zoom transitions (full viewport including margins)
+    registerViewportCapture(() => {
+      const snapshot = new OffscreenCanvas(canvas.width, canvas.height);
+      const snapCtx = snapshot.getContext('2d');
+      if (!snapCtx) return null;
+      snapCtx.drawImage(canvas, 0, 0);
+      return snapshot;
+    });
+
     return () => {
       stopLoop();
       unregisterSnapshotCapture();
+      unregisterViewportCapture();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('dev-overrides-changed', onDevOverridesChanged);
     };
@@ -352,12 +363,20 @@ export function GameboardCanvas() {
         }
         const action = getEscapeAction(state);
 
-        // If zoom-out, capture snapshot for lid-close animation
+        // If zoom-out, capture snapshot for zoom-out animation
         if (action === 'zoom-out') {
-          const canvas = canvasRef.current;
-          if (canvas) {
-            const snapshot = createGridSnapshot(canvas, offsetRef.current, cellSizeRef.current);
-            if (snapshot) state.startLidClose(snapshot);
+          if (state.zoomTransitionState.type !== 'idle') return;
+          const snapshot = captureViewportSnapshot();
+          if (snapshot) {
+            const lastEntry = state.boardStack[state.boardStack.length - 1];
+            if (lastEntry) {
+              const parentNode = lastEntry.board.nodes.get(lastEntry.nodeIdInParent);
+              if (parentNode) {
+                const { cols, rows } = getNodeGridSize(parentNode);
+                const targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
+                state.startZoomCapture(snapshot, targetRect, 'out');
+              }
+            }
           }
         }
 
@@ -396,10 +415,17 @@ export function GameboardCanvas() {
         activePuzzle: state.activePuzzle,
         keyboardGhostPosition: state.keyboardGhostPosition,
         onEnterNode: (nodeId: string) => {
-          const canvas = canvasRef.current;
-          if (canvas) {
-            const snapshot = createGridSnapshot(canvas, offsetRef.current, cellSizeRef.current);
-            if (snapshot) state.startLidOpen(snapshot);
+          if (state.zoomTransitionState.type !== 'idle') return;
+          if (state.activeBoard) {
+            const node = state.activeBoard.nodes.get(nodeId);
+            if (node) {
+              const snapshot = captureViewportSnapshot();
+              if (snapshot) {
+                const { cols, rows } = getNodeGridSize(node);
+                const targetRect = { col: node.position.col, row: node.position.row, cols, rows };
+                state.startZoomCapture(snapshot, targetRect, 'in');
+              }
+            }
           }
           state.zoomIntoNode(nodeId);
         },

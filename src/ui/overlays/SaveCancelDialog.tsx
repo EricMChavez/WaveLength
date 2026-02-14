@@ -1,11 +1,29 @@
 import { useGameStore } from '../../store/index.ts';
 import { bakeGraph } from '../../engine/baking/index.ts';
 import { generateId } from '../../shared/generate-id.ts';
+import { captureViewportSnapshot } from '../../gameboard/canvas/snapshot.ts';
+import { getNodeGridSize } from '../../shared/grid/index.ts';
 import type { NodeSwap } from '../../store/slices/navigation-slice.ts';
 import styles from './SaveCancelDialog.module.css';
 
-function getCanvasSnapshot(): string {
-  return document.querySelector('canvas')?.toDataURL() ?? '';
+/** Capture viewport and start zoom-out transition. */
+function startZoomOut(state: ReturnType<typeof useGameStore.getState>): void {
+  if (state.zoomTransitionState.type !== 'idle') return;
+  const snapshot = captureViewportSnapshot();
+  if (!snapshot) return;
+
+  const lastEntry = state.boardStack[state.boardStack.length - 1];
+  if (lastEntry) {
+    const parentNode = lastEntry.board.nodes.get(lastEntry.nodeIdInParent);
+    if (parentNode) {
+      const { cols, rows } = getNodeGridSize(parentNode);
+      const targetRect = { col: parentNode.position.col, row: parentNode.position.row, cols, rows };
+      state.startZoomCapture(snapshot, targetRect, 'out');
+      return;
+    }
+  }
+  // Fallback: synthetic center rect
+  state.startZoomCapture(snapshot, { col: 28, row: 16, cols: 5, rows: 3 }, 'out');
 }
 
 export function SaveCancelDialog() {
@@ -33,7 +51,7 @@ export function SaveCancelDialog() {
       const overwrite = window.confirm(`Overwrite "${existingEntry.title}"?`);
       if (overwrite) {
         state.updateUtilityNode(editingUtilityId, metadata, state.activeBoard);
-        state.startZoomTransition('out', getCanvasSnapshot());
+        startZoomOut(state);
         state.finishEditingUtility();
       } else {
         const newName = window.prompt('Name for new custom node:');
@@ -49,7 +67,7 @@ export function SaveCancelDialog() {
           versionHash: generateId(),
           cpLayout,
         });
-        state.startZoomTransition('out', getCanvasSnapshot());
+        startZoomOut(state);
         const swap: NodeSwap | undefined = nodeIdInParent ? {
           nodeId: nodeIdInParent,
           newType: `utility:${newUtilityId}`,
@@ -72,7 +90,7 @@ export function SaveCancelDialog() {
         versionHash: generateId(),
         cpLayout,
       });
-      state.startZoomTransition('out', getCanvasSnapshot());
+      startZoomOut(state);
       const swap: NodeSwap | undefined = nodeIdInParent ? {
         nodeId: nodeIdInParent,
         newType: `utility:${editingUtilityId}`,
@@ -88,7 +106,7 @@ export function SaveCancelDialog() {
 
   function handleDiscard() {
     const state = useGameStore.getState();
-    state.startZoomTransition('out', getCanvasSnapshot());
+    startZoomOut(state);
     state.finishEditingUtility();
     state.closeOverlay();
   }
