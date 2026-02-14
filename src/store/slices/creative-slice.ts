@@ -22,11 +22,10 @@ export interface CreativeSlotState {
   waveform: WaveformDef;
 }
 
-/** Create default slot state (left=input, right=output) */
+/** Create default slot state (all off — fresh creative mode starts empty) */
 function createDefaultSlots(): CreativeSlotState[] {
-  return Array.from({ length: CREATIVE_SLOT_COUNT }, (_, i) => ({
-    // Left slots (0-2) are inputs, right slots (3-5) are outputs
-    direction: (i < 3 ? 'input' : 'output') as 'input' | 'output',
+  return Array.from({ length: CREATIVE_SLOT_COUNT }, () => ({
+    direction: 'off' as const,
     waveform: { ...DEFAULT_INPUT_WAVEFORM },
   }));
 }
@@ -56,18 +55,18 @@ export interface CreativeSlice {
   setCreativeSlotWaveform: (slotIndex: number, waveform: WaveformDef) => void;
   /** Set just the shape of a slot's waveform (keeps other params) */
   setCreativeSlotWaveformShape: (slotIndex: number, shape: WaveformShape) => void;
-  /** Get the slot index for a meter (side + index) */
+  /** @deprecated Use slotIndex directly — no conversion needed */
   getCreativeSlotIndex: (side: 'left' | 'right', index: number) => number;
   /** Clear saved creative state (for "New Creative" action) */
   clearSavedCreativeState: () => void;
 }
 
-/** Convert meter side + index to slot index */
+/** @deprecated Use sideToSlot() from shared/grid/slot-helpers.ts instead */
 export function meterToSlotIndex(side: 'left' | 'right', index: number): number {
   return side === 'left' ? index : index + 3;
 }
 
-/** Convert slot index to meter side + index */
+/** @deprecated Use slotSide()/slotPerSideIndex() from shared/grid/slot-helpers.ts instead */
 export function slotToMeterInfo(slotIndex: number): { side: 'left' | 'right'; index: number } {
   if (slotIndex < 3) {
     return { side: 'left', index: slotIndex };

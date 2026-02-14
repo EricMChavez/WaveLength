@@ -225,7 +225,7 @@ describe('navigation-slice', () => {
 
     const s = store.getState();
     for (const slot of s.meterSlots.values()) {
-      expect(slot.visualState).toBe('hidden');
+      expect(slot.mode).toBe('hidden');
     }
   });
 
@@ -236,20 +236,20 @@ describe('navigation-slice', () => {
     // Simulate active meters before zoom-in
     const { meterSlots } = store.getState();
     for (const [key, slot] of meterSlots) {
-      meterSlots.set(key, { ...slot, visualState: 'active' });
+      meterSlots.set(key, { ...slot, mode: 'input' });
     }
     store.setState({ meterSlots: new Map(meterSlots) });
 
     store.getState().zoomIntoNode('p1');
     // Child board gets default (hidden) meters
     for (const slot of store.getState().meterSlots.values()) {
-      expect(slot.visualState).toBe('hidden');
+      expect(slot.mode).toBe('hidden');
     }
 
     store.getState().zoomOut();
     // Parent meters should be restored to 'active'
     for (const slot of store.getState().meterSlots.values()) {
-      expect(slot.visualState).toBe('active');
+      expect(slot.mode).toBe('input');
     }
   });
 
@@ -270,9 +270,9 @@ describe('navigation-slice', () => {
     const s = store.getState();
     // Occupancy should be recomputed for utility board
     expect(s.occupancy).toBeDefined();
-    // Meters should be reset to hidden
+    // Utility editing: meters derived from board (no utility slot nodes → all 'off')
     for (const slot of s.meterSlots.values()) {
-      expect(slot.visualState).toBe('hidden');
+      expect(slot.mode).toBe('off');
     }
   });
 
@@ -283,7 +283,7 @@ describe('navigation-slice', () => {
     // Set parent meters to active
     const { meterSlots } = store.getState();
     for (const [key, slot] of meterSlots) {
-      meterSlots.set(key, { ...slot, visualState: 'active' });
+      meterSlots.set(key, { ...slot, mode: 'input' });
     }
     store.setState({ meterSlots: new Map(meterSlots) });
 
@@ -294,9 +294,9 @@ describe('navigation-slice', () => {
     };
 
     store.getState().startEditingUtility('util1', utilityBoard, 'p1' as any);
-    // Child should have hidden meters
+    // Child should have 'off' meters (empty utility board → no utility slot nodes)
     for (const slot of store.getState().meterSlots.values()) {
-      expect(slot.visualState).toBe('hidden');
+      expect(slot.mode).toBe('off');
     }
 
     store.getState().finishEditingUtility();
@@ -306,7 +306,7 @@ describe('navigation-slice', () => {
     expect(s.occupancy).toBeDefined();
     // Meters should be restored to active
     for (const slot of s.meterSlots.values()) {
-      expect(slot.visualState).toBe('active');
+      expect(slot.mode).toBe('input');
     }
   });
 });

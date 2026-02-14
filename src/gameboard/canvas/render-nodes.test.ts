@@ -63,6 +63,7 @@ function makeState(overrides: Partial<RenderNodesState> = {}): RenderNodesState 
     portSignals: new Map(),
     rejectedKnobNodeId: null,
     connectedInputPorts: new Set(),
+    liveNodeIds: new Set(),
     ...overrides,
   };
 }
@@ -135,10 +136,9 @@ describe('getNodePixelRect', () => {
     const node = makeNode('n1', 'memory', 5, 3);
     const cellSize = 40;
     const rect = getNodePixelRect(node, cellSize);
-    // Single port at row 1, but grid is 2 rows tall → body covers full grid
-    // bodyTop = min(0.5, -0.5) = -0.5, bodyBottom = max(1.5, 1.5) = 1.5, height = 2 cells
-    expect(rect.width).toBe(FUNDAMENTAL_GRID_COLS * cellSize);
-    expect(rect.height).toBe(FUNDAMENTAL_GRID_ROWS * cellSize);
+    // memory is 3x1: single port at row 0, body spans 1 cell tall with 0.5 padding above
+    expect(rect.width).toBe(3 * cellSize);
+    expect(rect.height).toBe(1 * cellSize);
     expect(rect.x).toBe(5 * cellSize);
     expect(rect.y).toBe((3 - 0.5) * cellSize);
   });

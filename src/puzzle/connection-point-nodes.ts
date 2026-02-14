@@ -6,8 +6,10 @@ const CP_INPUT_PREFIX = '__cp_input_';
 const CP_OUTPUT_PREFIX = '__cp_output_';
 /** ID prefix for creative mode slot virtual nodes */
 const CP_CREATIVE_PREFIX = '__cp_creative_';
-/** ID prefix for bidirectional connection point virtual nodes (utility editing) */
+/** ID prefix for bidirectional connection point virtual nodes (utility editing) - LEGACY */
 const CP_BIDIR_PREFIX = '__cp_bidir_';
+/** ID prefix for utility slot virtual nodes (new utility editing) */
+const CP_UTILITY_PREFIX = '__cp_utility_';
 /** ID suffix */
 const CP_SUFFIX = '__';
 
@@ -43,9 +45,49 @@ export function getBidirectionalCpIndex(nodeId: string): number {
   return parseInt(num, 10);
 }
 
+/** Build the virtual node ID for a utility slot */
+export function utilitySlotId(slotIndex: number): string {
+  return `${CP_UTILITY_PREFIX}${slotIndex}${CP_SUFFIX}`;
+}
+
+/** Check if a node ID is a utility slot virtual node */
+export function isUtilitySlotNode(nodeId: string): boolean {
+  return nodeId.startsWith(CP_UTILITY_PREFIX) && nodeId.endsWith(CP_SUFFIX);
+}
+
+/** Extract the slot index from a utility slot node ID. Returns -1 if not a utility slot node. */
+export function getUtilitySlotIndex(nodeId: string): number {
+  if (!isUtilitySlotNode(nodeId)) return -1;
+  const num = nodeId.slice(CP_UTILITY_PREFIX.length, -CP_SUFFIX.length);
+  return parseInt(num, 10);
+}
+
+/**
+ * Create a virtual NodeState for a utility slot.
+ * Slots 0-2 are on the left side, slots 3-5 are on the right side.
+ * Input slots emit signals (0 inputs, 1 output).
+ * Output slots receive signals (1 input, 0 outputs).
+ */
+export function createUtilitySlotNode(
+  slotIndex: number,
+  direction: 'input' | 'output',
+): NodeState {
+  const id = utilitySlotId(slotIndex);
+  const type = direction === 'input' ? 'connection-input' : 'connection-output';
+
+  return {
+    id,
+    type,
+    position: { col: 0, row: 0 },
+    params: { slotIndex },
+    inputCount: direction === 'input' ? 0 : 1,
+    outputCount: direction === 'input' ? 1 : 0,
+  };
+}
+
 /** Check if a node ID belongs to any connection point virtual node */
 export function isConnectionPointNode(nodeId: string): boolean {
-  return isConnectionInputNode(nodeId) || isConnectionOutputNode(nodeId) || isCreativeSlotNode(nodeId) || isBidirectionalCpNode(nodeId);
+  return isConnectionInputNode(nodeId) || isConnectionOutputNode(nodeId) || isCreativeSlotNode(nodeId) || isBidirectionalCpNode(nodeId) || isUtilitySlotNode(nodeId);
 }
 
 /** Check if a node ID is a creative mode slot virtual node */

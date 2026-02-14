@@ -85,7 +85,8 @@ function SavePuzzleDialogInner() {
     const tolerance = SOLVE_CHECK_TOLERANCE;
 
     for (const [slotIndex, targetSamples] of recordedTargetSamples) {
-      const outputIdx = slotIndex - 3;
+      // Creative-mode evaluator uses slotIndex directly as outputIndex (not slotIndex - 3)
+      const outputIdx = slotIndex;
       if (outputIdx < 0 || outputIdx >= outputCount) return false;
       for (let c = 0; c < targetSamples.length; c++) {
         const actual = cycleResults.outputValues[c]?.[outputIdx] ?? 0;

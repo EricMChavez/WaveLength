@@ -1,7 +1,9 @@
 import type { StateCreator } from 'zustand';
 import type { NodeState, GameboardState, Wire } from '../../shared/types/index.ts';
 import { createWire } from '../../shared/types/index.ts';
-import type { WaveformDef, ConnectionPointConfig, PuzzleDefinition, AllowedNodes } from '../../puzzle/types.ts';
+import type { WaveformDef, PuzzleDefinition, AllowedNodes, SlotConfig } from '../../puzzle/types.ts';
+import type { MeterMode } from '../../gameboard/meters/meter-types.ts';
+import { buildSlotConfigFromDirections } from '../../puzzle/types.ts';
 import { createConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
 
 /** Definition of a custom puzzle created in Creative Mode */
@@ -104,7 +106,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       exitCreativeMode: () => void;
       setActiveBoard: (board: GameboardState) => void;
       loadPuzzle: (puzzle: PuzzleDefinition) => void;
-      initializeMeters: (config: ConnectionPointConfig, state?: string) => void;
+      initializeMeters: (config: SlotConfig, inactiveMode?: MeterMode) => void;
     };
 
     // Exit creative mode
@@ -114,8 +116,6 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
     const nodes = new Map<string, NodeState>();
     let inputCount = 0;
     let outputCount = 0;
-    // Track cpIndex per slot for meter config
-    const slotCpIndices: (number | undefined)[] = new Array(puzzle.slots.length).fill(undefined);
 
     for (let i = 0; i < puzzle.slots.length; i++) {
       const slot = puzzle.slots[i];
@@ -126,7 +126,6 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       const meterIndex = isLeftSide ? i : i - 3;
       const cpType = slot.direction === 'input' ? 'input' : 'output';
       const cpIndex = slot.direction === 'input' ? inputCount++ : outputCount++;
-      slotCpIndices[i] = cpIndex;
 
       const node = createConnectionPointNode(cpType, cpIndex, { physicalSide, meterIndex });
       nodes.set(node.id, node);
@@ -188,20 +187,9 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
       }
     }
 
-    // Build meter config from slot layout — 1:1 positional mapping (no packing)
-    // Slots 0-2 map to left meters 0-2, slots 3-5 map to right meters 0-2
-    const leftMeters = puzzle.slots.slice(0, 3).map((slot, i) => ({
-      active: slot.direction !== 'off',
-      direction: (slot.direction === 'off' ? 'input' : slot.direction) as 'input' | 'output',
-      cpIndex: slotCpIndices[i],
-    }));
-    const rightMeters = puzzle.slots.slice(3, 6).map((slot, i) => ({
-      active: slot.direction !== 'off',
-      direction: (slot.direction === 'off' ? 'output' : slot.direction) as 'input' | 'output',
-      cpIndex: slotCpIndices[i + 3],
-    }));
-
-    const cpConfig: ConnectionPointConfig = { left: leftMeters, right: rightMeters };
+    // Build SlotConfig from slot layout — 1:1 positional mapping (no packing)
+    const dirs = puzzle.slots.map(s => s.direction);
+    const slotConfig = buildSlotConfigFromDirections(dirs);
 
     // Build puzzle definition
     const puzzleDef: PuzzleDefinition = {
@@ -216,7 +204,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
         inputs,
         expectedOutputs,
       }],
-      connectionPoints: cpConfig,
+      slotConfig,
       tutorialMessage: puzzle.tutorialMessage,
       tutorialTitle: puzzle.tutorialTitle,
     };
@@ -225,7 +213,7 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
     // the cycle runner subscriber sees activePuzzle when evaluating the new board
     store.loadPuzzle(puzzleDef);
     store.setActiveBoard(board);
-    store.initializeMeters(cpConfig, 'active');
+    store.initializeMeters(slotConfig, 'hidden');
   },
 
   getSerializableCustomPuzzles: () => {

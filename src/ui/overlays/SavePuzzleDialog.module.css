@@ -16,22 +16,23 @@
   flex-direction: column;
   width: 90%;
   max-width: 500px;
-  background: #1e1e2e;
-  border-radius: 12px;
-  border: 1px solid #3a3a5a;
+  background: #141418;
+  border-radius: 6px;
+  border: 1px solid #2a3632;
   overflow: hidden;
 }
 
 .header {
   padding: 20px 24px 16px;
-  border-bottom: 1px solid #3a3a5a;
+  border-bottom: 1px solid #2a3632;
 }
 
 .title {
   margin: 0;
+  font-family: 'Bungee', cursive;
   font-size: 20px;
-  font-weight: 600;
-  color: #F5AF28;
+  font-weight: 400;
+  color: #f0a202;
 }
 
 .content {
@@ -50,27 +51,28 @@
 }
 
 .label {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   font-weight: 500;
-  color: #9090b0;
+  color: #6a7a76;
 }
 
 .input,
 .textarea {
   padding: 10px 12px;
-  background: #2a2a3e;
-  border: 1px solid #4a4a6a;
-  border-radius: 6px;
-  color: #e0e0f0;
+  background: #0e1012;
+  border: 1px solid #2a3632;
+  border-radius: 4px;
+  color: #d8dcd0;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 14px;
-  font-family: inherit;
   outline: none;
   transition: border-color 0.2s;
 }
 
 .input:focus,
 .textarea:focus {
-  border-color: #F5AF28;
+  border-color: #3c91e6;
 }
 
 .textarea {
@@ -82,25 +84,26 @@
   padding: 10px 12px;
   background: rgba(224, 56, 56, 0.1);
   border: 1px solid rgba(224, 56, 56, 0.3);
-  border-radius: 6px;
+  border-radius: 4px;
   color: #E03838;
   font-size: 13px;
 }
 
 .summary {
   padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid #3a3a5a;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #2a3632;
+  border-radius: 4px;
 }
 
 .summaryTitle {
   margin: 0 0 12px;
-  font-size: 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
   font-weight: 600;
-  color: #9090b0;
+  color: #4a5654;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 
 .summaryGrid {
@@ -112,15 +115,16 @@
 .summaryItem {
   display: flex;
   gap: 8px;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
 }
 
 .summaryLabel {
-  color: #9090b0;
+  color: #6a7a76;
 }
 
 .summaryValue {
-  color: #e0e0f0;
+  color: #d8dcd0;
   font-weight: 500;
 }
 
@@ -129,31 +133,34 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid #3a3a5a;
-  background: #252535;
+  border-top: 1px solid #2a3632;
+  background: #1a1e20;
 }
 
 .cancelButton {
   padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: #e0e0e0;
+  background: #0e1012;
+  border: 1px solid rgba(60, 145, 230, 0.3);
+  border-radius: 4px;
+  color: #3c91e6;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .cancelButton:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(60, 145, 230, 0.08);
+  border-color: rgba(60, 145, 230, 0.5);
 }
 
 .saveButton {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #F5AF28 0%, #e09d1f 100%);
+  background: linear-gradient(135deg, #f0a202 0%, #d89a20 100%);
   border: none;
-  border-radius: 6px;
-  color: #1a1a2e;
+  border-radius: 4px;
+  color: #0a0a10;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -162,14 +169,14 @@
 
 .saveButton:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(245, 175, 40, 0.3);
+  box-shadow: 0 4px 12px rgba(240, 162, 2, 0.3);
 }
 
 .checkboxSection {
   padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid #3a3a5a;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #2a3632;
+  border-radius: 4px;
 }
 
 .checkboxGrid {
@@ -182,13 +189,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
-  color: #e0e0f0;
+  color: #d8dcd0;
   cursor: pointer;
 }
 
 .checkboxItem input[type="checkbox"] {
-  accent-color: #F5AF28;
+  accent-color: #f0a202;
 }
 
 .startingNodeList {
@@ -200,10 +208,11 @@
 .toggleAllButton {
   margin-left: 8px;
   padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-  color: #9090b0;
+  background: rgba(60, 145, 230, 0.06);
+  border: 1px solid rgba(60, 145, 230, 0.15);
+  border-radius: 2px;
+  color: #6a7a76;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 11px;
   cursor: pointer;
   text-transform: none;
@@ -212,8 +221,8 @@
 }
 
 .toggleAllButton:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #e0e0f0;
+  background: rgba(60, 145, 230, 0.1);
+  color: #3c91e6;
 }
 
 .quantityRow {
@@ -224,42 +233,46 @@
 }
 
 .quantityLabel {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
-  color: #e0e0f0;
+  color: #d8dcd0;
 }
 
 .quantityInput {
   width: 60px;
   padding: 4px 8px;
-  background: #2a2a3e;
-  border: 1px solid #4a4a6a;
+  background: #0e1012;
+  border: 1px solid #2a3632;
   border-radius: 4px;
-  color: #e0e0f0;
+  color: #d8dcd0;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   text-align: center;
   outline: none;
 }
 
 .quantityInput:focus {
-  border-color: #F5AF28;
+  border-color: #3c91e6;
 }
 
 .warning {
   padding: 10px 12px;
-  background: rgba(245, 175, 40, 0.1);
-  border: 1px solid rgba(245, 175, 40, 0.3);
-  border-radius: 6px;
-  color: #F5AF28;
+  background: rgba(240, 162, 2, 0.1);
+  border: 1px solid rgba(240, 162, 2, 0.3);
+  border-radius: 4px;
+  color: #f0a202;
   font-size: 13px;
 }
 
 .hint {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 11px;
-  color: #6a6a8a;
+  color: #4a5654;
   margin-top: 2px;
 }
 
 .startingSummary {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
-  color: #9090b0;
+  color: #6a7a76;
 }

@@ -4,12 +4,20 @@
  * Evaluates the entire signal graph for N cycles, producing
  * a complete set of output samples. No time-domain simulation —
  * the graph settles instantly each cycle.
+ *
+ * Uses a two-pass approach for seamless looping:
+ * - Pass 0 (warm-up): runs all cycles to establish steady-state.
+ *   Memory nodes and cross-cycle parameter wires reach their
+ *   wrap-around values (cycle 0's "previous" = cycle N-1's value).
+ * - Pass 1 (recording): re-runs all cycles, now recording results.
+ *   This eliminates the zero-glitch on cycle 0.
  */
 
 import type { NodeId, NodeState, Wire } from '../../shared/types/index.ts';
 import type { Result } from '../../shared/result/index.ts';
 import { ok, err } from '../../shared/result/index.ts';
 import { topologicalSortWithDepths } from '../graph/topological-sort.ts';
+import { computeLiveNodes } from '../graph/liveness.ts';
 import { getNodeDefinition } from '../nodes/registry.ts';
 import type { NodeRuntimeState } from '../nodes/framework.ts';
 import { clamp } from '../../shared/math/index.ts';
@@ -21,6 +29,8 @@ import {
   getConnectionPointIndex,
   isCreativeSlotNode,
   getCreativeSlotIndex,
+  isUtilitySlotNode,
+  getUtilitySlotIndex,
 } from '../../puzzle/connection-point-nodes.ts';
 
 // =============================================================================
@@ -43,6 +53,8 @@ export interface CycleResults {
   nodeDepths: Map<NodeId, number>;
   /** Maximum depth across all nodes */
   maxDepth: number;
+  /** Set of node IDs reachable from input sources (live nodes) */
+  liveNodeIds: ReadonlySet<NodeId>;
 }
 
 /** Error from cycle evaluation. */
@@ -138,9 +150,28 @@ export function evaluateAllCycles(
         // Creative input slot: use slot index (0-2) as cpIndex
         if (slotIndex >= 0 && slotIndex + 1 > inputCount) inputCount = slotIndex + 1;
       } else if (node?.type === 'connection-output') {
-        // Creative output slot: derive fixed output index from slot position.
-        // Slots 3-5 map to output indices 0-2, matching meter cpIndex expectations.
-        const outputIndex = slotIndex - 3;
+        // Creative output slot: use slot index directly as output index.
+        // Left outputs (0-2) and right outputs (3-5) each get unique indices.
+        const outputIndex = slotIndex;
+        if (outputIndex >= 0 && outputIndex + 1 > outputCount) outputCount = outputIndex + 1;
+        const wire = wireByTarget.get(`${nodeId}:0`);
+        if (wire) {
+          outputCpSources.set(outputIndex, {
+            nodeId: wire.source.nodeId,
+            portIndex: wire.source.portIndex,
+          });
+        }
+      }
+    } else if (isUtilitySlotNode(nodeId)) {
+      const node = nodes.get(nodeId);
+      const slotIndex = getUtilitySlotIndex(nodeId);
+      if (node?.type === 'connection-input') {
+        // Utility input slot: use slot index directly as cpIndex
+        if (slotIndex >= 0 && slotIndex + 1 > inputCount) inputCount = slotIndex + 1;
+      } else if (node?.type === 'connection-output') {
+        // Utility output slot: use slot index directly as output index
+        // Left outputs get indices 0-2, right outputs get indices 3-5 — no collision
+        const outputIndex = slotIndex;
         if (outputIndex >= 0 && outputIndex + 1 > outputCount) outputCount = outputIndex + 1;
         const wire = wireByTarget.get(`${nodeId}:0`);
         if (wire) {
@@ -215,6 +246,12 @@ export function evaluateAllCycles(
         const slotIndex = getCreativeSlotIndex(nodeId);
         if (slotIndex >= 0) inputCpIndexMap.set(nodeId, slotIndex);
       }
+    } else if (isUtilitySlotNode(nodeId)) {
+      const node = nodes.get(nodeId);
+      if (node?.type === 'connection-input') {
+        const slotIndex = getUtilitySlotIndex(nodeId);
+        if (slotIndex >= 0) inputCpIndexMap.set(nodeId, slotIndex);
+      }
     } else if (isConnectionInputNode(nodeId)) {
       const idx = getConnectionPointIndex(nodeId);
       if (idx >= 0) inputCpIndexMap.set(nodeId, idx);
@@ -226,105 +263,127 @@ export function evaluateAllCycles(
     nodeOutputsMap.set(nodeId, []);
   }
 
-  // ─── Evaluate cycles ─────────────────────────────────────────────────────
-  for (let cycle = 0; cycle < cycleCount; cycle++) {
-    const inputValues = inputGenerator(cycle);
-    currentOutputs.clear();
+  // Compute forward-reachable (live) nodes from input sources
+  const liveNodeIds = computeLiveNodes(wires, new Set(inputCpIndexMap.keys()));
 
-    // Store input CP outputs (they "output" the input signal)
-    for (const [nodeId, cpIndex] of inputCpIndexMap) {
-      const value = cpIndex < inputValues.length ? inputValues[cpIndex] : 0;
-      currentOutputs.set(nodeId, [value]);
-      nodeOutputsMap.get(nodeId)!.push([value]);
-    }
+  // ─── Evaluate cycles (two-pass for seamless looping) ─────────────────────
+  // Pass 0: warm-up — establish steady-state for Memory nodes and cross-cycle
+  //         parameter wires. No results are recorded.
+  // Pass 1: recording — re-run with warmed-up state, record all results.
+  for (let pass = 0; pass < 2; pass++) {
+    const recording = pass === 1;
 
-    // Evaluate each processing node in topological order
-    for (const nodeId of processingOrder) {
-      const node = nodes.get(nodeId);
-      if (!node) continue;
+    for (let cycle = 0; cycle < cycleCount; cycle++) {
+      const inputValues = inputGenerator(cycle);
+      currentOutputs.clear();
 
-      const def = getNodeDefinition(node.type);
-      if (!def) continue;
+      // Store input CP outputs (they "output" the input signal)
+      for (const [nodeId, cpIndex] of inputCpIndexMap) {
+        const value = cpIndex < inputValues.length ? inputValues[cpIndex] : 0;
+        currentOutputs.set(nodeId, [value]);
+        if (recording) nodeOutputsMap.get(nodeId)!.push([value]);
+      }
 
-      // Gather inputs for this node
-      const nodeInputs: number[] = [];
-      for (let portIndex = 0; portIndex < node.inputCount; portIndex++) {
-        const key = `${nodeId}:${portIndex}`;
-        const wire = wireByTarget.get(key);
+      // Evaluate each processing node in topological order
+      for (const nodeId of processingOrder) {
+        const node = nodes.get(nodeId);
+        if (!node) continue;
 
-        if (!wire) {
-          // No wire — use port constant or default 0
-          nodeInputs.push(portConstants.get(key) ?? 0);
+        // Skip non-live nodes — record zero outputs to keep arrays consistent
+        if (!liveNodeIds.has(nodeId)) {
+          const zeroOutputs = new Array(node.outputCount).fill(0);
+          currentOutputs.set(nodeId, zeroOutputs);
+          if (recording) nodeOutputsMap.get(nodeId)!.push(zeroOutputs);
           continue;
         }
 
-        // Check if this is a cross-cycle parameter wire
-        const paramInfo = paramWireInfos.find(
-          (p) => p.wire.id === wire.id,
-        );
+        const def = getNodeDefinition(node.type);
+        if (!def) continue;
 
-        if (paramInfo && paramInfo.kind === 'cross-cycle') {
-          // Use stored value from previous cycle
+        // Gather inputs for this node
+        const nodeInputs: number[] = [];
+        for (let portIndex = 0; portIndex < node.inputCount; portIndex++) {
+          const key = `${nodeId}:${portIndex}`;
+          const wire = wireByTarget.get(key);
+
+          if (!wire) {
+            // No wire — use port constant or default 0
+            nodeInputs.push(portConstants.get(key) ?? 0);
+            continue;
+          }
+
+          // Check if this is a cross-cycle parameter wire
+          const paramInfo = paramWireInfos.find(
+            (p) => p.wire.id === wire.id,
+          );
+
+          if (paramInfo && paramInfo.kind === 'cross-cycle') {
+            // Use stored value from previous cycle
+            const crossKey = `${wire.source.nodeId}:${wire.source.portIndex}`;
+            nodeInputs.push(crossCycleValues.get(crossKey) ?? portConstants.get(key) ?? 0);
+          } else {
+            // Same-cycle signal or same-cycle parameter: source already evaluated
+            const sourceOutputs = currentOutputs.get(wire.source.nodeId);
+            if (sourceOutputs) {
+              nodeInputs.push(sourceOutputs[wire.source.portIndex] ?? 0);
+            } else {
+              nodeInputs.push(portConstants.get(key) ?? 0);
+            }
+          }
+        }
+
+        // Evaluate
+        const nodeState = nodeStates.get(nodeId);
+        const outputs = def.evaluate({
+          inputs: nodeInputs,
+          params: node.params as Record<string, number | string | boolean>,
+          state: nodeState,
+          tickIndex: cycle,
+        });
+
+        // Clamp all outputs
+        const clampedOutputs = outputs.map((v) => clamp(v));
+        currentOutputs.set(nodeId, clampedOutputs);
+
+        // Record node outputs
+        if (recording) nodeOutputsMap.get(nodeId)!.push([...clampedOutputs]);
+      }
+
+      // Update cross-cycle values for next cycle
+      for (const { wire, kind } of paramWireInfos) {
+        if (kind === 'cross-cycle') {
           const crossKey = `${wire.source.nodeId}:${wire.source.portIndex}`;
-          nodeInputs.push(crossCycleValues.get(crossKey) ?? portConstants.get(key) ?? 0);
-        } else {
-          // Same-cycle signal or same-cycle parameter: source already evaluated
           const sourceOutputs = currentOutputs.get(wire.source.nodeId);
           if (sourceOutputs) {
-            nodeInputs.push(sourceOutputs[wire.source.portIndex] ?? 0);
-          } else {
-            nodeInputs.push(portConstants.get(key) ?? 0);
+            crossCycleValues.set(crossKey, sourceOutputs[wire.source.portIndex] ?? 0);
           }
         }
       }
 
-      // Evaluate
-      const nodeState = nodeStates.get(nodeId);
-      const outputs = def.evaluate({
-        inputs: nodeInputs,
-        params: node.params as Record<string, number | string | boolean>,
-        state: nodeState,
-        tickIndex: cycle,
-      });
-
-      // Clamp all outputs
-      const clampedOutputs = outputs.map((v) => clamp(v));
-      currentOutputs.set(nodeId, clampedOutputs);
-
-      // Record node outputs
-      nodeOutputsMap.get(nodeId)!.push([...clampedOutputs]);
-    }
-
-    // Update cross-cycle values for next cycle
-    for (const { wire, kind } of paramWireInfos) {
-      if (kind === 'cross-cycle') {
-        const crossKey = `${wire.source.nodeId}:${wire.source.portIndex}`;
-        const sourceOutputs = currentOutputs.get(wire.source.nodeId);
-        if (sourceOutputs) {
-          crossCycleValues.set(crossKey, sourceOutputs[wire.source.portIndex] ?? 0);
+      // Record wire values at this cycle
+      if (recording) {
+        for (const wire of wires) {
+          const sourceOutputs = currentOutputs.get(wire.source.nodeId);
+          const value = sourceOutputs ? (sourceOutputs[wire.source.portIndex] ?? 0) : 0;
+          wireValuesMap.get(wire.id)!.push(value);
         }
       }
-    }
 
-    // Record wire values at this cycle
-    for (const wire of wires) {
-      const sourceOutputs = currentOutputs.get(wire.source.nodeId);
-      const value = sourceOutputs ? (sourceOutputs[wire.source.portIndex] ?? 0) : 0;
-      wireValuesMap.get(wire.id)!.push(value);
-    }
-
-    // Collect output CP values
-    const cycleOutputs = new Array<number>(outputCount).fill(0);
-    for (let i = 0; i < outputCount; i++) {
-      const source = outputCpSources.get(i);
-      if (source) {
-        const sourceOutputs = currentOutputs.get(source.nodeId);
-        if (sourceOutputs) {
-          cycleOutputs[i] = sourceOutputs[source.portIndex] ?? 0;
+      // Collect output CP values
+      if (recording) {
+        const cycleOutputs = new Array<number>(outputCount).fill(0);
+        for (let i = 0; i < outputCount; i++) {
+          const source = outputCpSources.get(i);
+          if (source) {
+            const sourceOutputs = currentOutputs.get(source.nodeId);
+            if (sourceOutputs) {
+              cycleOutputs[i] = sourceOutputs[source.portIndex] ?? 0;
+            }
+          }
         }
+        outputValues.push(cycleOutputs);
       }
     }
-    outputValues.push(cycleOutputs);
   }
 
   return ok({
@@ -335,6 +394,7 @@ export function evaluateAllCycles(
     processingOrder,
     nodeDepths,
     maxDepth,
+    liveNodeIds,
   });
 }
 

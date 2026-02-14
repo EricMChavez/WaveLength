@@ -11,10 +11,13 @@ import {
   offsetNode,
   scaleNode,
   thresholdNode,
+  addNode,
   maxNode,
   minNode,
   splitNode,
+  divideNode,
   memoryNode,
+  negateNode,
 } from './definitions';
 
 // =============================================================================
@@ -29,10 +32,13 @@ const NODE_DEFINITIONS: readonly NodeDefinition<Record<string, ParamValue>>[] = 
   offsetNode as NodeDefinition<Record<string, ParamValue>>,
   scaleNode as NodeDefinition<Record<string, ParamValue>>,
   thresholdNode as NodeDefinition<Record<string, ParamValue>>,
+  addNode as NodeDefinition<Record<string, ParamValue>>,
   maxNode as NodeDefinition<Record<string, ParamValue>>,
   minNode as NodeDefinition<Record<string, ParamValue>>,
   splitNode as NodeDefinition<Record<string, ParamValue>>,
+  divideNode as NodeDefinition<Record<string, ParamValue>>,
   memoryNode as NodeDefinition<Record<string, ParamValue>>,
+  negateNode as NodeDefinition<Record<string, ParamValue>>,
 ] as const;
 
 // =============================================================================

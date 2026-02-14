@@ -110,7 +110,7 @@ describe('evaluateAllCycles', () => {
   });
 
   describe('memory node', () => {
-    it('outputs 0 on cycle 0, then echoes previous input', () => {
+    it('outputs last cycle input on cycle 0 (wrap-around)', () => {
       const nodes = new Map<NodeId, NodeState>();
       nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
       nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
@@ -129,8 +129,9 @@ describe('evaluateAllCycles', () => {
         10,
       ));
 
-      // Cycle 0: memory outputs 0 (initial state), stores 0
-      expect(result.outputValues[0][0]).toBe(0);
+      // Warm-up pass establishes wrap-around: cycle 9 input = 90
+      // Cycle 0: memory outputs 90 (wrap-around from cycle 9), stores 0
+      expect(result.outputValues[0][0]).toBe(90);
       // Cycle 1: memory outputs 0 (previous=0), stores 10
       expect(result.outputValues[1][0]).toBe(0);
       // Cycle 2: memory outputs 10 (previous=10), stores 20
@@ -139,6 +140,32 @@ describe('evaluateAllCycles', () => {
       expect(result.outputValues[3][0]).toBe(20);
       // Cycle 9: memory outputs 80 (previous input was 80 at cycle 8)
       expect(result.outputValues[9][0]).toBe(80);
+    });
+
+    it('seamless loop with constant input (all outputs equal)', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+      nodes.set('mem', makeNode('mem', 'memory', 1, 1));
+
+      const wires: Wire[] = [
+        makeWire('w1', '__cp_input_0__', 0, 'mem', 0),
+        makeWire('w2', 'mem', 0, '__cp_output_0__', 0),
+      ];
+
+      const result = unwrap(evaluateAllCycles(
+        nodes,
+        wires,
+        new Map(),
+        constantInputs([42]),
+        256,
+      ));
+
+      // With warm-up, Memory gets constant 42 every cycle.
+      // After warm-up, previousValue = 42. All 256 outputs should be 42.
+      for (let i = 0; i < 256; i++) {
+        expect(result.outputValues[i][0]).toBe(42);
+      }
     });
   });
 
@@ -178,27 +205,28 @@ describe('evaluateAllCycles', () => {
   describe('unconnected inputs use port constants', () => {
     it('uses port constant when no wire connected', () => {
       const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
       nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
-      // Add node: A + X
+      // Offset node: A + X — wire input CP to A, use port constant for X
       nodes.set('add1', makeNode('add1', 'offset', 2, 1));
 
       const wires: Wire[] = [
-        makeWire('w1', 'add1', 0, '__cp_output_0__', 0),
+        makeWire('w1', '__cp_input_0__', 0, 'add1', 0),
+        makeWire('w2', 'add1', 0, '__cp_output_0__', 0),
       ];
 
       const portConstants = new Map<string, number>();
-      portConstants.set('add1:0', 75); // constant 75 to A input
-      // X defaults to 0 (unconnected, no constant)
+      portConstants.set('add1:1', 25); // constant 25 to X knob input
 
       const result = unwrap(evaluateAllCycles(
         nodes,
         wires,
         portConstants,
-        constantInputs([]),
+        constantInputs([50]),
         4,
       ));
 
-      // Add: 75 + 0 = 75
+      // Offset: 50 + 25 = 75
       for (let i = 0; i < 4; i++) {
         expect(result.outputValues[i][0]).toBe(75);
       }
@@ -428,8 +456,9 @@ describe('evaluateAllCycles', () => {
         4,
       ));
 
+      // Slot 3 → output index 3 (slot index used directly)
       for (let i = 0; i < 4; i++) {
-        expect(result.outputValues[i][0]).toBe(-60);
+        expect(result.outputValues[i][3]).toBe(-60);
       }
     });
 
@@ -457,9 +486,10 @@ describe('evaluateAllCycles', () => {
         4,
       ));
 
+      // Slots 3,4 → output indices 3,4
       for (let i = 0; i < 4; i++) {
-        expect(result.outputValues[i][0]).toBe(-40); // inverted
-        expect(result.outputValues[i][1]).toBe(40);  // passthrough
+        expect(result.outputValues[i][3]).toBe(-40); // inverted
+        expect(result.outputValues[i][4]).toBe(40);  // passthrough
       }
     });
 
@@ -487,10 +517,11 @@ describe('evaluateAllCycles', () => {
         4,
       ));
 
+      // Slots 4,5 → output indices 4,5; indices 0-3 are 0 (no slots)
       for (let i = 0; i < 4; i++) {
-        expect(result.outputValues[i][0]).toBe(0);   // no slot 3
-        expect(result.outputValues[i][1]).toBe(-50);  // inverted
-        expect(result.outputValues[i][2]).toBe(50);   // passthrough
+        expect(result.outputValues[i][3]).toBe(0);   // no slot 3
+        expect(result.outputValues[i][4]).toBe(-50);  // inverted
+        expect(result.outputValues[i][5]).toBe(50);   // passthrough
       }
     });
   });
@@ -616,6 +647,77 @@ describe('evaluateAllCycles', () => {
       expect(result.nodeDepths.get('__cp_input_0__')).toBe(0);
       expect(result.nodeDepths.get('__cp_output_0__')).toBe(1);
       expect(result.maxDepth).toBe(1);
+    });
+  });
+
+  describe('node liveness', () => {
+    it('disconnected threshold(0) produces 0 output (not +100)', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+      // Disconnected threshold node — not wired to any input
+      nodes.set('thresh', makeNode('thresh', 'threshold', 2, 1, { level: 0 }));
+
+      // Only wire connects thresh to output, but nothing feeds thresh
+      const wires: Wire[] = [
+        makeWire('w1', 'thresh', 0, '__cp_output_0__', 0),
+      ];
+
+      const result = unwrap(evaluateAllCycles(
+        nodes, wires, new Map(), constantInputs([50]), 4,
+      ));
+
+      // Threshold is NOT live (no input source reaches it), so it outputs 0
+      for (let i = 0; i < 4; i++) {
+        expect(result.outputValues[i][0]).toBe(0);
+      }
+    });
+
+    it('liveNodeIds includes connected nodes and excludes disconnected', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+      nodes.set('connected', makeNode('connected', 'scale', 2, 1));
+      nodes.set('disconnected', makeNode('disconnected', 'threshold', 2, 1, { level: 0 }));
+
+      const wires: Wire[] = [
+        makeWire('w1', '__cp_input_0__', 0, 'connected', 0),
+        makeWire('w2', 'connected', 0, '__cp_output_0__', 0),
+      ];
+
+      const portConstants = new Map<string, number>();
+      portConstants.set('connected:1', 100); // unity scale
+
+      const result = unwrap(evaluateAllCycles(
+        nodes, wires, portConstants, constantInputs([42]), 4,
+      ));
+
+      expect(result.liveNodeIds.has('__cp_input_0__')).toBe(true);
+      expect(result.liveNodeIds.has('connected')).toBe(true);
+      expect(result.liveNodeIds.has('__cp_output_0__')).toBe(true);
+      expect(result.liveNodeIds.has('disconnected')).toBe(false);
+    });
+
+    it('connected threshold evaluates normally', () => {
+      const nodes = new Map<NodeId, NodeState>();
+      nodes.set('__cp_input_0__', makeNode('__cp_input_0__', 'connection-input', 0, 1));
+      nodes.set('__cp_output_0__', makeNode('__cp_output_0__', 'connection-output', 1, 0));
+      nodes.set('thresh', makeNode('thresh', 'threshold', 2, 1, { level: 0 }));
+
+      const wires: Wire[] = [
+        makeWire('w1', '__cp_input_0__', 0, 'thresh', 0),
+        makeWire('w2', 'thresh', 0, '__cp_output_0__', 0),
+      ];
+
+      const result = unwrap(evaluateAllCycles(
+        nodes, wires, new Map(), constantInputs([50]), 4,
+      ));
+
+      // Connected threshold(level=0): 50 >= 0 → +100
+      for (let i = 0; i < 4; i++) {
+        expect(result.outputValues[i][0]).toBe(100);
+      }
+      expect(result.liveNodeIds.has('thresh')).toBe(true);
     });
   });
 

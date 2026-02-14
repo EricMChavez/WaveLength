@@ -32,6 +32,7 @@ function makeCycleResults(
     processingOrder,
     nodeDepths: nodeDepths ?? new Map(),
     maxDepth: maxDepth ?? 0,
+    liveNodeIds: new Set(processingOrder),
   };
 }
 

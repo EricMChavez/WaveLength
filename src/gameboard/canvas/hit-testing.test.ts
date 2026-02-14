@@ -218,8 +218,8 @@ describe('hitTestMeter', () => {
   function makeMeterSlots(): Map<MeterKey, MeterSlotState> {
     const slots = new Map<MeterKey, MeterSlotState>();
     for (let i = 0; i < 3; i++) {
-      slots.set(`left:${i}`, { side: 'left', index: i, visualState: 'active', direction: 'input' });
-      slots.set(`right:${i}`, { side: 'right', index: i, visualState: 'active', direction: 'output' });
+      slots.set(`slot:${i}` as MeterKey, { mode: 'input' });
+      slots.set(`slot:${i + 3}` as MeterKey, { mode: 'output' });
     }
     return slots;
   }
@@ -233,9 +233,7 @@ describe('hitTestMeter', () => {
     const result = hitTestMeter(x, y, cellSize, slots);
     expect(result).not.toBeNull();
     expect(result?.type).toBe('meter');
-    expect(result?.side).toBe('left');
-    expect(result?.index).toBe(0);
-    expect(result?.slotIndex).toBe(0);
+    if (result?.type === 'meter') expect(result.slotIndex).toBe(0);
   });
 
   it('hits right meter waveform area when clicked', () => {
@@ -251,9 +249,7 @@ describe('hitTestMeter', () => {
     const result = hitTestMeter(x, y, cellSize, slots);
     expect(result).not.toBeNull();
     expect(result?.type).toBe('meter');
-    expect(result?.side).toBe('right');
-    expect(result?.index).toBe(0);
-    expect(result?.slotIndex).toBe(3); // Right meters have slotIndex offset by 3
+    if (result?.type === 'meter') expect(result.slotIndex).toBe(3);
   });
 
   it('does not hit left meter when clicking in playable area', () => {
@@ -292,14 +288,13 @@ describe('hitTestMeter', () => {
     const y = METER_GRID_ROWS * cellSize + (METER_GRID_ROWS * cellSize) / 2; // Center of meter 1
     const result = hitTestMeter(x, y, cellSize, slots);
     expect(result).not.toBeNull();
-    expect(result?.index).toBe(1);
-    expect(result?.slotIndex).toBe(1);
+    if (result?.type === 'meter') expect(result.slotIndex).toBe(1);
   });
 
   it('skips hidden meters', () => {
     const slots = makeMeterSlots();
     // Hide the first left meter
-    slots.set('left:0', { side: 'left', index: 0, visualState: 'hidden', direction: 'input' });
+    slots.set('slot:0' as MeterKey, { mode: 'hidden' });
     const waveformWidth = METER_GRID_COLS * cellSize * CHANNEL_RATIOS.waveform;
     const x = waveformWidth / 2;
     const y = (METER_GRID_ROWS * cellSize) / 2;

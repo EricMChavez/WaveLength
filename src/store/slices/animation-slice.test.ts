@@ -238,28 +238,6 @@ describe('animation-slice', () => {
     });
   });
 
-  describe('ceremony animation - startCeremonyZoomOut', () => {
-    it('transitions from name-reveal to zoom-out with snapshot', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startNameReveal();
-      const snapshot = mockOffscreenCanvas();
-      store.getState().startCeremonyZoomOut(snapshot);
-
-      const anim = store.getState().ceremonyAnimation;
-      expect(anim.type).toBe('zoom-out');
-      if (anim.type === 'zoom-out') {
-        expect(anim.startTime).toBe(1000);
-        expect(anim.snapshot).toBe(snapshot);
-      }
-    });
-
-    it('is a no-op when in victory-burst', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startCeremonyZoomOut(mockOffscreenCanvas());
-      expect(store.getState().ceremonyAnimation.type).toBe('victory-burst');
-    });
-  });
-
   describe('ceremony animation - endCeremony', () => {
     it('transitions from victory-burst to inactive', () => {
       store.getState().startVictoryBurst();
@@ -270,14 +248,6 @@ describe('animation-slice', () => {
     it('transitions from name-reveal to inactive', () => {
       store.getState().startVictoryBurst();
       store.getState().startNameReveal();
-      store.getState().endCeremony();
-      expect(store.getState().ceremonyAnimation.type).toBe('inactive');
-    });
-
-    it('transitions from zoom-out to inactive', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startNameReveal();
-      store.getState().startCeremonyZoomOut(mockOffscreenCanvas());
       store.getState().endCeremony();
       expect(store.getState().ceremonyAnimation.type).toBe('inactive');
     });

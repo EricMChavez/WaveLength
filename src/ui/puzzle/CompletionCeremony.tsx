@@ -1,12 +1,11 @@
 import { useGameStore } from '../../store/index.ts';
 import { PUZZLE_LEVELS } from '../../puzzle/levels/index.ts';
 import { createPuzzleGameboard } from '../../puzzle/puzzle-gameboard.ts';
-import { buildConnectionPointConfig } from '../../puzzle/types.ts';
+import { buildSlotConfig } from '../../puzzle/types.ts';
 import styles from './CompletionCeremony.module.css';
 
 export function CompletionCeremony() {
   const active = useGameStore((s) => s.ceremonyActive);
-  const snapshot = useGameStore((s) => s.ceremonySnapshot);
   const puzzle = useGameStore((s) => s.ceremonyPuzzle);
   const isResolve = useGameStore((s) => s.ceremonyIsResolve);
   const bakeMetadata = useGameStore((s) => s.ceremonyBakeMetadata);
@@ -30,10 +29,10 @@ export function CompletionCeremony() {
       store.loadPuzzle(nextPuzzle);
       store.setActiveBoard(createPuzzleGameboard(nextPuzzle));
 
-      // Initialize meters with the next puzzle's connection point configuration
-      const cpConfig = nextPuzzle.connectionPoints
-        ?? buildConnectionPointConfig(nextPuzzle.activeInputs, nextPuzzle.activeOutputs);
-      store.initializeMeters(cpConfig, 'active');
+      // Initialize meters with the next puzzle's slot configuration
+      const slotConfig = nextPuzzle.slotConfig
+        ?? buildSlotConfig(nextPuzzle.activeInputs, nextPuzzle.activeOutputs);
+      store.initializeMeters(slotConfig, 'hidden');
 
     } else {
       // Last level completed — go to sandbox
@@ -56,16 +55,6 @@ export function CompletionCeremony() {
 
   return (
     <div className={styles.overlay}>
-      {snapshot && (
-        <img
-          className={styles.snapshot}
-          src={snapshot}
-          alt="Puzzle solution"
-          width={400}
-          height={300}
-        />
-      )}
-
       <div className={styles.info}>
         <h2 className={styles.title}>{puzzle.title}</h2>
         <p className={styles.description}>{puzzle.description}</p>

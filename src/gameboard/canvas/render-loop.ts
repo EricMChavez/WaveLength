@@ -5,8 +5,11 @@ import { generateWaveformValue } from '../../puzzle/waveform-generators.ts';
 import { GRID_COLS, GRID_ROWS, METER_LEFT_START, METER_RIGHT_START, gridRectToPixels, pixelToGrid } from '../../shared/grid/index.ts';
 import { drawMeter } from '../meters/render-meter.ts';
 import type { RenderMeterState } from '../meters/render-meter.ts';
-import { METER_GRID_ROWS, METER_GRID_COLS, METERS_PER_SIDE, METER_GAP_ROWS, METER_VERTICAL_OFFSETS, meterKey } from '../meters/meter-types.ts';
+import { METER_GRID_ROWS, METER_GRID_COLS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS, meterKey, modeToDirection } from '../meters/meter-types.ts';
 import type { MeterKey } from '../meters/meter-types.ts';
+import { TOTAL_SLOTS, slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
+import { buildSlotConfig, directionIndexToSlot } from '../../puzzle/types.ts';
+import type { SlotConfig } from '../../puzzle/types.ts';
 import { drawNodes } from './render-nodes.ts';
 import { drawWires } from './render-wires.ts';
 import { computeWireAnimationCache } from './wire-animation.ts';
@@ -30,9 +33,61 @@ import type { NodeState, Wire } from '../../shared/types/index.ts';
 import type { CycleResults } from '../../engine/evaluation/index.ts';
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
-import { isConnectionInputNode, isConnectionOutputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex } from '../../puzzle/connection-point-nodes.ts';
+import { isConnectionInputNode, isConnectionOutputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex, isUtilitySlotNode, getUtilitySlotIndex } from '../../puzzle/connection-point-nodes.ts';
 
 const PLAYPOINT_RATE = 16; // cycles per second
+
+/**
+ * Extract the flat slot index (0-5) from any CP node type for connected-CP set building.
+ * Returns -1 if the node is not a CP node or doesn't match the expected direction.
+ * For standard puzzle CPs, uses sideToSlot for proper slot derivation.
+ */
+function getCpSlotIdx(
+  nodeId: string,
+  expectedDir: 'input' | 'output',
+  nodes?: ReadonlyMap<string, NodeState> | null,
+): number {
+  if (isCreativeSlotNode(nodeId)) {
+    const node = nodes?.get(nodeId);
+    const isMatch = expectedDir === 'input'
+      ? node?.type === 'connection-input'
+      : node?.type === 'connection-output';
+    return isMatch ? getCreativeSlotIndex(nodeId) : -1;
+  }
+  if (isUtilitySlotNode(nodeId)) {
+    const node = nodes?.get(nodeId);
+    const isMatch = expectedDir === 'input'
+      ? node?.type === 'connection-input'
+      : node?.type === 'connection-output';
+    return isMatch ? getUtilitySlotIndex(nodeId) : -1;
+  }
+  if (isBidirectionalCpNode(nodeId)) {
+    return getBidirectionalCpIndex(nodeId);
+  }
+  if (expectedDir === 'output' && isConnectionOutputNode(nodeId)) {
+    // Standard puzzle output CP: per-direction index → right-side slot
+    const cpIndex = getConnectionPointIndex(nodeId);
+    const node = nodes?.get(nodeId);
+    if (node?.params.physicalSide) {
+      const pSide = node.params.physicalSide as 'left' | 'right';
+      const idx = node.params.meterIndex as number;
+      return pSide === 'left' ? idx : idx + 3;
+    }
+    return cpIndex + 3; // default: outputs on right
+  }
+  if (expectedDir === 'input' && isConnectionInputNode(nodeId)) {
+    // Standard puzzle input CP: per-direction index → left-side slot
+    const cpIndex = getConnectionPointIndex(nodeId);
+    const node = nodes?.get(nodeId);
+    if (node?.params.physicalSide) {
+      const pSide = node.params.physicalSide as 'left' | 'right';
+      const idx = node.params.meterIndex as number;
+      return pSide === 'left' ? idx : idx + 3;
+    }
+    return cpIndex; // default: inputs on left
+  }
+  return -1;
+}
 
 /** Build a map of signal value per CP at current playpoint, from meter signal arrays. */
 function computeCpSignals(
@@ -152,6 +207,12 @@ let _knobValuesNodes: ReadonlyMap<string, NodeState> | null = null;
 let _knobValuesWires: ReadonlyArray<Wire> | null = null;
 let _knobValuesCycleResults: CycleResults | null = null;
 let _knobValuesPlaypoint = -1;
+
+// Cache: liveness sets (rebuild only when cycleResults changes)
+let _liveNodeIdsCache: ReadonlySet<string> = new Set();
+let _liveWireIdsCache: ReadonlySet<string> = new Set();
+let _livenessCycleResults: CycleResults | null = null;
+let _livenessWires: ReadonlyArray<Wire> | null = null;
 
 /**
  * Start the requestAnimationFrame render loop.
@@ -320,22 +381,14 @@ export function startRenderLoop(
 
     // Build connected output CP set (cached on wires reference)
     // Output CPs receive signal from the graph — wires target them
+    // Keys: `output:${slotIndex}` uniformly
     if (boardWires !== _connectedOutputCPsWires) {
       const set = new Set<string>();
       if (boardWires) {
         for (const wire of boardWires) {
           const targetId = wire.target.nodeId;
-          if (isConnectionOutputNode(targetId)) {
-            set.add(`output:${getConnectionPointIndex(targetId)}`);
-          } else if (isCreativeSlotNode(targetId)) {
-            // Creative slot index is 0-5 (0-2=left, 3-5=right).
-            // Meters use position index 0-2 per side, so convert slot→meter index.
-            const slotIdx = getCreativeSlotIndex(targetId);
-            const meterIdx = slotIdx < 3 ? slotIdx : slotIdx - 3;
-            set.add(`output:${meterIdx}`);
-          } else if (isBidirectionalCpNode(targetId)) {
-            set.add(`output:${getBidirectionalCpIndex(targetId)}`);
-          }
+          const slotIdx = getCpSlotIdx(targetId, 'output', state.activeBoard?.nodes);
+          if (slotIdx >= 0) set.add(`output:${slotIdx}`);
         }
       }
       _connectedOutputCPsCache = set;
@@ -345,22 +398,14 @@ export function startRenderLoop(
 
     // Build connected input CP set (cached on wires reference)
     // Input CPs emit signal into the graph — wires source from them
+    // Keys: `input:${slotIndex}` uniformly
     if (boardWires !== _connectedInputCPsWires) {
       const set = new Set<string>();
       if (boardWires) {
         for (const wire of boardWires) {
           const sourceId = wire.source.nodeId;
-          if (isConnectionInputNode(sourceId)) {
-            set.add(`input:${getConnectionPointIndex(sourceId)}`);
-          } else if (isCreativeSlotNode(sourceId)) {
-            // Creative slot index is 0-5 (0-2=left, 3-5=right).
-            // Meters use position index 0-2 per side, so convert slot→meter index.
-            const slotIdx = getCreativeSlotIndex(sourceId);
-            const meterIdx = slotIdx < 3 ? slotIdx : slotIdx - 3;
-            set.add(`input:${meterIdx}`);
-          } else if (isBidirectionalCpNode(sourceId)) {
-            set.add(`input:${getBidirectionalCpIndex(sourceId)}`);
-          }
+          const slotIdx = getCpSlotIdx(sourceId, 'input', state.activeBoard?.nodes);
+          if (slotIdx >= 0) set.add(`input:${slotIdx}`);
         }
       }
       _connectedInputCPsCache = set;
@@ -372,60 +417,43 @@ export function startRenderLoop(
     const meterTopMargin = 0; // in grid rows
     const meterStride = METER_GRID_ROWS + METER_GAP_ROWS; // rows per meter + gap
 
-    for (let i = 0; i < METERS_PER_SIDE; i++) {
-      // Left meters
-      const leftKey: MeterKey = meterKey('left', i);
-      const leftSlot = state.meterSlots.get(leftKey);
-      if (leftSlot) {
-        const meterRow = meterTopMargin + i * meterStride + METER_VERTICAL_OFFSETS[i];
-        const leftRect = gridRectToPixels({
-          col: METER_LEFT_START,
-          row: meterRow,
-          cols: METER_GRID_COLS,
-          rows: METER_GRID_ROWS,
-        }, cellSize);
-        const cpIdx = leftSlot.cpIndex ?? i;
-        const dir = leftSlot.direction;
-        const isConnected = dir === 'input'
-          ? connectedInputCPs.has(`input:${cpIdx}`)
-          : connectedOutputCPs.has(`output:${cpIdx}`);
-        const renderState: RenderMeterState = {
-          slot: leftSlot,
-          signalValues: meterSignalArrays.get(`${dir}:${cpIdx}`) ?? null,
-          targetValues: dir === 'output' ? (meterTargetArrays.get(`target:${cpIdx}`) ?? null) : null,
-          matchStatus: dir === 'output' ? (perSampleMatch.get(`output:${cpIdx}`) ?? null) : undefined,
-          playpoint,
-          isConnected,
-        };
-        drawMeter(ctx!, tokens, renderState, leftRect);
-      }
+    const isUtilityEditing = !!state.editingUtilityId;
 
-      // Right meters
-      const rightKey: MeterKey = meterKey('right', i);
-      const rightSlot = state.meterSlots.get(rightKey);
-      if (rightSlot) {
-        const meterRowRight = meterTopMargin + i * meterStride + METER_VERTICAL_OFFSETS[i];
-        const rightRect = gridRectToPixels({
-          col: METER_RIGHT_START,
-          row: meterRowRight,
-          cols: METER_GRID_COLS,
-          rows: METER_GRID_ROWS,
-        }, cellSize);
-        const cpIdxR = rightSlot.cpIndex ?? i;
-        const dirR = rightSlot.direction;
-        const isConnectedR = dirR === 'input'
-          ? connectedInputCPs.has(`input:${cpIdxR}`)
-          : connectedOutputCPs.has(`output:${cpIdxR}`);
-        const renderState: RenderMeterState = {
-          slot: rightSlot,
-          signalValues: meterSignalArrays.get(`${dirR}:${cpIdxR}`) ?? null,
-          targetValues: dirR === 'output' ? (meterTargetArrays.get(`target:${cpIdxR}`) ?? null) : null,
-          matchStatus: dirR === 'output' ? (perSampleMatch.get(`output:${cpIdxR}`) ?? null) : undefined,
-          playpoint,
-          isConnected: isConnectedR,
-        };
-        drawMeter(ctx!, tokens, renderState, rightRect);
-      }
+    // Single loop over all 6 meter slots (0-2 left, 3-5 right)
+    // Signal keys uniformly use slot index: `${direction}:${slotIndex}`
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
+      const key: MeterKey = meterKey(i);
+      const slot = state.meterSlots.get(key);
+      if (!slot) continue;
+
+      const side = slotSide(i);
+      const perSideIdx = slotPerSideIndex(i);
+      const meterRow = meterTopMargin + perSideIdx * meterStride + METER_VERTICAL_OFFSETS[perSideIdx];
+      const meterCol = side === 'left' ? METER_LEFT_START : METER_RIGHT_START;
+      const meterRect = gridRectToPixels({
+        col: meterCol,
+        row: meterRow,
+        cols: METER_GRID_COLS,
+        rows: METER_GRID_ROWS,
+      }, cellSize);
+
+      const dir = modeToDirection(slot.mode);
+      // Uniform signal key: `${direction}:${slotIndex}`
+      const isConnected = dir === 'input'
+        ? connectedInputCPs.has(`input:${i}`)
+        : connectedOutputCPs.has(`output:${i}`);
+      const renderState: RenderMeterState = {
+        slot,
+        side,
+        signalValues: meterSignalArrays.get(`${dir}:${i}`) ?? null,
+        targetValues: dir === 'output' ? (meterTargetArrays.get(`target:${i}`) ?? null) : null,
+        matchStatus: dir === 'output' ? (perSampleMatch.get(`output:${i}`) ?? null) : undefined,
+        playpoint,
+        isConnected,
+        isPortMatched: dir === 'output' && (state.perPortMatch[i] === true),
+        isUtilityEditing,
+      };
+      drawMeter(ctx!, tokens, renderState, meterRect);
     }
 
     // Compute signal values for port/CP coloring from meter signal arrays (cached)
@@ -465,6 +493,27 @@ export function startRenderLoop(
     }
     const connectedInputPorts = _connectedInputPortsCache;
 
+    // Rebuild liveness caches when cycleResults or wires change
+    if (cycleResults !== _livenessCycleResults || boardWires !== _livenessWires) {
+      if (cycleResults && boardWires) {
+        _liveNodeIdsCache = cycleResults.liveNodeIds;
+        const liveWires = new Set<string>();
+        for (const wire of boardWires) {
+          if (cycleResults.liveNodeIds.has(wire.source.nodeId)) {
+            liveWires.add(wire.id);
+          }
+        }
+        _liveWireIdsCache = liveWires;
+      } else {
+        _liveNodeIdsCache = new Set();
+        _liveWireIdsCache = new Set();
+      }
+      _livenessCycleResults = cycleResults;
+      _livenessWires = boardWires;
+    }
+    const liveNodeIds = _liveNodeIdsCache;
+    const liveWireIds = _liveWireIdsCache;
+
     if (state.activeBoard) {
       // Wire rendering: branch on pause state for blip animation
       const isPaused = state.playMode === 'paused';
@@ -477,9 +526,9 @@ export function startRenderLoop(
           cachedWireAnimResults = cycleResults;
           cachedWireAnimPlaypoint = playpoint;
         }
-        drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, undefined, true);
+        drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, undefined, true, liveWireIds);
         if (cachedWireAnim) {
-          drawWireBlips(ctx!, tokens, state.activeBoard.wires, state.activeBoard.nodes, cellSize, cachedWireAnim, pauseProgress);
+          drawWireBlips(ctx!, tokens, state.activeBoard.wires, state.activeBoard.nodes, cellSize, cachedWireAnim, pauseProgress, liveWireIds);
         }
       } else {
         if (
@@ -492,7 +541,7 @@ export function startRenderLoop(
           _wireValuesPlaypoint = playpoint;
           _wireValuesWires = state.activeBoard.wires;
         }
-        drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, _wireValuesCache);
+        drawWires(ctx!, tokens, state.activeBoard.wires, cellSize, state.activeBoard.nodes, _wireValuesCache, false, liveWireIds);
       }
 
       // Compute knob values from cycle results (cached)
@@ -520,6 +569,7 @@ export function startRenderLoop(
         portSignals,
         rejectedKnobNodeId: getRejectedKnobNodeId(),
         connectedInputPorts,
+        liveNodeIds,
       }, cellSize);
 
       // Keyboard focus ring (after nodes, before wire preview)
@@ -528,7 +578,7 @@ export function startRenderLoop(
         state.activeBoard.nodes, state.activeBoard.wires,
         logicalWidth, logicalHeight, cellSize,
         state.interactionMode.type === 'keyboard-wiring' ? state.interactionMode : null,
-        state.activePuzzle?.connectionPoints,
+        state.activePuzzle?.slotConfig,
       );
     }
 
@@ -537,6 +587,7 @@ export function startRenderLoop(
       activePuzzle: state.activePuzzle,
       perPortMatch: state.perPortMatch,
       editingUtilityId: state.editingUtilityId,
+      meterSlots: state.meterSlots,
       cpSignals,
       connectedOutputCPs,
     }, cellSize);
@@ -605,33 +656,7 @@ export function startRenderLoop(
       drawNameReveal(ctx!, tokens, revealProgress, puzzleName, puzzleDesc, logicalWidth, logicalHeight);
 
       if (revealProgress >= 1) {
-        // Capture grid-area snapshot for zoom-out (canvas is viewport-sized)
-        const snapDpr = window.devicePixelRatio || 1;
-        const bitmapX = Math.round(offset.x * snapDpr);
-        const bitmapY = Math.round(offset.y * snapDpr);
-        const bitmapW = Math.round(logicalWidth * snapDpr);
-        const bitmapH = Math.round(logicalHeight * snapDpr);
-        const snapshot = new OffscreenCanvas(bitmapW, bitmapH);
-        const snapshotCtx = snapshot.getContext('2d');
-        if (snapshotCtx) {
-          snapshotCtx.drawImage(canvas, bitmapX, bitmapY, bitmapW, bitmapH, 0, 0, bitmapW, bitmapH);
-        }
-        state.startCeremonyZoomOut(snapshot);
-      }
-    } else if (ceremony.type === 'zoom-out') {
-      const zoomDuration = parseDurationMs(tokens.animZoomDuration);
-      const zoomProgress = computeProgress(ceremony.startTime, timestamp, zoomDuration);
-
-      // Synthesize a closing lid animation state from the ceremony snapshot
-      drawLidAnimation(ctx!, tokens, {
-        type: 'closing',
-        progress: zoomProgress,
-        snapshot: ceremony.snapshot,
-        startTime: ceremony.startTime,
-      }, zoomProgress, logicalWidth, logicalHeight);
-
-      if (zoomProgress >= 1) {
-        // Ceremony complete — finalize
+        // Ceremony canvas phases complete — finalize and show React overlay
         handleCeremonyCompletion(state);
       }
     }
@@ -683,6 +708,7 @@ const CYCLE_COUNT = 256;
  * Build flat signal arrays for all meter CPs from cycle results.
  * Input CPs get their values from the input waveforms (test case or creative slots).
  * Output CPs get their values from cycle evaluation results.
+ * Keys uniformly use slot index: `${direction}:${slotIndex}`.
  */
 function buildMeterSignalArrays(
   cycleResults: CycleResults | null,
@@ -691,20 +717,32 @@ function buildMeterSignalArrays(
   const result = new Map<string, number[]>();
   const { activePuzzle, activeTestCaseIndex } = state;
 
+  // Derive SlotConfig for per-direction → slot index mapping
+  const config: SlotConfig | null = activePuzzle
+    ? (activePuzzle.slotConfig ?? buildSlotConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs))
+    : null;
+
   // Input signals from test case waveforms or creative mode slots
-  if (activePuzzle) {
+  // Skip when editing a utility node (no input waveforms — only direction arrows)
+  if (state.editingUtilityId) {
+    // No input signal arrays for utility editing — meters show direction only
+  } else if (activePuzzle && config) {
     const testCase = activePuzzle.testCases[activeTestCaseIndex];
     if (testCase) {
       for (let i = 0; i < testCase.inputs.length; i++) {
+        // Map per-direction input index → flat slot index
+        const slotIdx = directionIndexToSlot(config, 'input', i);
+        if (slotIdx < 0) continue;
         const samples = new Array(CYCLE_COUNT);
         for (let c = 0; c < CYCLE_COUNT; c++) {
           samples[c] = generateWaveformValue(c, testCase.inputs[i]);
         }
-        result.set(`input:${i}`, samples);
+        result.set(`input:${slotIdx}`, samples);
       }
     }
   } else if (state.isCreativeMode) {
-    for (let i = 0; i < 3; i++) {
+    // Creative mode: slot index used directly (0-5)
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
       const slot = state.creativeSlots[i];
       if (slot?.direction === 'input') {
         const samples = new Array(CYCLE_COUNT);
@@ -720,11 +758,20 @@ function buildMeterSignalArrays(
   if (cycleResults) {
     const outputCount = cycleResults.outputValues[0]?.length ?? 0;
     for (let i = 0; i < outputCount; i++) {
+      // For puzzle mode: evaluator output index is per-direction → map to slot index
+      // For creative/utility: evaluator already uses slot indices
+      let slotIdx: number;
+      if (config) {
+        slotIdx = directionIndexToSlot(config, 'output', i);
+        if (slotIdx < 0) continue;
+      } else {
+        slotIdx = i; // Creative/utility: evaluator output index IS the slot index
+      }
       const samples = new Array(CYCLE_COUNT);
       for (let c = 0; c < CYCLE_COUNT; c++) {
         samples[c] = cycleResults.outputValues[c]?.[i] ?? 0;
       }
-      result.set(`output:${i}`, samples);
+      result.set(`output:${slotIdx}`, samples);
     }
   }
 
@@ -733,6 +780,7 @@ function buildMeterSignalArrays(
 
 /**
  * Build flat target arrays for output meters from puzzle test case expected outputs.
+ * Keys use slot index: `target:${slotIndex}`.
  */
 function buildMeterTargetArrays(
   state: ReturnType<typeof useGameStore.getState>,
@@ -742,15 +790,21 @@ function buildMeterTargetArrays(
 
   if (!activePuzzle) return result;
 
+  const config: SlotConfig = activePuzzle.slotConfig
+    ?? buildSlotConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs);
+
   const testCase = activePuzzle.testCases[activeTestCaseIndex];
   if (!testCase) return result;
 
   for (let i = 0; i < testCase.expectedOutputs.length; i++) {
+    // Map per-direction output index → flat slot index
+    const slotIdx = directionIndexToSlot(config, 'output', i);
+    if (slotIdx < 0) continue;
     const samples = new Array(CYCLE_COUNT);
     for (let c = 0; c < CYCLE_COUNT; c++) {
       samples[c] = generateWaveformValue(c, testCase.expectedOutputs[i]);
     }
-    result.set(`target:${i}`, samples);
+    result.set(`target:${slotIdx}`, samples);
   }
 
   return result;

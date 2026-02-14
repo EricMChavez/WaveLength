@@ -35,32 +35,116 @@ export interface PuzzleTestCase {
   expectedOutputs: WaveformDef[];
 }
 
-/** Configuration for a single connection point slot */
-export interface ConnectionPointSlot {
-  /** Whether this connection point is active (visible and usable) */
+// =============================================================================
+// SlotConfig — flat 0-5 slot index system
+// =============================================================================
+
+/** Definition of a single slot (0-5) on the gameboard edge. */
+export interface SlotDef {
   active: boolean;
-  /** Direction: 'input' emits signals into the board, 'output' receives signals */
   direction: 'input' | 'output';
-  /** Sequential index within this direction type (e.g., 0th input, 1st output).
-   *  Used by the render loop to build the correct buffer key (direction:cpIndex). */
-  cpIndex?: number;
 }
 
 /**
  * Configuration for all 6 connection point slots on a gameboard.
- * Left side: 3 slots (indices 0-2), Right side: 3 slots (indices 0-2).
+ * Slot 0-2 = left side (top/mid/bottom), Slot 3-5 = right side (top/mid/bottom).
+ * Physical side is always derived: `slotSide(i)`.
  */
-export interface ConnectionPointConfig {
-  /** Left-side connection point slots (up to 3) */
-  left: ConnectionPointSlot[];
-  /** Right-side connection point slots (up to 3) */
-  right: ConnectionPointSlot[];
+export type SlotConfig = readonly [SlotDef, SlotDef, SlotDef, SlotDef, SlotDef, SlotDef];
+
+/**
+ * Build a SlotConfig from activeInputs/activeOutputs counts.
+ * Inputs fill left slots top-down (0, 1, 2). Outputs fill right slots top-down (3, 4, 5).
+ */
+export function buildSlotConfig(activeInputs: number, activeOutputs: number): SlotConfig {
+  return [
+    { active: 0 < activeInputs, direction: 'input' },
+    { active: 1 < activeInputs, direction: 'input' },
+    { active: 2 < activeInputs, direction: 'input' },
+    { active: 0 < activeOutputs, direction: 'output' },
+    { active: 1 < activeOutputs, direction: 'output' },
+    { active: 2 < activeOutputs, direction: 'output' },
+  ] as SlotConfig;
 }
 
 /**
- * Build a ConnectionPointConfig from activeInputs/activeOutputs counts.
- * Inputs occupy left slots, outputs occupy right slots.
+ * Build a SlotConfig from a 6-element directions array.
+ * 'off' slots are marked inactive. 'input'/'output' mapped to their actual direction.
  */
+export function buildSlotConfigFromDirections(
+  dirs: readonly ('input' | 'output' | 'off')[],
+): SlotConfig {
+  const slots: SlotDef[] = [];
+  for (let i = 0; i < 6; i++) {
+    const dir = dirs[i] ?? 'off';
+    slots.push({
+      active: dir !== 'off',
+      direction: dir === 'off' ? (i < 3 ? 'input' : 'output') : dir,
+    });
+  }
+  return slots as unknown as SlotConfig;
+}
+
+/**
+ * Map a per-direction index ("the Nth input" or "the Nth output") to a flat slot index.
+ * Returns -1 if not found.
+ */
+export function directionIndexToSlot(
+  config: SlotConfig,
+  direction: 'input' | 'output',
+  dirIndex: number,
+): number {
+  let count = 0;
+  for (let i = 0; i < 6; i++) {
+    if (config[i].active && config[i].direction === direction) {
+      if (count === dirIndex) return i;
+      count++;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Map a flat slot index to a per-direction index ("this slot is the Nth output").
+ * Returns -1 if the slot is inactive or not found.
+ */
+export function slotToDirectionIndex(config: SlotConfig, slotIndex: number): number {
+  const slot = config[slotIndex];
+  if (!slot?.active) return -1;
+  let count = 0;
+  for (let i = 0; i < slotIndex; i++) {
+    if (config[i].active && config[i].direction === slot.direction) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Derive a 6-element directions array from a SlotConfig.
+ */
+export function slotConfigToDirections(config: SlotConfig): ('input' | 'output' | 'off')[] {
+  return config.map(s => s.active ? s.direction : 'off');
+}
+
+// =============================================================================
+// Legacy ConnectionPointConfig (deprecated — bridges during migration)
+// =============================================================================
+
+/** @deprecated Use SlotDef instead */
+export interface ConnectionPointSlot {
+  active: boolean;
+  direction: 'input' | 'output';
+  cpIndex?: number;
+}
+
+/** @deprecated Use SlotConfig instead */
+export interface ConnectionPointConfig {
+  left: ConnectionPointSlot[];
+  right: ConnectionPointSlot[];
+}
+
+/** @deprecated Use buildSlotConfig instead */
 export function buildConnectionPointConfig(
   activeInputs: number,
   activeOutputs: number,
@@ -76,24 +160,63 @@ export function buildConnectionPointConfig(
   return { left, right };
 }
 
-/**
- * Build a ConnectionPointConfig for utility node editing (bidirectional CPs).
- * All 6 slots are active. Left slots report as 'input', right as 'output'
- * for hit-testing purposes (the actual direction is determined by wiring).
- */
+/** @deprecated Use buildSlotConfigFromDirections instead */
 export function buildCustomNodeConnectionPointConfig(): ConnectionPointConfig {
-  return {
-    left: [
-      { active: true, direction: 'input', cpIndex: 0 },
-      { active: true, direction: 'input', cpIndex: 1 },
-      { active: true, direction: 'input', cpIndex: 2 },
-    ],
-    right: [
-      { active: true, direction: 'output', cpIndex: 0 },
-      { active: true, direction: 'output', cpIndex: 1 },
-      { active: true, direction: 'output', cpIndex: 2 },
-    ],
-  };
+  return buildUtilityConnectionPointConfig(['input', 'input', 'input', 'output', 'output', 'output']);
+}
+
+/** @deprecated Use buildSlotConfigFromDirections instead */
+export function buildUtilityConnectionPointConfig(
+  directions: readonly ('input' | 'output' | 'off')[],
+): ConnectionPointConfig {
+  const left: ConnectionPointSlot[] = [];
+  for (let i = 0; i < 3; i++) {
+    const dir = directions[i];
+    left.push({
+      active: dir !== 'off',
+      direction: dir === 'off' ? 'input' : dir,
+      cpIndex: i,
+    });
+  }
+  const right: ConnectionPointSlot[] = [];
+  for (let i = 0; i < 3; i++) {
+    const dir = directions[i + 3];
+    right.push({
+      active: dir !== 'off',
+      direction: dir === 'off' ? 'output' : dir,
+      cpIndex: i,
+    });
+  }
+  return { left, right };
+}
+
+/**
+ * Convert a SlotConfig to a legacy ConnectionPointConfig.
+ * Bridges new code to old consumers during migration.
+ */
+export function slotConfigToConnectionPointConfig(config: SlotConfig): ConnectionPointConfig {
+  const left: ConnectionPointSlot[] = [];
+  const right: ConnectionPointSlot[] = [];
+  // Count per-direction indices
+  let inputIdx = 0;
+  let outputIdx = 0;
+  for (let i = 0; i < 3; i++) {
+    const slot = config[i];
+    left.push({
+      active: slot.active,
+      direction: slot.direction,
+      cpIndex: slot.active ? (slot.direction === 'input' ? inputIdx++ : outputIdx++) : i,
+    });
+  }
+  for (let i = 3; i < 6; i++) {
+    const slot = config[i];
+    right.push({
+      active: slot.active,
+      direction: slot.direction,
+      cpIndex: slot.active ? (slot.direction === 'input' ? inputIdx++ : outputIdx++) : i - 3,
+    });
+  }
+  return { left, right };
 }
 
 /** A user-defined waveform entry (paste into custom-waveforms.ts). */
@@ -138,7 +261,10 @@ export interface PuzzleDefinition {
   allowedNodes: AllowedNodes;
   /** Test cases the player's circuit must satisfy */
   testCases: PuzzleTestCase[];
-  /** Connection point configuration (derived from activeInputs/activeOutputs if not set) */
+  /** Flat slot configuration (derived from activeInputs/activeOutputs if not set).
+   *  Slots 0-2 = left, 3-5 = right. Replaces connectionPoints. */
+  slotConfig?: SlotConfig;
+  /** @deprecated Use slotConfig instead */
   connectionPoints?: ConnectionPointConfig;
   /** Nodes pre-placed on the board when the puzzle starts */
   initialNodes?: InitialNodeDef[];

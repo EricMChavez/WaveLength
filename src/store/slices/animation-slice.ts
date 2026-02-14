@@ -20,14 +20,13 @@ export type LidAnimationState =
 /**
  * Validation ceremony animation state machine.
  *
- * Phases progress: inactive → victory-burst → name-reveal → zoom-out → inactive.
+ * Phases progress: inactive → victory-burst → name-reveal → inactive.
  * Separate from lidAnimation to avoid mutex conflicts.
  */
 export type ValidationCeremonyState =
   | { type: 'inactive' }
   | { type: 'victory-burst'; startTime: number }
-  | { type: 'name-reveal'; startTime: number }
-  | { type: 'zoom-out'; startTime: number; snapshot: OffscreenCanvas };
+  | { type: 'name-reveal'; startTime: number };
 
 export interface AnimationSlice {
   lidAnimation: LidAnimationState;
@@ -50,9 +49,6 @@ export interface AnimationSlice {
 
   /** Transition to name reveal (victory-burst → name-reveal). */
   startNameReveal: () => void;
-
-  /** Transition to zoom-out (name-reveal → zoom-out). */
-  startCeremonyZoomOut: (snapshot: OffscreenCanvas) => void;
 
   /** End ceremony, returning to inactive (any → inactive). */
   endCeremony: () => void;
@@ -113,12 +109,6 @@ export const createAnimationSlice: StateCreator<GameStore, [], [], AnimationSlic
     const current = get().ceremonyAnimation;
     if (current.type !== 'victory-burst') return;
     set({ ceremonyAnimation: { type: 'name-reveal', startTime: performance.now() } });
-  },
-
-  startCeremonyZoomOut: (snapshot) => {
-    const current = get().ceremonyAnimation;
-    if (current.type !== 'name-reveal') return;
-    set({ ceremonyAnimation: { type: 'zoom-out', startTime: performance.now(), snapshot } });
   },
 
   endCeremony: () => {

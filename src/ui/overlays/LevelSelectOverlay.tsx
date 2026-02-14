@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store/index.ts';
 import { PUZZLE_LEVELS } from '../../puzzle/levels/index.ts';
 import { createPuzzleGameboard } from '../../puzzle/puzzle-gameboard.ts';
-import { buildConnectionPointConfig } from '../../puzzle/types.ts';
+import { buildSlotConfig } from '../../puzzle/types.ts';
 import { exportCustomPuzzleAsSource } from '../../puzzle/export-puzzle.ts';
 import styles from './LevelSelectOverlay.module.css';
 
@@ -45,9 +45,9 @@ function LevelSelectInner() {
     store.setCurrentLevel(index);
     store.loadPuzzle(puzzle);
     store.setActiveBoard(createPuzzleGameboard(puzzle));
-    const cpConfig = puzzle.connectionPoints
-      ?? buildConnectionPointConfig(puzzle.activeInputs, puzzle.activeOutputs);
-    store.initializeMeters(cpConfig, 'active');
+    const slotConfig = puzzle.slotConfig
+      ?? buildSlotConfig(puzzle.activeInputs, puzzle.activeOutputs);
+    store.initializeMeters(slotConfig, 'hidden');
 
     closeOverlay();
   }, [closeOverlay]);

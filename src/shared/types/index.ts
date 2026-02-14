@@ -39,7 +39,8 @@ export type FundamentalNodeType =
   | 'max'
   | 'min'
   | 'memory'
-  | 'split';
+  | 'split'
+  | 'negate';
 
 /** State of a single node on a gameboard */
 export interface NodeState {

@@ -116,12 +116,12 @@ describe('exportCustomPuzzleAsSource', () => {
     expect(result).toContain("name: 'My Amplifier'");
   });
 
-  it('always includes connectionPoints with correct slot structure', () => {
+  it('always includes slotConfig with correct slot structure', () => {
     const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
-    expect(result).toContain('connectionPoints');
-    // Standard layout: input on left slot 0, output on right slot 0
-    expect(result).toContain("{ active: true, direction: 'input', cpIndex: 0 }");
-    expect(result).toContain("{ active: true, direction: 'output', cpIndex: 0 }");
+    expect(result).toContain('slotConfig');
+    // Standard layout: input on slot 0, output on slot 3
+    expect(result).toContain("{ active: true, direction: 'input' }");
+    expect(result).toContain("{ active: true, direction: 'output' }");
     // Inactive slots
     expect(result).toContain("{ active: false, direction: 'input' }");
   });
@@ -139,14 +139,13 @@ describe('exportCustomPuzzleAsSource', () => {
       targetSamples: new Map([[0, [10, 20, 30]]]),
     });
     const result = exportCustomPuzzleAsSource(puzzle);
-    expect(result).toContain('connectionPoints');
-    // Left side has output at slot 0
-    expect(result).toContain("{ active: true, direction: 'output', cpIndex: 0 }");
-    // Right side has input at slot 0
-    expect(result).toContain("{ active: true, direction: 'input', cpIndex: 0 }");
+    expect(result).toContain('slotConfig');
+    // Slot 0 = output, slot 3 = input
+    expect(result).toContain("{ active: true, direction: 'output' }");
+    expect(result).toContain("{ active: true, direction: 'input' }");
   });
 
-  it('assigns correct cpIndex values for mixed layout', () => {
+  it('assigns correct active values for mixed layout', () => {
     const puzzle = makeCustomPuzzle({
       slots: [
         { direction: 'input', waveform: { shape: 'sine-full', amplitude: 100, period: 256, phase: 0, offset: 0 } },
@@ -162,11 +161,12 @@ describe('exportCustomPuzzleAsSource', () => {
       ]),
     });
     const result = exportCustomPuzzleAsSource(puzzle);
-    // Left side: input cpIndex 0, output cpIndex 0
-    // Right side: input cpIndex 1, output cpIndex 1
-    // The left input is index 0, left output is index 0
-    // The right input continues from 1 (1 left input), right output continues from 1 (1 left output)
-    expect(result).toContain('connectionPoints');
+    expect(result).toContain('slotConfig');
+    // 4 active slots + 2 inactive
+    const activeCount = (result.match(/active: true/g) || []).length;
+    const inactiveCount = (result.match(/active: false/g) || []).length;
+    expect(activeCount).toBe(4);
+    expect(inactiveCount).toBe(2);
   });
 
   it('handles multiple inputs and outputs', () => {
@@ -211,6 +211,44 @@ describe('exportCustomPuzzleAsSource', () => {
     const result = exportCustomPuzzleAsSource(puzzle);
     expect(result).toContain("id: 'my-cool-puzzle'");
     expect(result).toContain('export const MY_COOL_PUZZLE: PuzzleDefinition');
+  });
+
+  it('exports tutorialTitle when present', () => {
+    const puzzle = makeCustomPuzzle({ tutorialTitle: 'Welcome' });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain("tutorialTitle: 'Welcome'");
+  });
+
+  it('exports tutorialMessage when present', () => {
+    const puzzle = makeCustomPuzzle({ tutorialMessage: 'Connect input to output' });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain("tutorialMessage: 'Connect input to output'");
+  });
+
+  it('exports both tutorialTitle and tutorialMessage', () => {
+    const puzzle = makeCustomPuzzle({
+      tutorialTitle: 'Step 1',
+      tutorialMessage: "Wire the nodes together",
+    });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain("tutorialTitle: 'Step 1'");
+    expect(result).toContain("tutorialMessage: 'Wire the nodes together'");
+  });
+
+  it('escapes quotes in tutorialTitle and tutorialMessage', () => {
+    const puzzle = makeCustomPuzzle({
+      tutorialTitle: "It's time",
+      tutorialMessage: "Let's go",
+    });
+    const result = exportCustomPuzzleAsSource(puzzle);
+    expect(result).toContain("tutorialTitle: 'It\\'s time'");
+    expect(result).toContain("tutorialMessage: 'Let\\'s go'");
+  });
+
+  it('omits tutorialTitle and tutorialMessage when not set', () => {
+    const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
+    expect(result).not.toContain('tutorialTitle');
+    expect(result).not.toContain('tutorialMessage');
   });
 
   it('ends with trailing newline', () => {

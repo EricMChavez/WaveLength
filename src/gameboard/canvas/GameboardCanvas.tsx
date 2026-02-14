@@ -9,7 +9,10 @@ import { generateId } from '../../shared/generate-id.ts';
 import { getNodeDefinition, getDefaultParams } from '../../engine/nodes/registry.ts';
 import type { PortRef } from '../../shared/types/index.ts';
 import { createWire } from '../../shared/types/index.ts';
-import { cpInputId, cpOutputId, creativeSlotId, cpBidirectionalId, isBidirectionalCpNode } from '../../puzzle/connection-point-nodes.ts';
+import { cpInputId, cpOutputId, creativeSlotId, cpBidirectionalId, utilitySlotId } from '../../puzzle/connection-point-nodes.ts';
+import { slotToDirectionIndex, buildSlotConfig } from '../../puzzle/types.ts';
+import type { SlotConfig } from '../../puzzle/types.ts';
+import { slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import {
   GRID_COLS,
@@ -73,41 +76,50 @@ function orderWireArgs(from: PortRef, to: PortRef): [PortRef, PortRef] {
 
 /**
  * Convert a connection-point hit into a PortRef referencing its virtual node.
- * Input CPs expose their output port (side: 'output'), output CPs expose their input port (side: 'input').
+ * Takes a flat slot index (0-5) and direction directly from the HitResult.
  * Returns null if the virtual node doesn't exist on the board.
- *
- * Supports regular puzzle CPs, creative mode slots, and bidirectional CPs.
  *
  * For bidirectional CPs, the `wireContext` determines which port to use:
  * - 'start': user is starting a wire FROM this CP → use output port
  * - 'end': user is ending a wire AT this CP → use input port
  */
 function connectionPointToPortRef(
-  cpSide: 'input' | 'output',
-  index: number,
+  slotIndex: number,
+  direction: 'input' | 'output',
   nodes: ReadonlyMap<string, import('../../shared/types/index.ts').NodeState>,
   wireContext: 'start' | 'end' = 'start',
+  slotConfig?: SlotConfig,
 ): PortRef | null {
-  // Try regular CP nodes first
-  const regularNodeId = cpSide === 'input' ? cpInputId(index) : cpOutputId(index);
-  if (nodes.has(regularNodeId)) {
-    // Input CPs emit signals → their wireable port is the output side
-    // Output CPs receive signals → their wireable port is the input side
+  // Try regular puzzle CP nodes first.
+  // Puzzle CPs are named by per-direction index, so convert slot → direction index.
+  const dirIndex = slotConfig
+    ? slotToDirectionIndex(slotConfig, slotIndex)
+    : slotPerSideIndex(slotIndex); // fallback: standard mapping
+  if (dirIndex >= 0) {
+    const regularNodeId = direction === 'input' ? cpInputId(dirIndex) : cpOutputId(dirIndex);
+    if (nodes.has(regularNodeId)) {
+      return {
+        nodeId: regularNodeId,
+        portIndex: 0,
+        side: direction === 'input' ? 'output' : 'input',
+      };
+    }
+  }
+
+  // Try utility slot nodes (slot index used directly)
+  const utilNodeId = utilitySlotId(slotIndex);
+  if (nodes.has(utilNodeId)) {
+    const node = nodes.get(utilNodeId)!;
     return {
-      nodeId: regularNodeId,
+      nodeId: utilNodeId,
       portIndex: 0,
-      side: cpSide === 'input' ? 'output' : 'input',
+      side: node.type === 'connection-input' ? 'output' : 'input',
     };
   }
 
-  // Try bidirectional CP nodes (utility editing)
-  // Left side (cpSide='input') → CPs 0-2, Right side (cpSide='output') → CPs 3-5
-  const bidirIndex = cpSide === 'input' ? index : index + 3;
-  const bidirNodeId = cpBidirectionalId(bidirIndex);
+  // Try bidirectional CP nodes (legacy utility editing, slot index used directly)
+  const bidirNodeId = cpBidirectionalId(slotIndex);
   if (nodes.has(bidirNodeId)) {
-    // Bidirectional CPs have both input and output ports.
-    // When starting a wire, use output port (port 0, side 'output')
-    // When ending a wire, use input port (port 0, side 'input')
     return {
       nodeId: bidirNodeId,
       portIndex: 0,
@@ -115,15 +127,10 @@ function connectionPointToPortRef(
     };
   }
 
-  // Try creative mode slot nodes
-  // Left side (cpSide='input') → slots 0-2, Right side (cpSide='output') → slots 3-5
-  const slotIndex = cpSide === 'input' ? index : index + 3;
+  // Try creative mode slot nodes (slot index used directly)
   const creativeNodeId = creativeSlotId(slotIndex);
   if (nodes.has(creativeNodeId)) {
     const node = nodes.get(creativeNodeId)!;
-    // Creative slots can be either input or output based on their current type
-    // connection-input nodes emit signals (wireable port is output)
-    // connection-output nodes receive signals (wireable port is input)
     return {
       nodeId: creativeNodeId,
       portIndex: 0,
@@ -185,6 +192,10 @@ export function GameboardCanvas() {
     startTime: number;
   } | null>(null);
   const justDraggedRef = useRef(false);
+
+  // Wire drag tracking refs
+  const potentialWireDragRef = useRef<{ portRef: PortRef; position: { x: number; y: number }; startX: number; startY: number } | null>(null);
+  const wireDragActiveRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -273,6 +284,8 @@ export function GameboardCanvas() {
       // Escape key: separate handler (escape-handler.ts)
       if (e.key === 'Escape') {
         const state = useGameStore.getState();
+        // Block Escape during ceremony overlay
+        if (state.ceremonyActive) return;
         const action = getEscapeAction(state);
 
         // If zoom-out, capture snapshot for lid-close animation
@@ -293,6 +306,8 @@ export function GameboardCanvas() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
       const state = useGameStore.getState();
+      // Block all keyboard actions during ceremony overlay
+      if (state.ceremonyActive) return;
       const kbAction = getKeyboardAction(e.key, e, state);
       if (kbAction.type === 'noop') return;
 
@@ -399,7 +414,8 @@ export function GameboardCanvas() {
       justDraggedRef.current = false;
       return;
     }
-    if (useGameStore.getState().hasActiveOverlay()) {
+    const clickState = useGameStore.getState();
+    if (clickState.hasActiveOverlay() || clickState.ceremonyActive) {
       return;
     }
     const canvas = canvasRef.current;
@@ -412,11 +428,16 @@ export function GameboardCanvas() {
 
     const state = useGameStore.getState();
 
-    // --- Creative mode: check for meter clicks first ---
-    if (state.isCreativeMode) {
+    // --- Utility editing / Creative mode: check for meter clicks first ---
+    if (state.editingUtilityId || state.isCreativeMode) {
       const meterHit = hitTestMeter(x, y, cellSizeRef.current, state.meterSlots);
       if (meterHit && meterHit.type === 'meter') {
-        state.openOverlay({ type: 'waveform-selector', slotIndex: meterHit.slotIndex });
+        if (state.editingUtilityId) {
+          // Utility editing: toggle CP direction (takes priority over creative mode)
+          state.toggleMeterMode(meterHit.slotIndex);
+        } else {
+          state.openOverlay({ type: 'waveform-selector', slotIndex: meterHit.slotIndex });
+        }
         return;
       }
     }
@@ -424,7 +445,7 @@ export function GameboardCanvas() {
     // --- Read-only mode: only allow selection ---
     if (state.activeBoardReadOnly) {
       if (!state.activeBoard) return;
-      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
+      const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
       if (hit.type === 'node') {
         state.selectNode(hit.nodeId);
       } else {
@@ -527,7 +548,7 @@ export function GameboardCanvas() {
     }
 
     if (!state.activeBoard) return;
-    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
+    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
 
     // --- Drawing wire mode ---
     if (state.interactionMode.type === 'drawing-wire') {
@@ -549,7 +570,7 @@ export function GameboardCanvas() {
 
       // Complete wire to a connection point
       if (hit.type === 'connection-point') {
-        const cpPortRef = connectionPointToPortRef(hit.side, hit.index, state.activeBoard.nodes, 'end');
+        const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.nodes, 'end', state.activePuzzle?.slotConfig);
         if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard.wires)) {
           state.addWire(
             createWire(
@@ -568,17 +589,18 @@ export function GameboardCanvas() {
     }
 
     // --- Idle mode ---
+    // Only output ports can start a wire
     if (hit.type === 'port') {
-      if (!isPortOccupied(hit.portRef, state.activeBoard.wires)) {
+      if (hit.portRef.side === 'output' && !isPortOccupied(hit.portRef, state.activeBoard.wires)) {
         state.startWireDraw(hit.portRef, hit.position);
       }
       return;
     }
 
-    // Start wire from connection point
+    // Start wire from connection point (only output-emitting CPs)
     if (hit.type === 'connection-point') {
-      const cpPortRef = connectionPointToPortRef(hit.side, hit.index, state.activeBoard.nodes);
-      if (cpPortRef && !isPortOccupied(cpPortRef, state.activeBoard.wires)) {
+      const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.nodes, 'start', state.activePuzzle?.slotConfig);
+      if (cpPortRef && cpPortRef.side === 'output' && !isPortOccupied(cpPortRef, state.activeBoard.wires)) {
         state.startWireDraw(cpPortRef, hit.position);
       }
       return;
@@ -607,7 +629,8 @@ export function GameboardCanvas() {
 
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    if (useGameStore.getState().hasActiveOverlay()) return;
+    const ctxState = useGameStore.getState();
+    if (ctxState.hasActiveOverlay() || ctxState.ceremonyActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -625,7 +648,7 @@ export function GameboardCanvas() {
     const cx = e.clientX - rect.left - offsetRef.current.x;
     const cy = e.clientY - rect.top - offsetRef.current.y;
     const { w, h } = getCanvasLogicalSize(canvas);
-    const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
+    const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
 
     if (hit.type === 'node') {
       const node = state.activeBoard.nodes.get(hit.nodeId);
@@ -651,7 +674,8 @@ export function GameboardCanvas() {
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (useGameStore.getState().hasActiveOverlay()) return;
+    const mdState = useGameStore.getState();
+    if (mdState.hasActiveOverlay() || mdState.ceremonyActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -665,7 +689,22 @@ export function GameboardCanvas() {
     const y = e.clientY - rect.top - offsetRef.current.y;
     const { w, h } = getCanvasLogicalSize(canvas);
 
-    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
+    const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
+
+    // Start potential wire drag from output port
+    if (hit.type === 'port' && hit.portRef.side === 'output' && !isPortOccupied(hit.portRef, state.activeBoard.wires)) {
+      potentialWireDragRef.current = { portRef: hit.portRef, position: hit.position, startX: x, startY: y };
+      return;
+    }
+
+    // Start potential wire drag from output-emitting CP
+    if (hit.type === 'connection-point') {
+      const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.nodes, 'start', state.activePuzzle?.slotConfig);
+      if (cpPortRef && cpPortRef.side === 'output' && !isPortOccupied(cpPortRef, state.activeBoard.wires)) {
+        potentialWireDragRef.current = { portRef: cpPortRef, position: hit.position, startX: x, startY: y };
+        return;
+      }
+    }
 
     // Start knob adjust on knob hit (when knob port is unwired)
     if (hit.type === 'knob') {
@@ -700,6 +739,38 @@ export function GameboardCanvas() {
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const state = useGameStore.getState();
+
+    // Handle wire drag complete
+    if (wireDragActiveRef.current && state.interactionMode.type === 'drawing-wire') {
+      const canvas = canvasRef.current;
+      if (canvas && state.activeBoard) {
+        const rect = canvas.getBoundingClientRect();
+        const ux = e.clientX - rect.left - offsetRef.current.x;
+        const uy = e.clientY - rect.top - offsetRef.current.y;
+        const { w, h } = getCanvasLogicalSize(canvas);
+        const hit = hitTest(ux, uy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
+        const fromPort = state.interactionMode.fromPort;
+
+        if (hit.type === 'port' && canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, state.activeBoard.wires)) {
+          state.addWire(createWire(generateId(), ...orderWireArgs(fromPort, hit.portRef)));
+        } else if (hit.type === 'connection-point') {
+          const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.nodes, 'end', state.activePuzzle?.slotConfig);
+          if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard.wires)) {
+            state.addWire(createWire(generateId(), ...orderWireArgs(fromPort, cpPortRef)));
+          }
+        }
+        state.cancelWireDraw();
+      }
+      wireDragActiveRef.current = false;
+      justDraggedRef.current = true;
+      potentialWireDragRef.current = null;
+      return;
+    }
+
+    // Clear potential wire drag on mouseup (no drag happened — let click handle it)
+    if (potentialWireDragRef.current) {
+      potentialWireDragRef.current = null;
+    }
 
     // Handle knob adjust commit
     if (state.interactionMode.type === 'adjusting-knob') {
@@ -762,7 +833,8 @@ export function GameboardCanvas() {
   // Update handleMouseMove to detect drag start and update drag position
   const handleMouseMoveWithDrag = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     setFocusVisible(false);
-    if (useGameStore.getState().hasActiveOverlay()) return;
+    const mmState = useGameStore.getState();
+    if (mmState.hasActiveOverlay() || mmState.ceremonyActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -785,6 +857,19 @@ export function GameboardCanvas() {
         state.batchKnobAdjust(nodeId, knobConfig.paramKey, knobConfig.portIndex, clampedValue);
       }
       return;
+    }
+
+    // Check if we should start wire drag
+    if (potentialWireDragRef.current && state.interactionMode.type === 'idle') {
+      const { startX, startY } = potentialWireDragRef.current;
+      const dx = x - startX;
+      const dy = y - startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance > DRAG_THRESHOLD_PX) {
+        state.startWireDraw(potentialWireDragRef.current.portRef, potentialWireDragRef.current.position);
+        potentialWireDragRef.current = null;
+        wireDragActiveRef.current = true;
+      }
     }
 
     // Check if we should start dragging
@@ -823,7 +908,7 @@ export function GameboardCanvas() {
         }
       } else {
         const { w, h } = getCanvasLogicalSize(canvas);
-        const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.connectionPoints, state.editingUtilityId);
+        const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
         const newHovered = hit.type === 'node' ? hit.nodeId : null;
         cache.col = gridCell.col;
         cache.row = gridCell.row;

@@ -96,12 +96,14 @@ export function drawWireBlips(
   cellSize: number,
   cache: WireAnimationCache,
   globalProgress: number,
+  liveWireIds?: ReadonlySet<string>,
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
   const wireWidth = useOverrides ? devOverrides.wireStyle.baseWidth : (Number(tokens.wireWidthBase) || 6);
 
   for (const wire of wires) {
+    if (liveWireIds && !liveWireIds.has(wire.id)) continue;
     const timing = cache.timings.get(wire.id);
     if (!timing) continue;
 

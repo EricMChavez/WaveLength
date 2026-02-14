@@ -14,8 +14,8 @@ import { getNodePixelRect } from './render-nodes.ts';
 import { getNodePortPosition, getConnectionPointPosition } from './port-positions.ts';
 import { NODE_STYLE, CONNECTION_POINT_CONFIG } from '../../shared/constants/index.ts';
 import { renderWirePreview } from './render-wire-preview.ts';
-import type { ConnectionPointConfig } from '../../puzzle/types.ts';
-import { buildConnectionPointConfig } from '../../puzzle/types.ts';
+import type { SlotConfig } from '../../puzzle/types.ts';
+import { slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
 
 export interface KeyboardWiringState {
   fromPort: PortRef;
@@ -34,7 +34,7 @@ export function drawKeyboardFocus(
   canvasH: number,
   cellSize: number,
   wiringState: KeyboardWiringState | null,
-  connectionPointConfig?: ConnectionPointConfig,
+  slotConfig?: SlotConfig,
 ): void {
   if (!focusVisible || !focusTarget) return;
 
@@ -56,8 +56,9 @@ export function drawKeyboardFocus(
       break;
     }
     case 'connection-point': {
-      const cpPos = findCpPhysicalPosition(focusTarget.side, focusTarget.index, connectionPointConfig);
-      const pos = getConnectionPointPosition(cpPos.physicalSide, cpPos.meterIndex, cellSize);
+      const side = slotSide(focusTarget.slotIndex);
+      const perSideIdx = slotPerSideIndex(focusTarget.slotIndex);
+      const pos = getConnectionPointPosition(side, perSideIdx, cellSize);
       drawCircleFocusRing(ctx, tokens, pos.x, pos.y, CONNECTION_POINT_CONFIG.RADIUS + 4);
       break;
     }
@@ -137,38 +138,7 @@ function drawWireFocusRing(
   ctx.setLineDash([]);
 }
 
-/**
- * Find the physical side and meter index for a connection point, given its
- * logical direction and cpIndex. Searches the config for a matching slot;
- * falls back to standard mapping (input→left, output→right).
- */
-function findCpPhysicalPosition(
-  direction: 'input' | 'output',
-  cpIndex: number,
-  config?: ConnectionPointConfig,
-): { physicalSide: 'left' | 'right'; meterIndex: number } {
-  if (config) {
-    // Search left slots
-    for (let i = 0; i < config.left.length; i++) {
-      const slot = config.left[i];
-      if (slot.active && slot.direction === direction && (slot.cpIndex ?? i) === cpIndex) {
-        return { physicalSide: 'left', meterIndex: i };
-      }
-    }
-    // Search right slots
-    for (let i = 0; i < config.right.length; i++) {
-      const slot = config.right[i];
-      if (slot.active && slot.direction === direction && (slot.cpIndex ?? i) === cpIndex) {
-        return { physicalSide: 'right', meterIndex: i };
-      }
-    }
-  }
-  // Fallback: standard mapping
-  return {
-    physicalSide: direction === 'input' ? 'left' : 'right',
-    meterIndex: cpIndex,
-  };
-}
+// findCpPhysicalPosition removed — slot index directly derives side via slotSide()/slotPerSideIndex()
 
 function drawWiringTargetHighlights(
   ctx: CanvasRenderingContext2D,

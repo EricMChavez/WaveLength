@@ -4,19 +4,22 @@ import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { getNodePortPosition, getConnectionPointPosition, getNodeHitRect, getNodeBodyPixelRect } from './port-positions.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
-import { gridToPixel, getNodeGridSize, METER_LEFT_START, METER_RIGHT_START } from '../../shared/grid/index.ts';
+import { buildWirePixelPath } from './render-wires.ts';
+import { METER_LEFT_START, METER_RIGHT_START } from '../../shared/grid/index.ts';
 import type { MeterKey, MeterSlotState } from '../meters/meter-types.ts';
-import { METER_GRID_ROWS, METER_GRID_COLS, METER_GAP_ROWS, CHANNEL_RATIOS } from '../meters/meter-types.ts';
-import type { ConnectionPointConfig } from '../../puzzle/types.ts';
-import { buildConnectionPointConfig, buildCustomNodeConnectionPointConfig } from '../../puzzle/types.ts';
+import { METER_GRID_ROWS, METER_GRID_COLS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS, CHANNEL_RATIOS, meterKeyToSlotIndex } from '../meters/meter-types.ts';
+import { TOTAL_SLOTS, slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
+import type { SlotConfig } from '../../puzzle/types.ts';
+import { buildSlotConfig, buildSlotConfigFromDirections } from '../../puzzle/types.ts';
+import { deriveDirectionsFromMeterSlots } from '../meters/meter-types.ts';
 
 export type HitResult =
   | { type: 'port'; portRef: PortRef; position: Vec2 }
-  | { type: 'connection-point'; side: 'input' | 'output'; index: number; position: Vec2 }
+  | { type: 'connection-point'; slotIndex: number; direction: 'input' | 'output'; position: Vec2 }
   | { type: 'knob'; nodeId: NodeId; center: Vec2 }
   | { type: 'node'; nodeId: NodeId }
   | { type: 'wire'; wireId: string }
-  | { type: 'meter'; side: 'left' | 'right'; index: number; slotIndex: number }
+  | { type: 'meter'; slotIndex: number }
   | { type: 'empty' };
 
 const PORT_HIT_RADIUS = 12;
@@ -47,6 +50,29 @@ function pointToSegmentDist(
 }
 
 /**
+ * Derive a SlotConfig for hit testing from available information.
+ */
+function deriveSlotConfig(
+  slotConfig?: SlotConfig,
+  activeInputs?: number,
+  activeOutputs?: number,
+  meterSlots?: ReadonlyMap<MeterKey, MeterSlotState>,
+): SlotConfig {
+  if (slotConfig) return slotConfig;
+  if (activeInputs !== undefined || activeOutputs !== undefined) {
+    return buildSlotConfig(
+      activeInputs ?? CONNECTION_POINT_CONFIG.INPUT_COUNT,
+      activeOutputs ?? CONNECTION_POINT_CONFIG.OUTPUT_COUNT,
+    );
+  }
+  if (meterSlots) {
+    const dirs = deriveDirectionsFromMeterSlots(meterSlots);
+    return buildSlotConfigFromDirections(dirs);
+  }
+  return buildSlotConfig(CONNECTION_POINT_CONFIG.INPUT_COUNT, CONNECTION_POINT_CONFIG.OUTPUT_COUNT);
+}
+
+/**
  * Hit test at canvas coordinate (x, y).
  * Priority: ports > connection points > node body > wires > empty.
  */
@@ -60,8 +86,9 @@ export function hitTest(
   wires: ReadonlyArray<Wire> = [],
   activeInputs?: number,
   activeOutputs?: number,
-  connectionPointConfig?: ConnectionPointConfig,
-  editingUtilityId?: string | null,
+  slotConfig?: SlotConfig,
+  _editingUtilityId?: string | null,
+  meterSlots?: ReadonlyMap<MeterKey, MeterSlotState>,
 ): HitResult {
   // 1. Check node ports (highest priority — skip virtual CP nodes)
   for (const node of nodes.values()) {
@@ -88,31 +115,16 @@ export function hitTest(
     }
   }
 
-  // 2. Check connection points (only active ones)
-  const cpConfig = editingUtilityId
-    ? buildCustomNodeConnectionPointConfig()
-    : connectionPointConfig
-      ?? buildConnectionPointConfig(
-        activeInputs ?? CONNECTION_POINT_CONFIG.INPUT_COUNT,
-        activeOutputs ?? CONNECTION_POINT_CONFIG.OUTPUT_COUNT,
-      );
-
-  // Left side CPs
-  for (let i = 0; i < cpConfig.left.length; i++) {
-    const slot = cpConfig.left[i];
+  // 2. Check connection points (single loop 0-5 over SlotConfig)
+  const config = deriveSlotConfig(slotConfig, activeInputs, activeOutputs, meterSlots);
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const slot = config[i];
     if (!slot.active) continue;
-    const pos = getConnectionPointPosition('left', i, cellSize);
+    const side = slotSide(i);
+    const perSideIdx = slotPerSideIndex(i);
+    const pos = getConnectionPointPosition(side, perSideIdx, cellSize);
     if (dist(x, y, pos.x, pos.y) <= CP_HIT_RADIUS) {
-      return { type: 'connection-point', side: slot.direction, index: slot.cpIndex ?? i, position: pos };
-    }
-  }
-  // Right side CPs
-  for (let i = 0; i < cpConfig.right.length; i++) {
-    const slot = cpConfig.right[i];
-    if (!slot.active) continue;
-    const pos = getConnectionPointPosition('right', i, cellSize);
-    if (dist(x, y, pos.x, pos.y) <= CP_HIT_RADIUS) {
-      return { type: 'connection-point', side: slot.direction, index: slot.cpIndex ?? i, position: pos };
+      return { type: 'connection-point', slotIndex: i, direction: slot.direction, position: pos };
     }
   }
 
@@ -151,14 +163,25 @@ export function hitTest(
 
   // 5. Check wires (path segments at gridline intersections)
   for (const wire of wires) {
-    if (wire.path.length < 2) continue;
-    for (let i = 0; i < wire.path.length - 1; i++) {
-      const ax = wire.path[i].col * cellSize;
-      const ay = wire.path[i].row * cellSize;
-      const bx = wire.path[i + 1].col * cellSize;
-      const by = wire.path[i + 1].row * cellSize;
-      if (pointToSegmentDist(x, y, ax, ay, bx, by) <= WIRE_HIT_THRESHOLD) {
-        return { type: 'wire', wireId: wire.id };
+    if (wire.path.length >= 2) {
+      for (let i = 0; i < wire.path.length - 1; i++) {
+        const ax = wire.path[i].col * cellSize;
+        const ay = wire.path[i].row * cellSize;
+        const bx = wire.path[i + 1].col * cellSize;
+        const by = wire.path[i + 1].row * cellSize;
+        if (pointToSegmentDist(x, y, ax, ay, bx, by) <= WIRE_HIT_THRESHOLD) {
+          return { type: 'wire', wireId: wire.id };
+        }
+      }
+    } else {
+      // Fallback: empty-path wire rendered as straight line between endpoints
+      const pts = buildWirePixelPath(wire, cellSize, nodes);
+      if (pts.length >= 2) {
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (pointToSegmentDist(x, y, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) <= WIRE_HIT_THRESHOLD) {
+            return { type: 'wire', wireId: wire.id };
+          }
+        }
       }
     }
   }
@@ -177,17 +200,19 @@ export function hitTestMeter(
   cellSize: number,
   meterSlots: ReadonlyMap<MeterKey, MeterSlotState>,
 ): HitResult | null {
-  // Meter layout: 3 meters per side, each 12 rows tall with no gaps (doubled density grid)
-  // Left meters: cols 0-5, Right meters: cols 58-63
-  // First meter starts at row 0 (no margin)
   const startRow = 0;
+  const meterStride = METER_GRID_ROWS + METER_GAP_ROWS;
 
-  for (const slot of meterSlots.values()) {
-    if (slot.visualState === 'hidden') continue;
+  for (const [key, slot] of meterSlots) {
+    if (slot.mode === 'hidden') continue;
 
-    // Calculate meter bounds in pixels
-    const meterRow = startRow + slot.index * (METER_GRID_ROWS + METER_GAP_ROWS);
-    const meterCol = slot.side === 'left' ? METER_LEFT_START : METER_RIGHT_START;
+    const slotIdx = meterKeyToSlotIndex(key);
+    const side = slotSide(slotIdx);
+    const index = slotPerSideIndex(slotIdx);
+
+    // Calculate meter bounds in pixels (matches render-loop.ts positioning)
+    const meterRow = startRow + index * meterStride + METER_VERTICAL_OFFSETS[index];
+    const meterCol = side === 'left' ? METER_LEFT_START : METER_RIGHT_START;
 
     const meterX = meterCol * cellSize;
     const meterY = meterRow * cellSize;
@@ -201,18 +226,11 @@ export function hitTestMeter(
 
     // Check if click is within the waveform channel area (leftmost ~59% of meter)
     const waveformWidth = meterW * CHANNEL_RATIOS.waveform;
-    const waveformStartX = slot.side === 'left' ? meterX : meterX + meterW - waveformWidth;
+    const waveformStartX = side === 'left' ? meterX : meterX + meterW - waveformWidth;
     const waveformEndX = waveformStartX + waveformWidth;
 
     if (x >= waveformStartX && x <= waveformEndX) {
-      // Calculate slot index: left side is 0-2, right side is 3-5
-      const slotIndex = slot.side === 'left' ? slot.index : slot.index + 3;
-      return {
-        type: 'meter',
-        side: slot.side,
-        index: slot.index,
-        slotIndex,
-      };
+      return { type: 'meter', slotIndex: slotIdx };
     }
   }
 

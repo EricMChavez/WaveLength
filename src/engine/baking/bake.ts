@@ -14,6 +14,8 @@ import {
   isBidirectionalCpNode,
   cpInputId,
   cpOutputId,
+  isUtilitySlotNode,
+  getUtilitySlotIndex,
 } from '../../puzzle/connection-point-nodes.ts';
 import { createLogger } from '../../shared/logger/index.ts';
 import type { BakeMetadata, BakeResult, BakeError, BakedEdge, BakedNodeConfig } from './types.ts';
@@ -190,6 +192,26 @@ export function bakeGraph(
     metadata.cpLayout = cpLayout;
   }
 
+  // Derive cpLayout from utility slot nodes if present (new system)
+  if (!cpLayout) {
+    const hasUtilitySlots = Array.from(bakeNodes.keys()).some(id => isUtilitySlotNode(id));
+    if (hasUtilitySlots) {
+      const layout: ('input' | 'output' | 'off')[] = [];
+      for (let i = 0; i < 6; i++) {
+        const slotId = `__cp_utility_${i}__`;
+        const node = bakeNodes.get(slotId);
+        if (!node) {
+          layout.push('off');
+        } else if (node.type === 'connection-input') {
+          layout.push('input');
+        } else {
+          layout.push('output');
+        }
+      }
+      metadata.cpLayout = layout;
+    }
+  }
+
   // Step 4: Build closure
   const evaluate = buildClosure(bakeNodes, analysis);
 
@@ -304,6 +326,29 @@ function analyzeGraph(
       continue;
     }
 
+    // Utility slot nodes: treated like standard input/output CPs for baking
+    if (isUtilitySlotNode(nodeId)) {
+      const slotIndex = getUtilitySlotIndex(nodeId);
+      if (node.type === 'connection-input') {
+        // Utility input slots: use slot index directly as cpIndex
+        if (slotIndex >= inputCount) inputCount = slotIndex + 1;
+      } else if (node.type === 'connection-output') {
+        // Utility output slots: use slot index directly as output index
+        // Left outputs get indices 0-2, right outputs get indices 3-5 — no collision
+        const outputIndex = slotIndex;
+        if (outputIndex >= 0 && outputIndex >= outputCount) outputCount = outputIndex + 1;
+        const wire = wireByTarget.get(`${nodeId}:0`);
+        if (wire) {
+          outputMappings.push({
+            cpIndex: outputIndex,
+            sourceNodeId: wire.source.nodeId,
+            sourcePort: wire.source.portIndex,
+          });
+        }
+      }
+      continue;
+    }
+
     // Processing node
     processingOrder.push(nodeId);
 
@@ -321,6 +366,10 @@ function analyzeGraph(
       if (isConnectionInputNode(sourceNodeId)) {
         const cpIndex = getConnectionPointIndex(sourceNodeId);
         portSources.set(wireKey, { kind: 'cp', cpIndex });
+      } else if (isUtilitySlotNode(sourceNodeId)) {
+        // Utility input slot: slot index is the cpIndex
+        const slotIndex = getUtilitySlotIndex(sourceNodeId);
+        portSources.set(wireKey, { kind: 'cp', cpIndex: slotIndex });
       } else {
         portSources.set(wireKey, {
           kind: 'node',

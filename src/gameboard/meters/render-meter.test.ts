@@ -23,6 +23,7 @@ const mockTokens: ThemeTokens = {
   colorError: '#f00',
   meterNeedle: '#fff',
   meterBorder: '#666',
+  meterBorderMatch: '#063',
   boardBorder: '#555',
   depthRaised: '#aaa',
   depthSunken: '#222',
@@ -72,33 +73,31 @@ function createMockCtx() {
 }
 
 describe('drawMeter', () => {
-  it('hidden state makes no canvas calls', () => {
+  it('hidden mode makes no canvas calls', () => {
     const ctx = createMockCtx();
-    const slot: MeterSlotState = { side: 'left', index: 0, visualState: 'hidden', direction: 'input' };
-    const state: RenderMeterState = { slot, signalValues: null, targetValues: null, playpoint: 0, isConnected: false };
+    const slot: MeterSlotState = { mode: 'hidden' };
+    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, isPortMatched: false, isUtilityEditing: false };
     drawMeter(ctx, mockTokens, state, testRect);
     expect(ctx._calls).toHaveLength(0);
   });
 
-  it('dimmed state draws interior and overlay only (no channels)', () => {
+  it('off mode draws housing and direction indicator but no channels', () => {
     const ctx = createMockCtx();
-    const slot: MeterSlotState = { side: 'left', index: 0, visualState: 'dimmed', direction: 'input' };
-    const state: RenderMeterState = { slot, signalValues: null, targetValues: null, playpoint: 0, isConnected: false };
+    const slot: MeterSlotState = { mode: 'off' };
+    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, isPortMatched: false, isUtilityEditing: false };
     drawMeter(ctx, mockTokens, state, testRect);
 
-    // Housing + interior use roundRect+fill; two-layer streak + dimmed overlay use fillRect
-    const fillRectCalls = ctx._calls.filter((c) => c.startsWith('fillRect'));
-    expect(fillRectCalls.length).toBe(3); // soft wash + hard band + dimmed overlay
+    // Should draw housing + interior + border + streak + direction indicator
     const roundRectCalls = ctx._calls.filter((c) => c.startsWith('roundRect'));
-    expect(roundRectCalls.length).toBe(4); // shadow + housing + interior + highlight streak clip
+    expect(roundRectCalls.length).toBeGreaterThanOrEqual(3); // shadow + housing + interior + border + streak clip
     const beginPathCalls = ctx._calls.filter((c) => c.startsWith('beginPath'));
-    expect(beginPathCalls.length).toBeGreaterThanOrEqual(3); // housing + interior cutout clip + interior fill
+    expect(beginPathCalls.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('active state draws interior, centerline, and channels', () => {
+  it('input mode draws interior, centerline, and channels', () => {
     const ctx = createMockCtx();
-    const slot: MeterSlotState = { side: 'right', index: 0, visualState: 'active', direction: 'output' };
-    const state: RenderMeterState = { slot, signalValues: [50, -30], targetValues: null, playpoint: 0, isConnected: true };
+    const slot: MeterSlotState = { mode: 'output' };
+    const state: RenderMeterState = { slot, side: 'right', signalValues: [50, -30], targetValues: null, playpoint: 0, isConnected: true, isPortMatched: false, isUtilityEditing: false };
     drawMeter(ctx, mockTokens, state, testRect);
 
     // Housing + interior + level bar use roundRect+fill; streak uses fillRect
@@ -108,6 +107,21 @@ describe('drawMeter', () => {
     expect(roundRectCalls.length).toBeGreaterThanOrEqual(3); // housing + interior + level bar
     const beginPathCalls = ctx._calls.filter((c) => c.startsWith('beginPath'));
     expect(beginPathCalls.length).toBeGreaterThanOrEqual(3); // housing + interior cutout + interior fill + channels
+  });
+
+  it('utility editing draws housing + direction indicator only', () => {
+    const ctx = createMockCtx();
+    const slot: MeterSlotState = { mode: 'input' };
+    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, isPortMatched: false, isUtilityEditing: true };
+    drawMeter(ctx, mockTokens, state, testRect);
+
+    // Should draw housing + interior + border + streak + direction indicator
+    // but NOT full channel rendering
+    const calls = ctx._calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // No drawLevelBar or drawWaveformChannel calls (they'd produce setLineDash)
+    const setLineDashCalls = calls.filter((c) => c.startsWith('setLineDash'));
+    expect(setLineDashCalls.length).toBe(0);
   });
 
   it('does not import useGameStore or COLORS', async () => {

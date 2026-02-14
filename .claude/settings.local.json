@@ -49,7 +49,14 @@
       "Bash(git reset:*)",
       "Bash(git checkout:*)",
       "Bash(cd:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(git push:*)",
+      "Bash(git mv:*)",
+      "Bash(tasklist:*)",
+      "Bash(wmic process where \"name=''node.exe''\" get commandline)",
+      "WebFetch(domain:fonts.googleapis.com)",
+      "Bash(gh repo rename:*)",
+      "Bash(gh repo view:*)"
     ]
   }
 }

@@ -42,7 +42,7 @@ describe('Memory node', () => {
     expect(memoryNode.category).toBe('timing');
     expect(memoryNode.inputs).toHaveLength(1);
     expect(memoryNode.outputs).toHaveLength(1);
-    expect(memoryNode.size).toEqual({ width: 3, height: 2 });
+    expect(memoryNode.size).toEqual({ width: 3, height: 1 });
     expect(memoryNode.createState).toBeDefined();
     expect(memoryNode.params).toBeUndefined();
   });

@@ -94,6 +94,7 @@ function buildGhostRenderState(
     portSignals: new Map(),
     rejectedKnobNodeId: null,
     connectedInputPorts: new Set(),
+    liveNodeIds: new Set(['__ghost__']),
   };
 }
 

@@ -11,6 +11,7 @@ function makeCycleResults(outputValues: number[][]): CycleResults {
     processingOrder: [],
     nodeDepths: new Map(),
     maxDepth: 0,
+    liveNodeIds: new Set(),
   };
 }
 

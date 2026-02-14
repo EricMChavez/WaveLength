@@ -44,6 +44,8 @@ function lerpColor(a: RGB, b: RGB, t: number): string {
   return `rgb(${r},${g},${bl})`;
 }
 
+const EMPTY_PORT_SIGNALS: ReadonlyMap<string, number> = new Map();
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -111,7 +113,8 @@ export function drawNodes(
   for (const node of state.nodes.values()) {
     if (isConnectionPointNode(node.id)) continue;
     drawNodeBody(ctx, tokens, state, node, cellSize);
-    drawNodePorts(ctx, tokens, node, cellSize, state.portSignals, state.connectedInputPorts);
+    const isLive = state.liveNodeIds.has(node.id);
+    drawNodePorts(ctx, tokens, node, cellSize, isLive ? state.portSignals : EMPTY_PORT_SIGNALS, state.connectedInputPorts);
   }
 
   // Second pass: draw selection highlight on top of all nodes
@@ -249,10 +252,13 @@ function drawNodeBody(
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = `${Math.round(cellSize * NODE_STYLE.LABEL_LETTER_SPACING_RATIO)}px`;
 
-  // Align label vertically with the top port position (row 0 of node grid),
-  // even if no port actually exists there.
-  const topPortY = node.position.row * cellSize;
-  const labelOffsetY = topPortY - centerY;
+  // If the node has a knob, keep label at top (aligned with top port row).
+  // Otherwise, center the label vertically in the node body.
+  const def = getNodeDefinition(node.type);
+  const hasKnob = !!getKnobConfig(def);
+  const labelOffsetY = hasKnob
+    ? node.position.row * cellSize - centerY
+    : 0;
   ctx.fillText(label, 0, labelOffsetY);
 
   ctx.letterSpacing = '0px';

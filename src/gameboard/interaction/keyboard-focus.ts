@@ -4,10 +4,10 @@
  */
 
 import type { PortRef, NodeState, Wire } from '../../shared/types/index.ts';
-import type { PuzzleDefinition } from '../../puzzle/types.ts';
-import { buildConnectionPointConfig } from '../../puzzle/types.ts';
+import type { PuzzleDefinition, SlotConfig } from '../../puzzle/types.ts';
+import { buildSlotConfig } from '../../puzzle/types.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
-import { CONNECTION_POINT_CONFIG } from '../../shared/constants/index.ts';
+import { TOTAL_SLOTS } from '../../shared/grid/slot-helpers.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,7 +16,7 @@ import { CONNECTION_POINT_CONFIG } from '../../shared/constants/index.ts';
 export type KeyboardFocusTarget =
   | { type: 'node'; nodeId: string }
   | { type: 'port'; portRef: PortRef }
-  | { type: 'connection-point'; side: 'input' | 'output'; index: number }
+  | { type: 'connection-point'; slotIndex: number }
   | { type: 'wire'; wireId: string };
 
 // ---------------------------------------------------------------------------
@@ -93,21 +93,14 @@ export function computeTabOrder(
     }
   }
 
-  // Active connection points (left side then right side)
+  // Active connection points (slots 0-5 in order)
   if (activePuzzle) {
-    const cpConfig = activePuzzle.connectionPoints
-      ?? buildConnectionPointConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs);
+    const config: SlotConfig = activePuzzle.slotConfig
+      ?? buildSlotConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs);
 
-    for (let i = 0; i < cpConfig.left.length; i++) {
-      const slot = cpConfig.left[i];
-      if (slot.active) {
-        order.push({ type: 'connection-point', side: slot.direction, index: slot.cpIndex ?? i });
-      }
-    }
-    for (let i = 0; i < cpConfig.right.length; i++) {
-      const slot = cpConfig.right[i];
-      if (slot.active) {
-        order.push({ type: 'connection-point', side: slot.direction, index: slot.cpIndex ?? i });
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
+      if (config[i].active) {
+        order.push({ type: 'connection-point', slotIndex: i });
       }
     }
   }
@@ -208,10 +201,7 @@ function findFocusIndex(order: KeyboardFocusTarget[], target: KeyboardFocusTarge
           item.portRef.side === (target as { type: 'port'; portRef: PortRef }).portRef.side
         );
       case 'connection-point':
-        return (
-          item.side === (target as { type: 'connection-point'; side: string; index: number }).side &&
-          item.index === (target as { type: 'connection-point'; side: string; index: number }).index
-        );
+        return item.slotIndex === (target as { type: 'connection-point'; slotIndex: number }).slotIndex;
       case 'wire':
         return item.wireId === (target as { type: 'wire'; wireId: string }).wireId;
     }

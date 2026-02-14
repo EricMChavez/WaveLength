@@ -10,8 +10,6 @@ export interface CeremonyPuzzleInfo {
 export interface CeremonySlice {
   /** Whether the completion ceremony overlay is active */
   ceremonyActive: boolean;
-  /** Canvas snapshot data URL for the zoom-out animation */
-  ceremonySnapshot: string | null;
   /** Puzzle info displayed during ceremony */
   ceremonyPuzzle: CeremonyPuzzleInfo | null;
   /** Whether this is a re-solve of an already-completed puzzle */
@@ -21,7 +19,6 @@ export interface CeremonySlice {
 
   /** Start the completion ceremony overlay */
   startCeremony: (
-    snapshot: string,
     puzzle: CeremonyPuzzleInfo,
     isResolve: boolean,
     bakeMetadata: BakeMetadata,
@@ -32,15 +29,13 @@ export interface CeremonySlice {
 
 export const createCeremonySlice: StateCreator<CeremonySlice> = (set) => ({
   ceremonyActive: false,
-  ceremonySnapshot: null,
   ceremonyPuzzle: null,
   ceremonyIsResolve: false,
   ceremonyBakeMetadata: null,
 
-  startCeremony: (snapshot, puzzle, isResolve, bakeMetadata) =>
+  startCeremony: (puzzle, isResolve, bakeMetadata) =>
     set({
       ceremonyActive: true,
-      ceremonySnapshot: snapshot,
       ceremonyPuzzle: puzzle,
       ceremonyIsResolve: isResolve,
       ceremonyBakeMetadata: bakeMetadata,
@@ -49,7 +44,6 @@ export const createCeremonySlice: StateCreator<CeremonySlice> = (set) => ({
   dismissCeremony: () =>
     set({
       ceremonyActive: false,
-      ceremonySnapshot: null,
       ceremonyPuzzle: null,
       ceremonyIsResolve: false,
       ceremonyBakeMetadata: null,

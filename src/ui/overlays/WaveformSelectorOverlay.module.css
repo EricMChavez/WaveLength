@@ -9,9 +9,9 @@
 }
 
 .panel {
-  background: #2a2a3e;
-  border: 1px solid #4a4a6a;
-  border-radius: 10px;
+  background: #141418;
+  border: 1px solid #2a3632;
+  border-radius: 6px;
   width: 280px;
   max-height: 400px;
   display: flex;
@@ -22,7 +22,7 @@
 
 .header {
   padding: 12px 16px;
-  border-bottom: 1px solid #3a3a5a;
+  border-bottom: 1px solid #2a3632;
 }
 
 .headerRow {
@@ -32,10 +32,10 @@
 }
 
 .backButton {
-  background: none;
-  border: 1px solid #4a4a6a;
+  background: #0e1012;
+  border: 1px solid rgba(60, 145, 230, 0.3);
   border-radius: 4px;
-  color: #9090b0;
+  color: #3c91e6;
   font-size: 16px;
   width: 28px;
   height: 28px;
@@ -48,19 +48,21 @@
 }
 
 .backButton:hover {
-  background: #3a3a5e;
-  color: #e0e0f0;
+  background: rgba(60, 145, 230, 0.08);
+  border-color: rgba(60, 145, 230, 0.5);
 }
 
 .title {
-  color: #e0e0f0;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #d8dcd0;
   font-size: 14px;
   font-weight: 600;
   margin: 0;
 }
 
 .subtitle {
-  color: #9090b0;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #6a7a76;
   font-size: 11px;
   margin-top: 2px;
 }
@@ -76,15 +78,15 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3a3a5a;
+  background: #2a3632;
 }
 
 .stepDot.active {
-  background: #3a7bd5;
+  background: #f0a202;
 }
 
 .stepDot.completed {
-  background: #5a9bf5;
+  background: #3c91e6;
 }
 
 .list {
@@ -100,9 +102,10 @@
   padding: 10px 12px;
   background: none;
   border: none;
-  border-radius: 6px;
-  color: #e0e0f0;
-  font-family: system-ui, sans-serif;
+  border-left: 2px solid transparent;
+  border-radius: 2px;
+  color: #d8dcd0;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
@@ -112,27 +115,29 @@
 
 .item:hover,
 .item:focus {
-  background: #3a3a5e;
+  background: rgba(60, 145, 230, 0.06);
+  color: #3c91e6;
 }
 
 .item.active {
-  background: #3a7bd5;
-  color: #fff;
+  background: rgba(240, 162, 2, 0.12);
+  color: #f0a202;
+  border-left: 2px solid #f0a202;
 }
 
 .waveformIcon {
   width: 32px;
   height: 20px;
-  border-radius: 3px;
-  background: #1a1a2e;
-  border: 1px solid #4a4a6a;
+  border-radius: 2px;
+  background: #0e1012;
+  border: 1px solid #2a3632;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .item.active .waveformIcon {
-  border-color: #5a9bf5;
+  border-color: #f0a202;
 }
 
 .waveformLabel {
@@ -141,17 +146,17 @@
 
 .divider {
   height: 1px;
-  background: #3a3a5a;
+  background: #2a3632;
   margin: 6px 0;
 }
 
 .offItem {
-  color: #9090b0;
+  color: #6a7a76;
 }
 
 .offItem.active {
-  background: #4a4a6a;
-  color: #e0e0f0;
+  background: rgba(240, 162, 2, 0.08);
+  color: #d8dcd0;
 }
 
 .exportButton {
@@ -159,36 +164,39 @@
   width: calc(100% - 24px);
   margin: 4px 12px 4px;
   padding: 6px 12px;
-  background: #2e3d5a;
-  border: 1px solid #4a5a7a;
+  background: #1a1e20;
+  border: 1px solid #2a3632;
   border-radius: 4px;
-  color: #9090b0;
-  font-family: system-ui, sans-serif;
+  color: #6a7a76;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 12px;
   cursor: pointer;
   text-align: center;
 }
 
 .exportButton:hover {
-  background: #3a4d6a;
-  color: #e0e0f0;
+  background: rgba(60, 145, 230, 0.06);
+  border-color: rgba(60, 145, 230, 0.3);
+  color: #3c91e6;
 }
 
 .copiedFeedback {
-  color: #5af5a0;
+  color: #27FB6B;
 }
 
 .sectionHeader {
-  color: #7070a0;
-  font-size: 11px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #4a5654;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.5px;
   padding: 4px 12px;
 }
 
 .emptyMessage {
-  color: #606080;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #4a5654;
   font-size: 12px;
   padding: 8px 12px;
   font-style: italic;

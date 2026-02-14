@@ -110,11 +110,11 @@ describe('keyboard-focus', () => {
       const puzzle = makePuzzle(2, 1);
       const order = computeTabOrder(nodes, [], null, puzzle);
 
-      // n1, cp-input:0, cp-input:1, cp-output:0
+      // n1, cp slot:0, cp slot:1, cp slot:3
       expect(order).toHaveLength(4);
-      expect(order[1]).toEqual({ type: 'connection-point', side: 'input', index: 0 });
-      expect(order[2]).toEqual({ type: 'connection-point', side: 'input', index: 1 });
-      expect(order[3]).toEqual({ type: 'connection-point', side: 'output', index: 0 });
+      expect(order[1]).toEqual({ type: 'connection-point', slotIndex: 0 });
+      expect(order[2]).toEqual({ type: 'connection-point', slotIndex: 1 });
+      expect(order[3]).toEqual({ type: 'connection-point', slotIndex: 3 });
     });
 
     it('returns empty for empty board', () => {

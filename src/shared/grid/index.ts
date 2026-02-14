@@ -33,6 +33,13 @@ export {
 } from './occupancy';
 export { getCellSize, setCellSize } from './cell-size-ref';
 export {
+  SLOTS_PER_SIDE,
+  TOTAL_SLOTS,
+  slotSide,
+  slotPerSideIndex,
+  sideToSlot,
+} from './slot-helpers';
+export {
   getRotatedPortSide,
   getRotatedSize,
   getPortApproachDirection,

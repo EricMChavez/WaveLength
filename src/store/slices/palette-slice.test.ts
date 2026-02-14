@@ -137,7 +137,7 @@ describe('palette filtering logic', () => {
         ? nodeRegistry.all.filter((def) => allowedNodes.includes(def.type))
         : nodeRegistry.all;
       expect(visible).toEqual(nodeRegistry.all);
-      expect(visible.length).toBe(7); // 7 fundamental nodes
+      expect(visible.length).toBe(10); // 10 fundamental nodes
     });
 
     it('allowedNodes filters to matching types only', () => {

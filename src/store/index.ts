@@ -72,4 +72,6 @@ initCustomPuzzlePersistence(useGameStore);
 initCycleRunner(useGameStore);
 
 // DEBUG: expose store for browser console inspection
-(window as unknown as Record<string, unknown>).__GAME_STORE__ = useGameStore;
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).__GAME_STORE__ = useGameStore;
+}

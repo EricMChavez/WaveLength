@@ -8,9 +8,9 @@
   position: fixed;
   z-index: 101;
   min-width: 160px;
-  background: #2a2a3e;
-  border: 1px solid #4a4a6a;
-  border-radius: 6px;
+  background: #141418;
+  border: 1px solid #2a3632;
+  border-radius: 4px;
   padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   outline: none;
@@ -22,8 +22,8 @@
   padding: 8px 16px;
   background: none;
   border: none;
-  color: #e0e0f0;
-  font-family: system-ui, sans-serif;
+  color: #d8dcd0;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
@@ -32,7 +32,8 @@
 
 .item:hover,
 .item:focus {
-  background: #3a3a5e;
+  background: rgba(60, 145, 230, 0.08);
+  color: #3c91e6;
 }
 
 .danger {
@@ -41,5 +42,6 @@
 
 .danger:hover,
 .danger:focus {
-  background: #3e2020;
+  background: rgba(224, 56, 56, 0.08);
+  color: #E03838;
 }

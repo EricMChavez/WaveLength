@@ -19,10 +19,13 @@ describe('Node Registry', () => {
       expect(nodeRegistry.allTypes).toContain('min');
       expect(nodeRegistry.allTypes).toContain('split');
       expect(nodeRegistry.allTypes).toContain('memory');
+      expect(nodeRegistry.allTypes).toContain('divide');
+      expect(nodeRegistry.allTypes).toContain('add');
+      expect(nodeRegistry.allTypes).toContain('negate');
     });
 
     it('has correct count', () => {
-      expect(nodeRegistry.all).toHaveLength(7);
+      expect(nodeRegistry.all).toHaveLength(10);
     });
 
     it('has byType lookup', () => {
@@ -31,8 +34,8 @@ describe('Node Registry', () => {
     });
 
     it('has byCategory lookup', () => {
-      expect(nodeRegistry.byCategory.math).toHaveLength(5); // offset, scale, threshold, max, min
-      expect(nodeRegistry.byCategory.routing).toHaveLength(1); // split
+      expect(nodeRegistry.byCategory.math).toHaveLength(7); // offset, scale, threshold, add, max, min, negate
+      expect(nodeRegistry.byCategory.routing).toHaveLength(2); // split, divide
       expect(nodeRegistry.byCategory.timing).toHaveLength(1); // memory
     });
   });

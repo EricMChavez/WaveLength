@@ -1,7 +1,8 @@
 import type { Wire, NodeState } from '../../shared/types/index.ts';
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import { getNodePortPosition, getConnectionPointPosition } from './port-positions.ts';
-import { isConnectionPointNode, isConnectionInputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex } from '../../puzzle/connection-point-nodes.ts';
+import { isConnectionPointNode, isConnectionInputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isUtilitySlotNode, getUtilitySlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex } from '../../puzzle/connection-point-nodes.ts';
+import { slotSide, slotPerSideIndex, sideToSlot } from '../../shared/grid/slot-helpers.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 
 // ── Colour helpers ──────────────────────────────────────────────────────────
@@ -103,37 +104,41 @@ function getPortPixelPosition(
   cellSize: number,
 ): { x: number; y: number } | null {
   if (isConnectionPointNode(nodeId)) {
-    let physicalSide: 'left' | 'right';
-    let meterIndex: number;
-
-    if (isCreativeSlotNode(nodeId)) {
-      // Creative slots: 0-2 are left, 3-5 are right
-      const slotIndex = getCreativeSlotIndex(nodeId);
-      physicalSide = slotIndex < 3 ? 'left' : 'right';
-      meterIndex = slotIndex < 3 ? slotIndex : slotIndex - 3;
-    } else if (isBidirectionalCpNode(nodeId)) {
-      // Bidirectional CPs (utility editing): 0-2 are left, 3-5 are right
-      const cpIndex = getBidirectionalCpIndex(nodeId);
-      physicalSide = cpIndex < 3 ? 'left' : 'right';
-      meterIndex = cpIndex < 3 ? cpIndex : cpIndex - 3;
-    } else {
-      // Standard CP nodes: check for physicalSide in params (custom puzzles),
-      // fall back to direction-based mapping (standard puzzles)
-      const node = nodes.get(nodeId);
-      if (node?.params.physicalSide) {
-        physicalSide = node.params.physicalSide as 'left' | 'right';
-        meterIndex = node.params.meterIndex as number;
-      } else {
-        physicalSide = isConnectionInputNode(nodeId) ? 'left' : 'right';
-        meterIndex = getConnectionPointIndex(nodeId);
-      }
-    }
-
+    // All CP node types encode a slot index (0-5). Derive physical side and per-side index.
+    const slotIndex = getCpSlotIndex(nodeId, nodes);
+    const physicalSide = slotSide(slotIndex);
+    const meterIndex = slotPerSideIndex(slotIndex);
     return getConnectionPointPosition(physicalSide, meterIndex, cellSize);
   }
   const node = nodes.get(nodeId);
   if (!node) return null;
   return getNodePortPosition(node, side, portIndex, cellSize);
+}
+
+/**
+ * Extract the flat slot index (0-5) from any CP node type.
+ * Creative/utility/bidir nodes encode it in their ID.
+ * Standard puzzle CP nodes use physicalSide+meterIndex params or direction-based fallback.
+ */
+function getCpSlotIndex(
+  nodeId: string,
+  nodes: ReadonlyMap<string, NodeState>,
+): number {
+  if (isCreativeSlotNode(nodeId)) return getCreativeSlotIndex(nodeId);
+  if (isUtilitySlotNode(nodeId)) return getUtilitySlotIndex(nodeId);
+  if (isBidirectionalCpNode(nodeId)) return getBidirectionalCpIndex(nodeId);
+
+  // Standard puzzle CP: check for physicalSide in params (custom puzzles)
+  const node = nodes.get(nodeId);
+  if (node?.params.physicalSide) {
+    const pSide = node.params.physicalSide as 'left' | 'right';
+    const idx = node.params.meterIndex as number;
+    return sideToSlot(pSide, idx);
+  }
+  // Fallback: input→left, output→right, per-direction index as per-side index
+  const isInput = isConnectionInputNode(nodeId);
+  const cpIndex = getConnectionPointIndex(nodeId);
+  return sideToSlot(isInput ? 'left' : 'right', cpIndex);
 }
 
 // ── Wire pixel path builder ─────────────────────────────────────────────────
@@ -211,6 +216,7 @@ export function drawWires(
   nodes?: ReadonlyMap<string, NodeState>,
   wireValues?: ReadonlyMap<string, number>,
   neutralOnly?: boolean,
+  liveWireIds?: ReadonlySet<string>,
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
@@ -241,6 +247,7 @@ export function drawWires(
     ctx.restore();
 
     if (neutralOnly) continue;
+    if (liveWireIds && !liveWireIds.has(wire.id)) continue;
     if (totalSegments === 0) continue; // single-point path, base drawn
 
     // Uniform signal value for the entire wire at current playpoint

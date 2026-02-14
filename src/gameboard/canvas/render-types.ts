@@ -32,14 +32,18 @@ export interface RenderNodesState {
   rejectedKnobNodeId: string | null;
   /** Set of connected input port keys: `${nodeId}:${portIndex}` */
   connectedInputPorts: ReadonlySet<string>;
+  /** Set of node IDs reachable from input sources (live nodes) */
+  liveNodeIds: ReadonlySet<string>;
 }
 
 /** State needed by renderConnectionPoints */
 export interface RenderConnectionPointsState {
   activePuzzle: PuzzleDefinition | null;
   perPortMatch: readonly boolean[];
-  /** Non-null when editing a utility node (bidirectional CPs) */
+  /** Non-null when editing a utility node */
   editingUtilityId?: string | null;
+  /** Meter slots for deriving CP directions during utility editing */
+  meterSlots?: ReadonlyMap<MeterKey, MeterSlotState>;
   /** Latest signal value per CP, keyed by `${direction}:${cpIndex}` (e.g. "input:0", "output:1"). */
   cpSignals: ReadonlyMap<string, number>;
   /** Set of connected output CP keys: `output:${cpIndex}` */

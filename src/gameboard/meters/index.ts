@@ -10,7 +10,7 @@ export {
   meterKey,
 } from './meter-types.ts';
 export type {
-  MeterVisualState,
+  MeterMode,
   MeterSide,
   MeterKey,
   MeterSlotState,

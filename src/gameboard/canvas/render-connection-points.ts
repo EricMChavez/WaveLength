@@ -2,7 +2,10 @@ import { CONNECTION_POINT_CONFIG } from '../../shared/constants/index.ts';
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { RenderConnectionPointsState } from './render-types.ts';
 import { getConnectionPointPosition } from './port-positions.ts';
-import { buildConnectionPointConfig, buildCustomNodeConnectionPointConfig } from '../../puzzle/types.ts';
+import { buildSlotConfig, buildSlotConfigFromDirections } from '../../puzzle/types.ts';
+import type { SlotConfig } from '../../puzzle/types.ts';
+import { TOTAL_SLOTS, slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
+import { deriveDirectionsFromMeterSlots } from '../../gameboard/meters/meter-types.ts';
 import { signalToColor, signalToGlow } from './render-wires.ts';
 
 /** Map a physical side direction to the angle (in radians) for the socket opening center. */
@@ -24,38 +27,32 @@ export function renderConnectionPoints(
 ): void {
   const { RADIUS } = CONNECTION_POINT_CONFIG;
 
-  const cpConfig = state.editingUtilityId
-    ? buildCustomNodeConnectionPointConfig()
-    : state.activePuzzle?.connectionPoints
-      ?? buildConnectionPointConfig(
-        state.activePuzzle?.activeInputs ?? CONNECTION_POINT_CONFIG.INPUT_COUNT,
-        state.activePuzzle?.activeOutputs ?? CONNECTION_POINT_CONFIG.OUTPUT_COUNT,
-      );
+  // Derive SlotConfig: puzzle definition takes priority, otherwise derive from meter slots
+  const config: SlotConfig = state.activePuzzle?.slotConfig
+    ?? (state.activePuzzle
+      ? buildSlotConfig(state.activePuzzle.activeInputs, state.activePuzzle.activeOutputs)
+      : state.meterSlots
+        ? buildSlotConfigFromDirections(deriveDirectionsFromMeterSlots(state.meterSlots))
+        : buildSlotConfig(CONNECTION_POINT_CONFIG.INPUT_COUNT, CONNECTION_POINT_CONFIG.OUTPUT_COUNT));
 
-  // Left-side connection points — input CPs provide signal, always filled circles
-  for (let i = 0; i < cpConfig.left.length; i++) {
-    const slot = cpConfig.left[i];
+  // Single loop over all 6 slots (0-2 left, 3-5 right)
+  // Signal keys uniformly use slot index: `${direction}:${slotIndex}`
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const slot = config[i];
     if (!slot.active) continue;
-    const pos = getConnectionPointPosition('left', i, cellSize);
-    const signalKey = slot.cpIndex !== undefined ? `${slot.direction}:${slot.cpIndex}` : `${slot.direction}:${i}`;
-    const signalValue = state.cpSignals.get(signalKey) ?? 0;
-    drawConnectionPoint(ctx, tokens, pos.x, pos.y, RADIUS, signalValue, false, 'right');
-  }
 
-  // Right-side connection points — output CPs need connections, socket when unconnected
-  for (let i = 0; i < cpConfig.right.length; i++) {
-    const slot = cpConfig.right[i];
-    if (!slot.active) continue;
-    const pos = getConnectionPointPosition('right', i, cellSize);
-    const signalKey = slot.cpIndex !== undefined ? `${slot.direction}:${slot.cpIndex}` : `${slot.direction}:${i}`;
+    const side = slotSide(i);
+    const perSideIdx = slotPerSideIndex(i);
+    const pos = getConnectionPointPosition(side, perSideIdx, cellSize);
+    const signalKey = `${slot.direction}:${i}`;
     const signalValue = state.cpSignals.get(signalKey) ?? 0;
 
-    // Output CPs: show socket if unconnected
+    // Output CPs render as socket when unconnected, full circle when wired
     const isOutputCP = slot.direction === 'output';
-    const cpIdx = slot.cpIndex !== undefined ? slot.cpIndex : i;
-    const isConnected = isOutputCP && state.connectedOutputCPs.has(`output:${cpIdx}`);
-    const isSocket = isOutputCP && !isConnected;
-    drawConnectionPoint(ctx, tokens, pos.x, pos.y, RADIUS, signalValue, isSocket, 'left');
+    const isConnected = isOutputCP && state.connectedOutputCPs.has(signalKey);
+    // Socket opening faces inward (left CPs face right, right CPs face left)
+    const openingDirection = side === 'left' ? 'right' : 'left';
+    drawConnectionPoint(ctx, tokens, pos.x, pos.y, RADIUS, signalValue, isOutputCP && !isConnected, openingDirection);
   }
 }
 

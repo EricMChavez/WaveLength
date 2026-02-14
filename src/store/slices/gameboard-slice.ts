@@ -1,8 +1,11 @@
 import type { StateCreator } from 'zustand';
+import type { GameStore } from '../index.ts';
 import type { GameboardId, GameboardState, NodeId, NodeState, Wire, NodeRotation } from '../../shared/types/index.ts';
 import type { GridPoint } from '../../shared/grid/types.ts';
 import { recomputeOccupancy, markNodeOccupied, clearNodeOccupied, createOccupancyGrid } from '../../shared/grid/index.ts';
-import { creativeSlotId } from '../../puzzle/connection-point-nodes.ts';
+import { creativeSlotId, utilitySlotId, createUtilitySlotNode } from '../../puzzle/connection-point-nodes.ts';
+import type { MeterMode } from '../../gameboard/meters/meter-types.ts';
+import { meterKey } from '../../gameboard/meters/meter-types.ts';
 
 export interface GameboardSlice {
   /** The currently active gameboard */
@@ -44,9 +47,11 @@ export interface GameboardSlice {
   addCreativeSlotNode: (slotIndex: number, direction: 'input' | 'output') => void;
   /** Batch update node params + port constant in a single set() with one graphVersion bump. Used during knob drag. */
   batchKnobAdjust: (nodeId: NodeId, paramKey: string, portIndex: number, value: number) => void;
+  /** Toggle a meter slot's mode during utility editing: input→output→off→input. Returns false if blocked by wires. */
+  toggleMeterMode: (cpIndex: number) => boolean;
 }
 
-export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
+export const createGameboardSlice: StateCreator<GameStore, [], [], GameboardSlice> = (set, get) => ({
   activeBoard: null,
   activeBoardId: null,
   portConstants: new Map<string, number>(),
@@ -268,6 +273,54 @@ export const createGameboardSlice: StateCreator<GameboardSlice> = (set) => ({
         occupancy,
       };
     }),
+
+  toggleMeterMode: (cpIndex) => {
+    const state = get();
+    if (!state.activeBoard) return false;
+
+    const nodeId = utilitySlotId(cpIndex);
+
+    // Check if any wires connect to this CP — block toggle if so
+    const hasWires = state.activeBoard.wires.some(
+      (w) => w.source.nodeId === nodeId || w.target.nodeId === nodeId,
+    );
+    if (hasWires) return false;
+
+    // Read current mode from meter slot (flat slot index key)
+    const key = meterKey(cpIndex);
+    const slot = state.meterSlots.get(key);
+    const currentMode: MeterMode = slot?.mode ?? 'off';
+
+    const nextModeMap: Record<string, MeterMode> = {
+      input: 'output',
+      output: 'off',
+      off: 'input',
+    };
+    const nextMode = nextModeMap[currentMode] ?? 'input';
+
+    // Update meter slot
+    const slots = new Map(state.meterSlots);
+    slots.set(key, { mode: nextMode });
+
+    // Update board nodes
+    const nodes = new Map(state.activeBoard.nodes);
+    if (nodes.has(nodeId)) {
+      nodes.delete(nodeId);
+    }
+    if (nextMode === 'input' || nextMode === 'output') {
+      const newNode = createUtilitySlotNode(cpIndex, nextMode);
+      nodes.set(newNode.id, newNode);
+    }
+
+    set({
+      activeBoard: { ...state.activeBoard, nodes },
+      meterSlots: slots,
+      graphVersion: state.graphVersion + 1,
+      routingVersion: state.routingVersion + 1,
+    });
+
+    return true;
+  },
 
   batchKnobAdjust: (nodeId, paramKey, portIndex, value) =>
     set((state) => {

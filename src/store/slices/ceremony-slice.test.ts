@@ -21,7 +21,6 @@ describe('ceremony-slice', () => {
     const store = createTestStore();
     const s = store.getState();
     expect(s.ceremonyActive).toBe(false);
-    expect(s.ceremonySnapshot).toBeNull();
     expect(s.ceremonyPuzzle).toBeNull();
     expect(s.ceremonyIsResolve).toBe(false);
     expect(s.ceremonyBakeMetadata).toBeNull();
@@ -30,11 +29,10 @@ describe('ceremony-slice', () => {
   it('startCeremony sets all ceremony fields', () => {
     const store = createTestStore();
     const puzzle = { id: 'p1', title: 'Test', description: 'A test puzzle' };
-    store.getState().startCeremony('data:image/png;base64,abc', puzzle, false, fakeMeta);
+    store.getState().startCeremony(puzzle, false, fakeMeta);
 
     const s = store.getState();
     expect(s.ceremonyActive).toBe(true);
-    expect(s.ceremonySnapshot).toBe('data:image/png;base64,abc');
     expect(s.ceremonyPuzzle).toEqual(puzzle);
     expect(s.ceremonyIsResolve).toBe(false);
     expect(s.ceremonyBakeMetadata).toEqual(fakeMeta);
@@ -43,19 +41,18 @@ describe('ceremony-slice', () => {
   it('startCeremony reflects re-solve flag', () => {
     const store = createTestStore();
     const puzzle = { id: 'p1', title: 'Test', description: 'A test puzzle' };
-    store.getState().startCeremony('snap', puzzle, true, fakeMeta);
+    store.getState().startCeremony(puzzle, true, fakeMeta);
     expect(store.getState().ceremonyIsResolve).toBe(true);
   });
 
   it('dismissCeremony resets all fields', () => {
     const store = createTestStore();
     const puzzle = { id: 'p1', title: 'Test', description: 'A test puzzle' };
-    store.getState().startCeremony('snap', puzzle, false, fakeMeta);
+    store.getState().startCeremony(puzzle, false, fakeMeta);
     store.getState().dismissCeremony();
 
     const s = store.getState();
     expect(s.ceremonyActive).toBe(false);
-    expect(s.ceremonySnapshot).toBeNull();
     expect(s.ceremonyPuzzle).toBeNull();
     expect(s.ceremonyIsResolve).toBe(false);
     expect(s.ceremonyBakeMetadata).toBeNull();

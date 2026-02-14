@@ -54,44 +54,23 @@ function formatWaveformDef(
 }
 
 /**
- * Generate a ConnectionPointConfig source block for the meter layout.
+ * Generate a SlotConfig source block for the meter layout.
  * Always emitted so that built-in levels preserve the exact meter positions.
  */
-function formatConnectionPoints(slots: CustomPuzzle['slots'], indent: string): string {
-  // Count inputs/outputs on each side for cpIndex assignment
-  let leftInputIdx = 0;
-  let leftOutputIdx = 0;
-  for (let i = 0; i < 3; i++) {
-    if (slots[i].direction === 'input') leftInputIdx++;
-    else if (slots[i].direction === 'output') leftOutputIdx++;
-  }
-
-  const formatSlots = (slotRange: Array<{ direction: 'input' | 'output' | 'off' }>, side: string) => {
-    const lines: string[] = [];
-    let inputIdx = side === 'left' ? 0 : leftInputIdx;
-    let outputIdx = side === 'left' ? 0 : leftOutputIdx;
-
-    for (const slot of slotRange) {
-      if (slot.direction === 'off') {
-        lines.push(`${indent}    { active: false, direction: 'input' },`);
-      } else {
-        const cpIdx = slot.direction === 'input' ? inputIdx++ : outputIdx++;
-        lines.push(`${indent}    { active: true, direction: '${slot.direction}', cpIndex: ${cpIdx} },`);
-      }
+function formatSlotConfig(slots: CustomPuzzle['slots'], indent: string): string {
+  const lines: string[] = [];
+  lines.push(`${indent}slotConfig: [`);
+  for (let i = 0; i < 6; i++) {
+    const slot = slots[i];
+    if (slot.direction === 'off') {
+      const defaultDir = i < 3 ? 'input' : 'output';
+      lines.push(`${indent}  { active: false, direction: '${defaultDir}' },`);
+    } else {
+      lines.push(`${indent}  { active: true, direction: '${slot.direction}' },`);
     }
-    return lines.join('\n');
-  };
-
-  return [
-    `${indent}connectionPoints: {`,
-    `${indent}  left: [`,
-    formatSlots(slots.slice(0, 3), 'left'),
-    `${indent}  ],`,
-    `${indent}  right: [`,
-    formatSlots(slots.slice(3, 6), 'right'),
-    `${indent}  ],`,
-    `${indent}},`,
-  ].join('\n');
+  }
+  lines.push(`${indent}],`);
+  return lines.join('\n');
 }
 
 /**
@@ -168,8 +147,8 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
     `  ],`,
   ];
 
-  // Always include connectionPoints to preserve meter layout
-  lines.push(formatConnectionPoints(puzzle.slots, '  '));
+  // Always include slotConfig to preserve meter layout
+  lines.push(formatSlotConfig(puzzle.slots, '  '));
 
   // Include initialNodes if any are defined
   if (puzzle.initialNodes && puzzle.initialNodes.length > 0) {
@@ -191,6 +170,14 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
       lines.push(`    { source: { nodeId: '${wire.source.nodeId}', portIndex: ${wire.source.portIndex} }, target: { nodeId: '${wire.target.nodeId}', portIndex: ${wire.target.portIndex} } },`);
     }
     lines.push(`  ],`);
+  }
+
+  // Include tutorialTitle and tutorialMessage if set
+  if (puzzle.tutorialTitle) {
+    lines.push(`  tutorialTitle: '${puzzle.tutorialTitle.replace(/'/g, "\\'")}',`);
+  }
+  if (puzzle.tutorialMessage) {
+    lines.push(`  tutorialMessage: '${puzzle.tutorialMessage.replace(/'/g, "\\'")}',`);
   }
 
   lines.push(`};`);

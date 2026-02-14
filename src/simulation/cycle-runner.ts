@@ -5,8 +5,9 @@ import type { CycleResults } from '../engine/evaluation/index.ts';
 import { generateWaveformValue } from '../puzzle/waveform-generators.ts';
 import { CONNECTION_POINT_CONFIG, VALIDATION_CONFIG } from '../shared/constants/index.ts';
 import { bakeGraph } from '../engine/baking/index.ts';
-import { cpBidirectionalId } from '../puzzle/connection-point-nodes.ts';
-import { buildConnectionPointConfig, buildCustomNodeConnectionPointConfig } from '../puzzle/types.ts';
+import { utilitySlotId } from '../puzzle/connection-point-nodes.ts';
+import { buildSlotConfig, directionIndexToSlot } from '../puzzle/types.ts';
+import type { SlotConfig } from '../puzzle/types.ts';
 import { createLogger } from '../shared/logger/index.ts';
 
 const log = createLogger('CycleRunner');
@@ -27,18 +28,18 @@ function initializeMeters(store: GameStore): void {
 
   perSampleMatchArrays.clear();
 
-  if (isCreativeMode) {
+  if (editingUtilityId) {
+    // Utility editing: meter slots already set by startEditingUtility / toggleMeterMode.
+    // No re-initialization needed — meter state is authoritative.
+  } else if (isCreativeMode) {
     // Creative mode: meters initialized by initializeCreativeMode() in App.tsx
   } else if (activePuzzle) {
-    const cpConfig = activePuzzle.connectionPoints
-      ?? buildConnectionPointConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs);
-    store.initializeMeters(cpConfig);
-  } else if (editingUtilityId) {
-    const cpConfig = buildCustomNodeConnectionPointConfig();
-    store.initializeMeters(cpConfig);
+    const slotConfig: SlotConfig = activePuzzle.slotConfig
+      ?? buildSlotConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs);
+    store.initializeMeters(slotConfig);
   } else {
-    const cpConfig = buildConnectionPointConfig(CONNECTION_POINT_CONFIG.INPUT_COUNT, CONNECTION_POINT_CONFIG.OUTPUT_COUNT);
-    store.initializeMeters(cpConfig);
+    const slotConfig = buildSlotConfig(CONNECTION_POINT_CONFIG.INPUT_COUNT, CONNECTION_POINT_CONFIG.OUTPUT_COUNT);
+    store.initializeMeters(slotConfig);
   }
 }
 
@@ -59,11 +60,23 @@ function runCycleEvaluation(): void {
   // Build input generator based on mode
   let inputGenerator: (cycleIndex: number) => number[];
 
-  if (isCreativeMode) {
+  if (editingUtilityId) {
+    // Utility editing: inputs from port constants (utility slot CPs)
+    // Takes priority over creative mode (utility can be entered from creative)
+    inputGenerator = (_cycleIndex: number) => {
+      const inputs: number[] = [];
+      for (let i = 0; i < 6; i++) {
+        const nodeId = utilitySlotId(i);
+        const key = `${nodeId}:0`;
+        inputs.push(constants.get(key) ?? 0);
+      }
+      return inputs;
+    };
+  } else if (isCreativeMode) {
     // Creative mode: inputs from creative slot waveforms
     inputGenerator = (cycleIndex: number) => {
       const inputs: number[] = [];
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 6; i++) {
         const slot = creativeSlots[i];
         if (slot?.direction === 'input') {
           inputs.push(generateWaveformValue(cycleIndex, slot.waveform));
@@ -82,17 +95,6 @@ function runCycleEvaluation(): void {
     }
     inputGenerator = (cycleIndex: number) => {
       return testCase.inputs.map(waveformDef => generateWaveformValue(cycleIndex, waveformDef));
-    };
-  } else if (editingUtilityId) {
-    // Utility editing: inputs from port constants (bidirectional CPs)
-    inputGenerator = (_cycleIndex: number) => {
-      const inputs: number[] = [];
-      for (let i = 0; i < 6; i++) {
-        const nodeId = cpBidirectionalId(i);
-        const key = `${nodeId}:0`;
-        inputs.push(constants.get(key) ?? 0);
-      }
-      return inputs;
     };
   } else {
     // No puzzle, no creative: zero inputs
@@ -128,8 +130,12 @@ function validateCycleResults(results: CycleResults, store: GameStore): void {
   const testCase = activePuzzle.testCases[activeTestCaseIndex];
   if (!testCase) return;
 
+  const slotConfig: SlotConfig = activePuzzle.slotConfig
+    ?? buildSlotConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs);
+
   const tolerance = VALIDATION_CONFIG.MATCH_TOLERANCE;
-  const perPortMatch: boolean[] = [];
+  // Slot-indexed perPortMatch: perPortMatch[slotIndex] = true/false
+  const perPortMatch: boolean[] = new Array(6).fill(false);
   let allMatch = testCase.expectedOutputs.length > 0;
 
   for (let outputIdx = 0; outputIdx < testCase.expectedOutputs.length; outputIdx++) {
@@ -144,8 +150,12 @@ function validateCycleResults(results: CycleResults, store: GameStore): void {
       if (!match) portMatch = false;
     }
 
-    perSampleMatchArrays.set(`output:${outputIdx}`, matchArr);
-    perPortMatch.push(portMatch);
+    // Map per-direction output index → flat slot index
+    const slotIdx = directionIndexToSlot(slotConfig, 'output', outputIdx);
+    if (slotIdx >= 0) {
+      perSampleMatchArrays.set(`output:${slotIdx}`, matchArr);
+      perPortMatch[slotIdx] = portMatch;
+    }
     if (!portMatch) allMatch = false;
   }
 
@@ -175,9 +185,6 @@ function triggerCeremony(): void {
   const { activePuzzle, activeBoard } = store;
   if (!activePuzzle || !activeBoard) return;
 
-  const canvas = document.querySelector('canvas');
-  const snapshot = canvas ? canvas.toDataURL() : '';
-
   const bakeResult = bakeGraph(activeBoard.nodes, activeBoard.wires);
   if (!bakeResult.ok) return;
 
@@ -185,7 +192,10 @@ function triggerCeremony(): void {
   const puzzleId = activePuzzle.id;
   const isResolve = store.completedLevels.has(puzzleId);
 
-  store.startCeremony(snapshot, {
+  // Auto-play so the solved puzzle animates behind the win modal
+  store.setPlayMode('playing');
+
+  store.startCeremony({
     id: puzzleId,
     title: activePuzzle.title,
     description: activePuzzle.description,

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store/index.ts';
 import type { WaveformShape, WaveformDef } from '../../puzzle/types.ts';
-import { slotToMeterInfo } from '../../store/slices/creative-slice.ts';
 import { creativeSlotId } from '../../puzzle/connection-point-nodes.ts';
-import { meterKey } from '../../gameboard/meters/meter-types.ts';
+import { slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
 import { CUSTOM_WAVEFORMS } from '../../puzzle/custom-waveforms.ts';
 import { extractOutputSamples, formatCustomWaveformEntry } from '../../puzzle/export-waveform.ts';
 import styles from './WaveformSelectorOverlay.module.css';
@@ -225,7 +224,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   const updateWires = useGameStore((s) => s.updateWires);
   const updateCreativeSlotNode = useGameStore((s) => s.updateCreativeSlotNode);
   const addCreativeSlotNode = useGameStore((s) => s.addCreativeSlotNode);
-  const setMeterVisualState = useGameStore((s) => s.setMeterVisualState);
+  const setMeterMode = useGameStore((s) => s.setMeterMode);
   const isCreativeMode = useGameStore((s) => s.isCreativeMode);
 
   const [step, setStep] = useState<WizardStep>('direction');
@@ -243,7 +242,8 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
 
   const slot = creativeSlots[slotIndex];
   const currentDirection = slot?.direction ?? 'output';
-  const { side, index } = slotToMeterInfo(slotIndex);
+  const side = slotSide(slotIndex);
+  const perSideIdx = slotPerSideIndex(slotIndex);
 
   // Helper: delete wires connected to this slot's CP node
   const deleteSlotWires = useCallback(() => {
@@ -262,13 +262,14 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
     if (currentDirection === 'off') {
       addCreativeSlotNode(slotIndex, 'input');
       setCreativeSlotDirection(slotIndex, 'input');
-      setMeterVisualState(meterKey(side, index), 'active');
+      setMeterMode(slotIndex, 'input');
     } else if (currentDirection === 'output') {
       deleteSlotWires();
       updateCreativeSlotNode(slotIndex, 'input');
       setCreativeSlotDirection(slotIndex, 'input');
+      setMeterMode(slotIndex, 'input');
     }
-  }, [currentDirection, slotIndex, addCreativeSlotNode, setCreativeSlotDirection, setMeterVisualState, side, index, deleteSlotWires, updateCreativeSlotNode]);
+  }, [currentDirection, slotIndex, addCreativeSlotNode, setCreativeSlotDirection, setMeterMode, deleteSlotWires, updateCreativeSlotNode]);
 
   const handleSelectOff = useCallback(() => {
     if (currentDirection === 'off') {
@@ -279,10 +280,10 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
     const changed = setCreativeSlotDirection(slotIndex, 'off');
     if (changed) {
       updateCreativeSlotNode(slotIndex, 'off');
-      setMeterVisualState(meterKey(side, index), 'hidden');
+      setMeterMode(slotIndex, 'off');
     }
     closeOverlay();
-  }, [slotIndex, currentDirection, deleteSlotWires, setCreativeSlotDirection, updateCreativeSlotNode, setMeterVisualState, side, index, closeOverlay]);
+  }, [slotIndex, currentDirection, deleteSlotWires, setCreativeSlotDirection, updateCreativeSlotNode, setMeterMode, closeOverlay]);
 
   const handleSelectOutput = useCallback(() => {
     if (currentDirection === 'output') {
@@ -294,13 +295,13 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
     }
     if (currentDirection === 'off') {
       addCreativeSlotNode(slotIndex, 'output');
-      setMeterVisualState(meterKey(side, index), 'active');
     } else {
       updateCreativeSlotNode(slotIndex, 'output');
     }
+    setMeterMode(slotIndex, 'output');
     setCreativeSlotDirection(slotIndex, 'output');
     closeOverlay();
-  }, [slotIndex, currentDirection, deleteSlotWires, setCreativeSlotDirection, updateCreativeSlotNode, addCreativeSlotNode, setMeterVisualState, side, index, closeOverlay]);
+  }, [slotIndex, currentDirection, deleteSlotWires, setCreativeSlotDirection, updateCreativeSlotNode, addCreativeSlotNode, setMeterMode, closeOverlay]);
 
   const handleSelectInput = useCallback(() => {
     setStep('shape');
@@ -347,14 +348,14 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   const handleExport = useCallback(async () => {
     const cycleResults = useGameStore.getState().cycleResults;
     if (!cycleResults) return;
-    const portIndex = slotIndex - 3; // output slots start at index 3
+    const portIndex = slotIndex; // output index matches slot index in creative mode
     const samples = extractOutputSamples(cycleResults, portIndex);
-    const slotLabel = `${side === 'left' ? 'Left' : 'Right'} ${index + 1}`;
+    const slotLabel = `${side === 'left' ? 'Left' : 'Right'} ${perSideIdx + 1}`;
     const source = formatCustomWaveformEntry('Output ' + slotLabel, samples);
     await navigator.clipboard.writeText(source);
     setCopiedFeedback(true);
     setTimeout(() => setCopiedFeedback(false), 2000);
-  }, [slotIndex, side, index]);
+  }, [slotIndex, side, perSideIdx]);
 
   const handleBack = useCallback(() => {
     if (step === 'shape') setStep('direction');
@@ -378,7 +379,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
     listRef.current?.focus();
   }, [step]);
 
-  const slotLabel = `${side === 'left' ? 'Left' : 'Right'} ${index + 1}`;
+  const slotLabel = `${side === 'left' ? 'Left' : 'Right'} ${perSideIdx + 1}`;
 
   const stepTitle: Record<WizardStep, string> = {
     direction: 'Configure Connection Point',

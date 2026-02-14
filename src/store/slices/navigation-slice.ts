@@ -1,10 +1,20 @@
 import type { StateCreator } from 'zustand';
 import type { GameStore } from '../index.ts';
-import type { GameboardState, NodeId } from '../../shared/types/index.ts';
+import type { GameboardState, NodeId, NodeState } from '../../shared/types/index.ts';
 import { gameboardFromBakeMetadata } from '../../puzzle/gameboard-from-metadata.ts';
 import { recomputeOccupancy } from '../../shared/grid/index.ts';
 import { createDefaultMeterSlots } from './meter-slice.ts';
-import type { MeterKey, MeterSlotState } from '../../gameboard/meters/meter-types.ts';
+import type { MeterKey, MeterMode, MeterSlotState } from '../../gameboard/meters/meter-types.ts';
+import { meterKey } from '../../gameboard/meters/meter-types.ts';
+import { TOTAL_SLOTS } from '../../shared/grid/slot-helpers.ts';
+import {
+  isUtilitySlotNode,
+  getUtilitySlotIndex,
+  isBidirectionalCpNode,
+  getBidirectionalCpIndex,
+  utilitySlotId,
+  createUtilitySlotNode,
+} from '../../puzzle/connection-point-nodes.ts';
 
 export interface BoardStackEntry {
   board: GameboardState;
@@ -41,6 +51,92 @@ export interface NavigationSlice {
   endZoomTransition: () => void;
   startEditingUtility: (utilityId: string, board: GameboardState, nodeIdInParent?: NodeId) => void;
   finishEditingUtility: (nodeSwap?: NodeSwap) => void;
+}
+
+/**
+ * Derive meter slots for utility editing from the board's utility slot nodes.
+ * Each slot gets mode = 'input' | 'output' | 'off' based on the board nodes.
+ */
+function deriveUtilityMeterSlots(board: GameboardState): Map<MeterKey, MeterSlotState> {
+  const slots = new Map<MeterKey, MeterSlotState>();
+
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const nodeId = utilitySlotId(i);
+    let mode: MeterMode = 'off';
+    if (board.nodes.has(nodeId)) {
+      const node = board.nodes.get(nodeId)!;
+      mode = node.type === 'connection-input' ? 'input' : 'output';
+    }
+    slots.set(meterKey(i), { mode });
+  }
+
+  return slots;
+}
+
+/**
+ * Migrate a board from old bidir CPs (__cp_bidir_N__) to new utility slots (__cp_utility_N__).
+ * If no bidir CPs exist, returns the board unchanged.
+ */
+function migrateOldBidirCps(board: GameboardState): GameboardState {
+  // Check if any old bidir CPs exist
+  let hasBidir = false;
+  for (const nodeId of board.nodes.keys()) {
+    if (isBidirectionalCpNode(nodeId)) {
+      hasBidir = true;
+      break;
+    }
+  }
+  if (!hasBidir) return board;
+
+  const nodes = new Map<string, NodeState>();
+
+  // Build ID mapping for wire remapping
+  const idMap = new Map<string, string>();
+
+  for (const [id, node] of board.nodes) {
+    if (isBidirectionalCpNode(id)) {
+      const cpIndex = getBidirectionalCpIndex(id);
+      // Bidir CPs: infer direction from wiring.
+      // Output port used (wires source from it) → 'input' (feeds signal into board)
+      // Input port used (wires target it) → 'output' (receives signal from board)
+      const hasOutgoing = board.wires.some(w => w.source.nodeId === id);
+      const hasIncoming = board.wires.some(w => w.target.nodeId === id);
+
+      let dir: 'input' | 'output';
+      if (hasOutgoing) {
+        dir = 'input';
+      } else if (hasIncoming) {
+        dir = 'output';
+      } else {
+        // Default: left=input, right=output
+        dir = cpIndex < 3 ? 'input' : 'output';
+      }
+
+      const newNode = createUtilitySlotNode(cpIndex, dir);
+      const newNodeId = utilitySlotId(cpIndex);
+      idMap.set(id, newNodeId);
+      nodes.set(newNodeId, newNode);
+    } else {
+      nodes.set(id, node);
+    }
+  }
+
+  // Remap wire references
+  const wires = board.wires.map(w => {
+    let source = w.source;
+    let target = w.target;
+
+    if (idMap.has(w.source.nodeId)) {
+      source = { ...source, nodeId: idMap.get(w.source.nodeId)! };
+    }
+    if (idMap.has(w.target.nodeId)) {
+      target = { ...target, nodeId: idMap.get(w.target.nodeId)! };
+    }
+
+    return { ...w, source, target };
+  });
+
+  return { ...board, nodes, wires };
 }
 
 export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSlice> = (
@@ -142,18 +238,24 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
 
     const newStack = [...state.boardStack, stackEntry];
 
+    // Migrate old bidir CPs to utility slot nodes if needed
+    const migratedBoard = migrateOldBidirCps(board);
+
+    // Derive meter slots from utility slot nodes on the board
+    const utilityMeterSlots = deriveUtilityMeterSlots(migratedBoard);
+
     set({
       boardStack: newStack,
-      activeBoard: board,
-      activeBoardId: board.id,
+      activeBoard: migratedBoard,
+      activeBoardId: migratedBoard.id,
       portConstants: new Map(),
       activeBoardReadOnly: false,
       navigationDepth: newStack.length,
       selectedNodeId: null,
       editingUtilityId: utilityId,
       editingNodeIdInParent: (nodeIdInParent ?? null) as NodeId | null,
-      occupancy: recomputeOccupancy(board.nodes),
-      meterSlots: createDefaultMeterSlots(),
+      occupancy: recomputeOccupancy(migratedBoard.nodes),
+      meterSlots: utilityMeterSlots,
     });
   },
 

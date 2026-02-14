@@ -21,6 +21,7 @@ const DARK_VALUES: Record<string, string> = {
   '--token-meter-needle': '#f5f5f5',
   '--token-color-error': '#e04040',
   '--token-meter-border': '#6c6666',
+  '--token-meter-border-match': '#27FB6B',
   '--token-board-border': '#3d3e42',
   '--token-depth-raised': 'rgba(0, 0, 0, 0.4)',
   '--token-depth-sunken': 'rgba(0, 0, 0, 0.6)',

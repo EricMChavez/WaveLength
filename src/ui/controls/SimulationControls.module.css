@@ -12,10 +12,11 @@
 }
 
 .banner {
-  background: rgba(245, 175, 40, 0.15);
-  border: 1px solid rgba(245, 175, 40, 0.3);
-  border-radius: 6px;
-  color: #F5AF28;
+  background: rgba(240, 162, 2, 0.15);
+  border: 1px solid rgba(240, 162, 2, 0.3);
+  border-radius: 4px;
+  color: #f0a202;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 12px;
   font-weight: 500;
   padding: 6px 12px;
@@ -28,10 +29,11 @@
 }
 
 .saveButton {
-  background: linear-gradient(135deg, #F5AF28 0%, #e09d1f 100%);
+  background: linear-gradient(135deg, #f0a202 0%, #d89a20 100%);
   border: none;
-  border-radius: 6px;
-  color: #1a1a2e;
+  border-radius: 4px;
+  color: #0a0a10;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   font-weight: 600;
   padding: 8px 16px;
@@ -41,7 +43,7 @@
 
 .saveButton:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(245, 175, 40, 0.3);
+  box-shadow: 0 4px 12px rgba(240, 162, 2, 0.3);
 }
 
 .saveButton:disabled {
@@ -50,10 +52,11 @@
 }
 
 .secondaryButton {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: #e0e0f0;
+  background: #1a1e20;
+  border: 1px solid rgba(60, 145, 230, 0.3);
+  border-radius: 4px;
+  color: #3c91e6;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   font-weight: 500;
   padding: 8px 16px;
@@ -62,14 +65,16 @@
 }
 
 .secondaryButton:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(60, 145, 230, 0.08);
+  border-color: rgba(60, 145, 230, 0.5);
 }
 
 .cancelButton {
   background: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  color: #9090b0;
+  border: 1px solid #2a3632;
+  border-radius: 4px;
+  color: #6a7a76;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   font-weight: 500;
   padding: 8px 16px;
@@ -78,28 +83,28 @@
 }
 
 .cancelButton:hover {
-  color: #e0e0f0;
-  border-color: rgba(255, 255, 255, 0.3);
+  color: #d8dcd0;
+  border-color: #4a5654;
 }
 
 .messageInput {
   width: 300px;
   padding: 6px 10px;
-  background: rgba(30, 30, 46, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: #e0e0f0;
+  background: #0e1012;
+  border: 1px solid #2a3632;
+  border-radius: 4px;
+  color: #d8dcd0;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 12px;
-  font-family: inherit;
   outline: none;
   text-align: center;
   transition: border-color 0.2s;
 }
 
 .messageInput:focus {
-  border-color: #F5AF28;
+  border-color: #3c91e6;
 }
 
 .messageInput::placeholder {
-  color: #6a6a8a;
+  color: #4a5654;
 }

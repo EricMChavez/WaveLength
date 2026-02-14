@@ -51,16 +51,11 @@ describe('creative-slice', () => {
       expect(slots.length).toBe(CREATIVE_SLOT_COUNT);
     });
 
-    it('left slots (0-2) default to input, right slots (3-5) default to output', () => {
+    it('all slots default to off (fresh creative mode starts empty)', () => {
       const slots = useGameStore.getState().creativeSlots;
-      // Left side (0-2) are inputs
-      expect(slots[0].direction).toBe('input');
-      expect(slots[1].direction).toBe('input');
-      expect(slots[2].direction).toBe('input');
-      // Right side (3-5) are outputs
-      expect(slots[3].direction).toBe('output');
-      expect(slots[4].direction).toBe('output');
-      expect(slots[5].direction).toBe('output');
+      for (let i = 0; i < slots.length; i++) {
+        expect(slots[i].direction).toBe('off');
+      }
     });
 
     it('all slots have default sine-quarter waveform', () => {
@@ -74,9 +69,9 @@ describe('creative-slice', () => {
   });
 
   describe('setCreativeSlotDirection', () => {
-    it('changes slot direction from input to output (left slot)', () => {
-      // Slot 0 defaults to input
-      expect(useGameStore.getState().creativeSlots[0].direction).toBe('input');
+    it('changes slot direction from off to output', () => {
+      // Slot 0 defaults to off
+      expect(useGameStore.getState().creativeSlots[0].direction).toBe('off');
 
       const changed = useGameStore.getState().setCreativeSlotDirection(0, 'output');
 
@@ -85,21 +80,21 @@ describe('creative-slice', () => {
     });
 
     it('returns false when direction unchanged', () => {
-      // Slot 0 defaults to input
-      expect(useGameStore.getState().creativeSlots[0].direction).toBe('input');
+      // Slot 0 defaults to off
+      expect(useGameStore.getState().creativeSlots[0].direction).toBe('off');
 
-      const changed = useGameStore.getState().setCreativeSlotDirection(0, 'input');
+      const changed = useGameStore.getState().setCreativeSlotDirection(0, 'off');
 
       expect(changed).toBe(false);
     });
 
     it('resets waveform to default when switching to input', () => {
       // Start from output direction
-      useGameStore.getState().setCreativeSlotDirection(3, 'input'); // Slot 3 defaults to output
+      useGameStore.getState().setCreativeSlotDirection(3, 'output');
       useGameStore.getState().setCreativeSlotWaveformShape(3, 'square-quarter');
       expect(useGameStore.getState().creativeSlots[3].waveform.shape).toBe('square-quarter');
 
-      useGameStore.getState().setCreativeSlotDirection(3, 'output');
+      useGameStore.getState().setCreativeSlotDirection(3, 'off');
       useGameStore.getState().setCreativeSlotDirection(3, 'input');
 
       expect(useGameStore.getState().creativeSlots[3].waveform.shape).toBe('sine-quarter');

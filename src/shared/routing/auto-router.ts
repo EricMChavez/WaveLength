@@ -17,6 +17,8 @@ import {
   getCreativeSlotIndex,
   isBidirectionalCpNode,
   getBidirectionalCpIndex,
+  isUtilitySlotNode,
+  getUtilitySlotIndex,
 } from '../../puzzle/connection-point-nodes.ts';
 import { METER_GRID_ROWS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS } from '../../gameboard/meters/meter-types.ts';
 import {
@@ -147,6 +149,8 @@ export function getPortWireDirection(
     let isLeftPhysical: boolean;
     if (isCreativeSlotNode(node.id)) {
       isLeftPhysical = getCreativeSlotIndex(node.id) < 3;
+    } else if (isUtilitySlotNode(node.id)) {
+      isLeftPhysical = getUtilitySlotIndex(node.id) < 3;
     } else if (isBidirectionalCpNode(node.id)) {
       isLeftPhysical = getBidirectionalCpIndex(node.id) < 3;
     } else if (node.params.physicalSide) {
@@ -270,28 +274,29 @@ export function getPortGridAnchor(
  * - CP row = floor(index * stride + METER_GRID_ROWS / 2)
  */
 function getConnectionPointAnchor(node: NodeState): GridPoint {
-  let isLeftSide: boolean;
-  let index: number;
-
+  // All CP node types encode a slot index (0-5). Extract it.
+  let slotIdx: number;
   if (isCreativeSlotNode(node.id)) {
-    // Creative slots: 0-2 are left (input side), 3-5 are right (output side)
-    const slotIndex = getCreativeSlotIndex(node.id);
-    isLeftSide = slotIndex < 3;
-    index = isLeftSide ? slotIndex : slotIndex - 3;
+    slotIdx = getCreativeSlotIndex(node.id);
+  } else if (isUtilitySlotNode(node.id)) {
+    slotIdx = getUtilitySlotIndex(node.id);
   } else if (isBidirectionalCpNode(node.id)) {
-    // Bidirectional CPs (utility editing): 0-2 are left, 3-5 are right
-    const cpIndex = getBidirectionalCpIndex(node.id);
-    isLeftSide = cpIndex < 3;
-    index = isLeftSide ? cpIndex : cpIndex - 3;
+    slotIdx = getBidirectionalCpIndex(node.id);
   } else if (node.params.physicalSide) {
-    // Custom puzzle: use explicit physical side and meter index
-    isLeftSide = node.params.physicalSide === 'left';
-    index = node.params.meterIndex as number;
+    // Custom puzzle: use explicit physical side and meter index → derive slot
+    const pSide = node.params.physicalSide as 'left' | 'right';
+    const idx = node.params.meterIndex as number;
+    slotIdx = pSide === 'left' ? idx : idx + 3;
   } else {
     // Standard puzzle: input→left, output→right
-    isLeftSide = isConnectionInputNode(node.id);
-    index = getConnectionPointIndex(node.id);
+    const isInput = isConnectionInputNode(node.id);
+    const cpIndex = getConnectionPointIndex(node.id);
+    slotIdx = isInput ? cpIndex : cpIndex + 3;
   }
+
+  // Derive physical side and per-side index from flat slot index
+  const isLeftSide = slotIdx < 3;
+  const index = slotIdx % 3;
 
   // Match meter layout: no margin, meters fill full height
   const meterTopMargin = 0;
@@ -417,7 +422,9 @@ export function findPath(
 
   // Source may be on the node body (anchors sit on node edge), so check bounds but
   // not occupancy — the stem will move the path off the occupied cell immediately.
-  if (!isRoutable(source.col, source.row)) return null;
+  // Use full grid bounds (not isRoutable) because CPs at col 56 can be sources when
+  // creative mode swaps input/output sides.
+  if (source.col < 0 || source.col >= GRID_COLS || source.row < 0 || source.row >= GRID_ROWS) return null;
   // Target may be outside the routable area (e.g. output CPs at col 56)
   // but must be within the full grid bounds
   if (target.col < 0 || target.col >= GRID_COLS || target.row < 0 || target.row >= GRID_ROWS) return null;

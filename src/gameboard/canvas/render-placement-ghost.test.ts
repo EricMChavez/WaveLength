@@ -121,10 +121,10 @@ describe('renderPlacementGhost', () => {
     // Mouse at pixel (480, 365) → grid (12, 9) at cellSize 40
     const state = makeState({ mousePosition: { x: 480, y: 365 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    // memory node: 3 cols x 2 rows, rotation 0
-    // getNodeBodyPixelRect: bodyTop=-0.5, bodyBottom=1.5 → y=(9-0.5)*40=340, h=80
+    // memory node: 3 cols x 1 row, rotation 0
+    // getNodeBodyPixelRect: bodyTop=-0.5, bodyBottom=0.5 → y=(9-0.5)*40=340, h=40
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      480, 340, 120, 80, expect.any(Number),
+      480, 340, 120, 40, expect.any(Number),
     );
   });
 
@@ -133,9 +133,9 @@ describe('renderPlacementGhost', () => {
     // Mouse at col 2 (inside meter zone) → should clamp to PLAYABLE_START + 1 (11)
     const state = makeState({ mousePosition: { x: 2 * cellSize + 5, y: 400 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    // Node at col 11: body x = 11 * 40 = 440, height = 80 (full 2-row body)
+    // Node at col 11: body x = 11 * 40 = 440, height = 40 (1-row memory node)
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      (PLAYABLE_START + 1) * cellSize, expect.any(Number), 120, 80, expect.any(Number),
+      (PLAYABLE_START + 1) * cellSize, expect.any(Number), 120, 40, expect.any(Number),
     );
   });
 
@@ -146,7 +146,7 @@ describe('renderPlacementGhost', () => {
     renderPlacementGhost(ctx, tokens, state, cellSize);
     const maxStartCol = PLAYABLE_END - 3;
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      maxStartCol * cellSize, expect.any(Number), 120, 80, expect.any(Number),
+      maxStartCol * cellSize, expect.any(Number), 120, 40, expect.any(Number),
     );
   });
 

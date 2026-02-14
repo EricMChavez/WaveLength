@@ -67,7 +67,8 @@ export const createAuthoringSlice: StateCreator<AuthoringSlice> = (set, get) => 
     }
 
     for (const slotIndex of outputSlotIndices) {
-      const outputIdx = slotIndex - 3; // slots 3-5 → output indices 0-2
+      // Creative-mode evaluator uses slotIndex directly as outputIndex (not slotIndex - 3)
+      const outputIdx = slotIndex;
       if (outputIdx >= 0 && outputIdx < outputCount) {
         const samples: number[] = [];
         for (let c = 0; c < cycleResults.outputValues.length; c++) {

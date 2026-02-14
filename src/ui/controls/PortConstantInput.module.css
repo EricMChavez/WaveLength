@@ -1,9 +1,9 @@
 .overlay {
   position: absolute;
   z-index: 20;
-  background: #16162a;
-  border: 1px solid #3a7bd5;
-  border-radius: 6px;
+  background: #141418;
+  border: 1px solid #2a3632;
+  border-radius: 4px;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -13,7 +13,8 @@
 }
 
 .label {
-  color: #9090b0;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #6a7a76;
   font-size: 11px;
 }
 
@@ -25,30 +26,33 @@
 
 .numberInput {
   width: 70px;
-  background: #44484e;
-  color: #e0e0f0;
-  border: 1px solid #3a3a5a;
+  background: #0e1012;
+  color: #d8dcd0;
+  border: 1px solid #2a3632;
   border-radius: 4px;
   padding: 4px 6px;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 12px;
   text-align: center;
 }
 
 .numberInput:focus {
   outline: none;
-  border-color: #3a7bd5;
+  border-color: #f0a202;
 }
 
 .okBtn {
-  background: #44484e;
-  color: #e0e0f0;
-  border: 1px solid #3a3a5a;
+  background: #1a1e20;
+  color: #d8dcd0;
+  border: 1px solid #2a3632;
   border-radius: 4px;
   padding: 4px 8px;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 11px;
   cursor: pointer;
 }
 
 .okBtn:hover {
-  background: #3a3a5a;
+  background: rgba(60, 145, 230, 0.06);
+  border-color: rgba(60, 145, 230, 0.3);
 }
