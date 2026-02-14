@@ -192,16 +192,14 @@ function triggerCeremony(): void {
   const puzzleId = activePuzzle.id;
   const isResolve = store.completedLevels.has(puzzleId);
 
-  // Auto-play so the solved puzzle animates behind the win modal
+  // Auto-play so the solved puzzle animates behind the celebration
   store.setPlayMode('playing');
 
-  store.startCeremony({
+  store.enterItWorks({
     id: puzzleId,
     title: activePuzzle.title,
     description: activePuzzle.description,
   }, isResolve, metadata);
-
-  store.startVictoryBurst();
 }
 
 /**

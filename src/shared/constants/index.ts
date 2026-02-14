@@ -120,6 +120,14 @@ export const BOARD_MESSAGE_CARD = {
   BODY_LINE_HEIGHT: 1.5,
 } as const;
 
+/** Playback bar grid region (centered in playable area, bottom rows) */
+export const PLAYBACK_BAR = {
+  COL_START: 24,
+  COL_END: 41,    // inclusive
+  ROW_START: 34,
+  ROW_END: 35,    // inclusive (bottom of grid)
+} as const;
+
 /** Display labels for node types (derived from registry for v2 nodes) */
 export const NODE_TYPE_LABELS: Record<string, string> = {
   offset: 'Offset',

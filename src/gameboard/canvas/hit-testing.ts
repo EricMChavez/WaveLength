@@ -20,6 +20,7 @@ export type HitResult =
   | { type: 'node'; nodeId: NodeId }
   | { type: 'wire'; wireId: string }
   | { type: 'meter'; slotIndex: number }
+  | { type: 'playback-button'; button: 'prev' | 'play-pause' | 'next' }
   | { type: 'empty' };
 
 const PORT_HIT_RADIUS = 12;
@@ -136,7 +137,7 @@ export function hitTest(
     const labelFontSize = Math.round(NODE_STYLE.LABEL_FONT_RATIO * cellSize);
     const centerX = bodyRect.x + bodyRect.width / 2;
     const centerY = bodyRect.y + bodyRect.height / 2 + labelFontSize * 0.5;
-    const knobRadius = 0.55 * cellSize;
+    const knobRadius = 1.1 * cellSize;
     if (dist(x, y, centerX, centerY) <= knobRadius) {
       return { type: 'knob', nodeId: node.id, center: { x: centerX, y: centerY } };
     }
@@ -187,6 +188,83 @@ export function hitTest(
   }
 
   return { type: 'empty' };
+}
+
+export const WIRE_SNAP_RADIUS_CELLS = 2;
+
+/**
+ * Find the nearest valid snap target (port or connection point) within a pixel radius.
+ * Used when a wire drop misses the exact hit target — snaps to the closest valid endpoint.
+ */
+export function findNearestSnapTarget(
+  x: number,
+  y: number,
+  maxRadiusPx: number,
+  nodes: ReadonlyMap<NodeId, NodeState>,
+  cellSize: number,
+  slotConfig?: SlotConfig,
+  activeInputs?: number,
+  activeOutputs?: number,
+  meterSlots?: ReadonlyMap<MeterKey, MeterSlotState>,
+  isValidTarget?: (hit: HitResult) => boolean,
+): HitResult | null {
+  let bestHit: HitResult | null = null;
+  let bestDist = maxRadiusPx;
+
+  // Check all non-CP-node ports
+  for (const node of nodes.values()) {
+    if (isConnectionPointNode(node.id)) continue;
+    for (let i = 0; i < node.outputCount; i++) {
+      const pos = getNodePortPosition(node, 'output', i, cellSize);
+      const d = dist(x, y, pos.x, pos.y);
+      if (d < bestDist) {
+        const hit: HitResult = {
+          type: 'port',
+          portRef: { nodeId: node.id, portIndex: i, side: 'output' },
+          position: pos,
+        };
+        if (!isValidTarget || isValidTarget(hit)) {
+          bestDist = d;
+          bestHit = hit;
+        }
+      }
+    }
+    for (let i = 0; i < node.inputCount; i++) {
+      const pos = getNodePortPosition(node, 'input', i, cellSize);
+      const d = dist(x, y, pos.x, pos.y);
+      if (d < bestDist) {
+        const hit: HitResult = {
+          type: 'port',
+          portRef: { nodeId: node.id, portIndex: i, side: 'input' },
+          position: pos,
+        };
+        if (!isValidTarget || isValidTarget(hit)) {
+          bestDist = d;
+          bestHit = hit;
+        }
+      }
+    }
+  }
+
+  // Check connection points
+  const config = deriveSlotConfig(slotConfig, activeInputs, activeOutputs, meterSlots);
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const slot = config[i];
+    if (!slot.active) continue;
+    const side = slotSide(i);
+    const perSideIdx = slotPerSideIndex(i);
+    const pos = getConnectionPointPosition(side, perSideIdx, cellSize);
+    const d = dist(x, y, pos.x, pos.y);
+    if (d < bestDist) {
+      const hit: HitResult = { type: 'connection-point', slotIndex: i, direction: slot.direction, position: pos };
+      if (!isValidTarget || isValidTarget(hit)) {
+        bestDist = d;
+        bestHit = hit;
+      }
+    }
+  }
+
+  return bestHit;
 }
 
 /**

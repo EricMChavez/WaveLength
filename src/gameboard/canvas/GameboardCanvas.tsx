@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { startRenderLoop } from './render-loop.ts';
 import { useGameStore } from '../../store/index.ts';
-import { hitTest, hitTestMeter } from './hit-testing.ts';
+import { hitTest, hitTestMeter, findNearestSnapTarget, WIRE_SNAP_RADIUS_CELLS } from './hit-testing.ts';
 import { getEscapeAction, executeEscapeAction } from '../interaction/escape-handler.ts';
 import { getKeyboardAction, executeKeyboardAction } from '../interaction/keyboard-handler.ts';
 import { setFocusVisible } from '../interaction/keyboard-focus.ts';
@@ -31,6 +31,8 @@ import {
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
+import { registerSnapshotCapture, unregisterSnapshotCapture } from './snapshot.ts';
+import { hitTestPlaybackBar, setHoveredPlaybackButton } from './render-playback-bar.ts';
 
 function getCanvasLogicalSize(canvas: HTMLCanvasElement) {
   const cellSize = parseInt(canvas.dataset.cellSize || '0', 10);
@@ -139,6 +141,53 @@ function connectionPointToPortRef(
   }
 
   return null;
+}
+
+/**
+ * Attempt to snap-complete a wire to the nearest valid port/connection-point
+ * within WIRE_SNAP_RADIUS_CELLS. Returns true if a wire was created.
+ */
+function trySnapComplete(
+  x: number,
+  y: number,
+  fromPort: PortRef,
+  state: ReturnType<typeof useGameStore.getState>,
+  cellSize: number,
+): boolean {
+  if (!state.activeBoard) return false;
+  const maxRadiusPx = WIRE_SNAP_RADIUS_CELLS * cellSize;
+  const snapHit = findNearestSnapTarget(
+    x, y, maxRadiusPx,
+    state.activeBoard.nodes, cellSize,
+    state.activePuzzle?.slotConfig,
+    state.activePuzzle?.activeInputs,
+    state.activePuzzle?.activeOutputs,
+    state.meterSlots,
+    (hit) => {
+      if (hit.type === 'port') {
+        return canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, state.activeBoard!.wires);
+      }
+      if (hit.type === 'connection-point') {
+        const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard!.nodes, 'end', state.activePuzzle?.slotConfig);
+        return !!cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard!.wires);
+      }
+      return false;
+    },
+  );
+  if (!snapHit) return false;
+
+  if (snapHit.type === 'port') {
+    state.addWire(createWire(generateId(), ...orderWireArgs(fromPort, snapHit.portRef)));
+    return true;
+  }
+  if (snapHit.type === 'connection-point') {
+    const cpPortRef = connectionPointToPortRef(snapHit.slotIndex, snapHit.direction, state.activeBoard.nodes, 'end', state.activePuzzle?.slotConfig);
+    if (cpPortRef) {
+      state.addWire(createWire(generateId(), ...orderWireArgs(fromPort, cpPortRef)));
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -271,8 +320,14 @@ export function GameboardCanvas() {
     const getOffset = () => offsetRef.current;
     const stopLoop = startRenderLoop(canvas, getCellSize, getOffset);
 
+    // Register snapshot capture for the VictoryCompleteButton
+    registerSnapshotCapture(() =>
+      createGridSnapshot(canvas, offsetRef.current, cellSizeRef.current),
+    );
+
     return () => {
       stopLoop();
+      unregisterSnapshotCapture();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('dev-overrides-changed', onDevOverridesChanged);
     };
@@ -284,8 +339,17 @@ export function GameboardCanvas() {
       // Escape key: separate handler (escape-handler.ts)
       if (e.key === 'Escape') {
         const state = useGameStore.getState();
-        // Block Escape during ceremony overlay
-        if (state.ceremonyActive) return;
+        // Handle Escape during ceremony phases
+        const cType = state.ceremonyState.type;
+        if (cType === 'it-works') {
+          // Cancel victory — return to normal editing
+          state.dismissCeremony();
+          return;
+        }
+        if (cType === 'victory-screen') {
+          // Block Escape on victory screen — user must click a button
+          return;
+        }
         const action = getEscapeAction(state);
 
         // If zoom-out, capture snapshot for lid-close animation
@@ -428,6 +492,17 @@ export function GameboardCanvas() {
 
     const state = useGameStore.getState();
 
+    // --- Playback bar: check before all other hit tests ---
+    if (!state.activeBoardReadOnly) {
+      const pbHit = hitTestPlaybackBar(x, y, cellSizeRef.current, state.playMode);
+      if (pbHit) {
+        if (pbHit.button === 'play-pause') state.togglePlayMode();
+        else if (pbHit.button === 'prev') state.stepPlaypoint(-1);
+        else if (pbHit.button === 'next') state.stepPlaypoint(1);
+        return;
+      }
+    }
+
     // --- Utility editing / Creative mode: check for meter clicks first ---
     if (state.editingUtilityId || state.isCreativeMode) {
       const meterHit = hitTestMeter(x, y, cellSizeRef.current, state.meterSlots);
@@ -460,9 +535,9 @@ export function GameboardCanvas() {
       const rotation = state.interactionMode.rotation;
       const { cols, rows } = getNodeGridSizeFromType(nodeType, state.puzzleNodes, state.utilityNodes, rotation);
       const grid = pixelToGrid(x, y, cellSizeRef.current);
-      // Clamp to playable area with 1-cell padding (same logic as placement ghost)
-      const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col, PLAYABLE_END - cols));
-      const row = Math.max(1, Math.min(grid.row, GRID_ROWS - rows - 1));
+      // Center node on cursor, then clamp to playable area with 1-cell padding
+      const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col - Math.floor(cols / 2), PLAYABLE_END - cols));
+      const row = Math.max(1, Math.min(grid.row - Math.floor(rows / 2), GRID_ROWS - rows - 1));
 
       // Validate occupancy before placing
       if (!canPlaceNode(state.occupancy, col, row, cols, rows)) return;
@@ -583,7 +658,8 @@ export function GameboardCanvas() {
         return;
       }
 
-      // Clicked empty space or node body — cancel wire draw
+      // Clicked empty space or node body — try snap before cancelling
+      trySnapComplete(x, y, fromPort, state, cellSizeRef.current);
       state.cancelWireDraw();
       return;
     }
@@ -647,6 +723,10 @@ export function GameboardCanvas() {
     const rect = canvas.getBoundingClientRect();
     const cx = e.clientX - rect.left - offsetRef.current.x;
     const cy = e.clientY - rect.top - offsetRef.current.y;
+
+    // No context menu on playback bar
+    if (hitTestPlaybackBar(cx, cy, cellSizeRef.current, state.playMode)) return;
+
     const { w, h } = getCanvasLogicalSize(canvas);
     const hit = hitTest(cx, cy, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
 
@@ -688,6 +768,9 @@ export function GameboardCanvas() {
     const x = e.clientX - rect.left - offsetRef.current.x;
     const y = e.clientY - rect.top - offsetRef.current.y;
     const { w, h } = getCanvasLogicalSize(canvas);
+
+    // Check playback bar first (prevent drag initiation on bar)
+    if (hitTestPlaybackBar(x, y, cellSizeRef.current, state.playMode)) return;
 
     const hit = hitTest(x, y, state.activeBoard.nodes, w, h, cellSizeRef.current, state.activeBoard.wires, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
 
@@ -758,6 +841,9 @@ export function GameboardCanvas() {
           if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard.wires)) {
             state.addWire(createWire(generateId(), ...orderWireArgs(fromPort, cpPortRef)));
           }
+        } else {
+          // No direct hit — try snap to nearest valid target
+          trySnapComplete(ux, uy, fromPort, state, cellSizeRef.current);
         }
         state.cancelWireDraw();
       }
@@ -807,14 +893,14 @@ export function GameboardCanvas() {
       const x = e.clientX - rect.left - offsetRef.current.x;
       const y = e.clientY - rect.top - offsetRef.current.y;
 
-      const { draggedNode, rotation } = state.interactionMode;
+      const { draggedNode, grabOffset, rotation } = state.interactionMode;
       const nodeType = draggedNode.type;
       const { cols, rows } = getNodeGridSizeFromType(nodeType, state.puzzleNodes, state.utilityNodes, rotation);
 
-      // Snap to grid (1-cell padding for port anchor routability)
+      // Snap to grid, subtract grab offset so node stays under cursor
       const grid = pixelToGrid(x, y, cellSizeRef.current);
-      const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col, PLAYABLE_END - cols));
-      const row = Math.max(1, Math.min(grid.row, GRID_ROWS - rows - 1));
+      const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col - grabOffset.col, PLAYABLE_END - cols));
+      const row = Math.max(1, Math.min(grid.row - grabOffset.row, GRID_ROWS - rows - 1));
 
       // Check if move is valid
       if (canMoveNode(state.occupancy, draggedNode, col, row, rotation)) {
@@ -885,10 +971,19 @@ export function GameboardCanvas() {
         if (!state.activeBoard) return;
         const node = state.activeBoard.nodes.get(nodeId);
         if (node) {
-          state.startDragging(node, { x, y });
+          const grid = pixelToGrid(x, y, cellSizeRef.current);
+          const grabOffset = { col: grid.col - node.position.col, row: grid.row - node.position.row };
+          state.startDragging(node, grabOffset);
         }
         potentialDragRef.current = null;
       }
+    }
+
+    // Update playback bar hover state and cursor
+    const pbHover = hitTestPlaybackBar(x, y, cellSizeRef.current, useGameStore.getState().playMode);
+    setHoveredPlaybackButton(pbHover?.button ?? null);
+    if (canvas && state.interactionMode.type === 'idle') {
+      canvas.style.cursor = pbHover ? 'pointer' : 'default';
     }
 
     // Update hover state for node highlighting (skip if dragging)

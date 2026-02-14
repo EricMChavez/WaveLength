@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(10, 10, 20, 0.35);
+  background: var(--token-surface-page-background, #0a0a14);
   display: flex;
   flex-direction: column;
   align-items: center;

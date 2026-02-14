@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { GameboardCanvas } from './gameboard/canvas/index.ts'
 import { SimulationControls } from './ui/controls/SimulationControls.tsx'
-import { NavigationBar } from './ui/controls/NavigationBar.tsx'
+import { GameboardButtons } from './ui/controls/GameboardButtons.tsx'
 import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
 import { ZoomTransition } from './ui/puzzle/ZoomTransition.tsx'
-import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, LevelSelectOverlay, SavePuzzleDialog, NodeCreationForm } from './ui/overlays/index.ts'
+import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, LevelSelectOverlay, SavePuzzleDialog, NodeCreationForm, SaveCancelDialog } from './ui/overlays/index.ts'
 import { PortConstantInput } from './ui/controls/PortConstantInput.tsx'
 import { useGameStore } from './store/index.ts'
 import type { GameboardState } from './shared/types/index.ts'
@@ -73,7 +73,7 @@ function App() {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <GameboardCanvas />
-      <NavigationBar />
+      <GameboardButtons />
       <SimulationControls />
       <PortConstantInput />
       <PaletteModal />
@@ -82,11 +82,12 @@ function App() {
       <WaveformSelectorOverlay />
       <LevelSelectOverlay />
       <SavePuzzleDialog />
+      <SaveCancelDialog />
       <NodeCreationForm />
       <StartScreen />
       <ZoomTransition />
       <CompletionCeremony />
-      {import.meta.env.DEV && <DevTools />}
+      {/* {import.meta.env.DEV && <DevTools />} */}
     </div>
   )
 }

@@ -307,20 +307,13 @@ export function getNodeBodyPixelRect(
 
 /**
  * Get the pixel rectangle for a node's hit testing region.
- * Uses the full grid footprint for easier clicking, regardless of body visual size.
+ * Matches the visual body rect so clicks align with what the user sees.
  */
 export function getNodeHitRect(
   node: NodeState,
   cellSize: number,
 ): { x: number; y: number; width: number; height: number } {
-  const { cols, rows } = getNodeGridSize(node);
-
-  const x = node.position.col * cellSize;
-  const y = node.position.row * cellSize;
-  const width = cols * cellSize;
-  const height = rows * cellSize;
-
-  return { x, y, width, height };
+  return getNodeBodyPixelRect(node, cellSize);
 }
 
 /**

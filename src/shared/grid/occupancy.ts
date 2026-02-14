@@ -1,4 +1,5 @@
 import { GRID_COLS, GRID_ROWS, PLAYABLE_START, PLAYABLE_END } from './constants.ts';
+import { PLAYBACK_BAR } from '../constants/index.ts';
 import type { NodeState, NodeRotation } from '../types/index.ts';
 import type { PuzzleNodeEntry, UtilityNodeEntry } from '../../store/slices/palette-slice.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
@@ -199,6 +200,16 @@ export function canPlaceNode(
   const maxRow = GRID_ROWS - 1; // endRow must be <= GRID_ROWS - 1
 
   if (col < minCol || row < minRow || endCol > maxCol || endRow > maxRow) {
+    return false;
+  }
+
+  // Block placement overlapping the playback bar region
+  if (
+    col <= PLAYBACK_BAR.COL_END &&
+    endCol - 1 >= PLAYBACK_BAR.COL_START &&
+    row <= PLAYBACK_BAR.ROW_END &&
+    endRow - 1 >= PLAYBACK_BAR.ROW_START
+  ) {
     return false;
   }
 

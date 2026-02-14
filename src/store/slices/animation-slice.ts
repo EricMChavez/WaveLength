@@ -17,20 +17,8 @@ export type LidAnimationState =
   | { type: 'opening'; progress: number; snapshot: OffscreenCanvas; startTime: number }
   | { type: 'closing'; progress: number; snapshot: OffscreenCanvas; startTime: number };
 
-/**
- * Validation ceremony animation state machine.
- *
- * Phases progress: inactive → victory-burst → name-reveal → inactive.
- * Separate from lidAnimation to avoid mutex conflicts.
- */
-export type ValidationCeremonyState =
-  | { type: 'inactive' }
-  | { type: 'victory-burst'; startTime: number }
-  | { type: 'name-reveal'; startTime: number };
-
 export interface AnimationSlice {
   lidAnimation: LidAnimationState;
-  ceremonyAnimation: ValidationCeremonyState;
 
   /** Start opening animation (zoom-in). Snapshot is the parent board. */
   startLidOpen: (snapshot: OffscreenCanvas) => void;
@@ -43,15 +31,6 @@ export interface AnimationSlice {
 
   /** End the animation, returning to idle. */
   endLidAnimation: () => void;
-
-  /** Start victory burst phase (inactive → victory-burst). */
-  startVictoryBurst: () => void;
-
-  /** Transition to name reveal (victory-burst → name-reveal). */
-  startNameReveal: () => void;
-
-  /** End ceremony, returning to inactive (any → inactive). */
-  endCeremony: () => void;
 }
 
 export const createAnimationSlice: StateCreator<GameStore, [], [], AnimationSlice> = (
@@ -59,7 +38,6 @@ export const createAnimationSlice: StateCreator<GameStore, [], [], AnimationSlic
   get,
 ) => ({
   lidAnimation: { type: 'idle' },
-  ceremonyAnimation: { type: 'inactive' },
 
   startLidOpen: (snapshot) => {
     const current = get().lidAnimation;
@@ -97,21 +75,5 @@ export const createAnimationSlice: StateCreator<GameStore, [], [], AnimationSlic
 
   endLidAnimation: () => {
     set({ lidAnimation: { type: 'idle' } });
-  },
-
-  startVictoryBurst: () => {
-    const current = get().ceremonyAnimation;
-    if (current.type !== 'inactive') return;
-    set({ ceremonyAnimation: { type: 'victory-burst', startTime: performance.now() } });
-  },
-
-  startNameReveal: () => {
-    const current = get().ceremonyAnimation;
-    if (current.type !== 'victory-burst') return;
-    set({ ceremonyAnimation: { type: 'name-reveal', startTime: performance.now() } });
-  },
-
-  endCeremony: () => {
-    set({ ceremonyAnimation: { type: 'inactive' } });
   },
 });

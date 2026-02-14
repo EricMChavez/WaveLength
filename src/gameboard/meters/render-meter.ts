@@ -254,9 +254,9 @@ function drawDirectionIndicator(
   const size = Math.min(waveformRect.width, waveformRect.height) * 0.25;
 
   ctx.save();
-  ctx.globalAlpha = 0.4;
+  ctx.globalAlpha = 0.7;
   ctx.strokeStyle = tokens.colorNeutral;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 

@@ -140,8 +140,8 @@ function renderPlacingNodeGhost(
     row = Math.max(minRow, Math.min(state.keyboardGhostPosition.row, maxRow));
   } else {
     const grid = pixelToGrid(state.mousePosition!.x, state.mousePosition!.y, cellSize);
-    col = Math.max(minCol, Math.min(grid.col, maxCol));
-    row = Math.max(minRow, Math.min(grid.row, maxRow));
+    col = Math.max(minCol, Math.min(grid.col - Math.floor(cols / 2), maxCol));
+    row = Math.max(minRow, Math.min(grid.row - Math.floor(rows / 2), maxRow));
   }
 
   const valid = canPlaceNode(state.occupancy as boolean[][], col, row, cols, rows);
@@ -178,14 +178,14 @@ function renderDraggingNodeGhost(
   if (state.interactionMode.type !== 'dragging-node') return;
   if (!state.mousePosition) return;
 
-  const { draggedNode, rotation } = state.interactionMode;
+  const { draggedNode, grabOffset, rotation } = state.interactionMode;
   const nodeType = draggedNode.type;
   const { cols, rows } = getNodeGridSizeFromType(nodeType, state.puzzleNodes, state.utilityNodes, rotation);
 
-  // Snap mouse to grid (1-cell padding for port anchor routability)
+  // Snap mouse to grid, subtract grab offset so ghost stays under cursor
   const grid = pixelToGrid(state.mousePosition.x, state.mousePosition.y, cellSize);
-  const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col, PLAYABLE_END - cols));
-  const row = Math.max(1, Math.min(grid.row, GRID_ROWS - rows - 1));
+  const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col - grabOffset.col, PLAYABLE_END - cols));
+  const row = Math.max(1, Math.min(grid.row - grabOffset.row, GRID_ROWS - rows - 1));
 
   const valid = canMoveNode(state.occupancy as boolean[][], draggedNode, col, row, rotation);
 

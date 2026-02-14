@@ -15,6 +15,37 @@ import {
   utilitySlotId,
   createUtilitySlotNode,
 } from '../../puzzle/connection-point-nodes.ts';
+import type { PuzzleNodeEntry, UtilityNodeEntry } from './palette-slice.ts';
+import type { PuzzleDefinition } from '../../puzzle/types.ts';
+
+export function computeBreadcrumbs(
+  boardStack: BoardStackEntry[],
+  puzzleNodes: Map<string, PuzzleNodeEntry>,
+  activePuzzle: PuzzleDefinition | null,
+  utilityNodes?: Map<string, UtilityNodeEntry>,
+): string[] {
+  const root = activePuzzle?.title ?? 'Sandbox';
+  const segments = [root];
+
+  for (const entry of boardStack) {
+    const node = entry.board.nodes.get(entry.nodeIdInParent);
+    if (node && node.type === 'custom-blank') {
+      segments.push('New Custom Node');
+    } else if (node && node.type.startsWith('puzzle:')) {
+      const puzzleId = node.type.slice('puzzle:'.length);
+      const title = puzzleNodes.get(puzzleId)?.title ?? puzzleId;
+      segments.push(title);
+    } else if (node && node.type.startsWith('utility:') && utilityNodes) {
+      const utilityId = node.type.slice('utility:'.length);
+      const title = utilityNodes.get(utilityId)?.title ?? utilityId;
+      segments.push(title);
+    } else if (entry.nodeIdInParent) {
+      segments.push(entry.nodeIdInParent);
+    }
+  }
+
+  return segments;
+}
 
 export interface BoardStackEntry {
   board: GameboardState;

@@ -1,0 +1,58 @@
+.container {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  pointer-events: none;
+  display: flex;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.btn {
+  pointer-events: auto;
+  background: rgba(14, 14, 24, 0.95);
+  border: 1px solid #2a3632;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  color: #d8dcd0;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  background: rgba(24, 24, 40, 0.95);
+  border-color: #3a5a4a;
+}
+
+.btnDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnDisabled:hover {
+  background: rgba(14, 14, 24, 0.95);
+  border-color: #2a3632;
+}
+
+.btnAmber {
+  border-color: #805a10;
+  background: linear-gradient(135deg, rgba(240, 162, 2, 0.15) 0%, rgba(14, 14, 24, 0.95) 100%);
+  color: #f0a202;
+}
+
+.btnAmber:hover {
+  border-color: #f0a202;
+  background: linear-gradient(135deg, rgba(240, 162, 2, 0.25) 0%, rgba(14, 14, 24, 0.95) 100%);
+}
+
+.icon {
+  font-size: 14px;
+  line-height: 1;
+}

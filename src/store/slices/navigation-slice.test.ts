@@ -13,7 +13,7 @@ import { createMeterSlice, createDefaultMeterSlots } from './meter-slice.ts';
 import { createRoutingSlice } from './routing-slice.ts';
 import { createOverlaySlice } from './overlay-slice.ts';
 import { createAnimationSlice } from './animation-slice.ts';
-import { computeBreadcrumbs } from '../../ui/controls/NavigationBar.tsx';
+import { computeBreadcrumbs } from './navigation-slice.ts';
 import type { GameStore } from '../index.ts';
 import type { GameboardState } from '../../shared/types/index.ts';
 import type { BakeMetadata } from '../../engine/baking/index.ts';

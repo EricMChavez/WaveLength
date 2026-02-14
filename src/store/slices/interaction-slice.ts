@@ -8,7 +8,7 @@ export type InteractionMode =
   | { type: 'placing-node'; nodeType: string; rotation: NodeRotation }
   | { type: 'drawing-wire'; fromPort: PortRef; fromPosition: Vec2 }
   | { type: 'keyboard-wiring'; fromPort: PortRef; validTargets: PortRef[]; targetIndex: number }
-  | { type: 'dragging-node'; draggedNode: NodeState; offset: Vec2; originalPosition: GridPoint; rotation: NodeRotation }
+  | { type: 'dragging-node'; draggedNode: NodeState; grabOffset: GridPoint; originalPosition: GridPoint; rotation: NodeRotation }
   | { type: 'adjusting-knob'; nodeId: NodeId; startY: number; startValue: number };
 
 /** Port currently being edited for a constant value */
@@ -67,7 +67,7 @@ export interface InteractionSlice {
   /** Commit knob adjustment and return to idle */
   commitKnobAdjust: () => void;
   /** Start dragging a node */
-  startDragging: (node: NodeState, mousePos: Vec2) => void;
+  startDragging: (node: NodeState, grabOffset: GridPoint) => void;
   /** Update drag position */
   updateDragPosition: (mousePos: Vec2) => void;
   /** Commit drag, move node to new position */
@@ -170,14 +170,12 @@ export const createInteractionSlice: StateCreator<InteractionSlice> = (set, get)
   commitKnobAdjust: () =>
     set({ interactionMode: { type: 'idle' } }),
 
-  startDragging: (node, mousePos) => {
-    // Calculate offset from mouse position to node position
-    // This offset will be used to maintain the grab point during drag
+  startDragging: (node, grabOffset) => {
     set({
       interactionMode: {
         type: 'dragging-node',
         draggedNode: node,
-        offset: mousePos, // Store the initial mouse position
+        grabOffset,
         originalPosition: node.position,
         rotation: node.rotation ?? 0,
       },

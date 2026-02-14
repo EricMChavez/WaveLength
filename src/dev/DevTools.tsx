@@ -247,5 +247,5 @@ export function DevTools() {
     }),
   });
 
-  return <Leva hidden />;
+  return <Leva />;
 }

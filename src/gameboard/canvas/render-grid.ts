@@ -11,7 +11,7 @@ import {
   METER_RIGHT_END,
 } from '../../shared/grid/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
-import { GAMEBOARD_STYLE, HIGHLIGHT_STREAK, DEPTH } from '../../shared/constants/index.ts';
+import { GAMEBOARD_STYLE, HIGHLIGHT_STREAK, DEPTH, PLAYBACK_BAR } from '../../shared/constants/index.ts';
 import { drawHighlightStreak, getLightDirection } from './render-highlight-streak.ts';
 import { drawBoardMessageCard } from './render-board-message-card.ts';
 import { drawNoiseGrain } from './render-noise-grain.ts';
@@ -200,6 +200,14 @@ function getDotMatrixCache(cellSize: number, color: string, opacity: number): Of
     // Offset relative to playable start since canvas starts at playableX
     const x = (col - PLAYABLE_START) * cellSize;
     for (let row = 1; row < GRID_ROWS; row++) {
+      // Skip dots inside the playback bar trapezoid (top edge inset by 2 cols each side)
+      if (row >= PLAYBACK_BAR.ROW_START && row <= PLAYBACK_BAR.ROW_END) {
+        // t: 0 at bottom, 1 at top — matches getTrapezoidPoints() inset
+        const t = (row - (PLAYBACK_BAR.ROW_END + 1)) / (PLAYBACK_BAR.ROW_START - (PLAYBACK_BAR.ROW_END + 1));
+        const leftEdge = PLAYBACK_BAR.COL_START + t * 2;
+        const rightEdge = PLAYBACK_BAR.COL_END + 1 - t * 2;
+        if (col >= leftEdge && col <= rightEdge) continue;
+      }
       const y = row * cellSize;
       ctx.moveTo(x + dotRadius, y);
       ctx.arc(x, y, dotRadius, 0, Math.PI * 2);

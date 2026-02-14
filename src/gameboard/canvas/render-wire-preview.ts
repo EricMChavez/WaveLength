@@ -14,28 +14,26 @@ export function renderWirePreview(
   path: GridPoint[] | null,
   cellSize: number,
 ): void {
+  const wireWidth = Number(tokens.wireWidthBase) || 6;
   ctx.strokeStyle = tokens.colorNeutral;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = wireWidth;
   ctx.setLineDash([6, 4]);
-  ctx.globalAlpha = 0.7;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.beginPath();
 
   if (path && path.length > 0) {
-    // Draw along the A* grid path
+    // Draw along the A* grid path only — no trailing segment to cursor
     ctx.moveTo(sourcePos.x, sourcePos.y);
     for (const pt of path) {
       ctx.lineTo(pt.col * cellSize, pt.row * cellSize);
     }
-    ctx.lineTo(targetPos.x, targetPos.y);
   } else {
-    // Fallback: simple dashed line
+    // Fallback: simple dashed line to cursor when no path exists
     ctx.moveTo(sourcePos.x, sourcePos.y);
     ctx.lineTo(targetPos.x, targetPos.y);
   }
 
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.globalAlpha = 1;
 }

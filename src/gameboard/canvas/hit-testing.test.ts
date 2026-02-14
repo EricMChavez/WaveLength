@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hitTest, hitTestMeter } from './hit-testing.ts';
+import { hitTest, hitTestMeter, findNearestSnapTarget, WIRE_SNAP_RADIUS_CELLS } from './hit-testing.ts';
 import type { NodeState, Wire } from '../../shared/types/index.ts';
 import { createWire } from '../../shared/types/index.ts';
 import {
@@ -13,6 +13,7 @@ import {
   METER_RIGHT_START,
   PLAYABLE_START,
 } from '../../shared/grid/index.ts';
+import { getNodePortPosition } from './port-positions.ts';
 import { NODE_STYLE } from '../../shared/constants/index.ts';
 import type { MeterKey, MeterSlotState } from '../meters/meter-types.ts';
 import { METER_GRID_COLS, METER_GRID_ROWS, CHANNEL_RATIOS } from '../meters/meter-types.ts';
@@ -333,5 +334,95 @@ describe('hitTest CP node filtering', () => {
     const result = hitTest(x, y, nodes, canvasWidth, canvasHeight, cellSize);
     expect(result.type).toBe('node');
     if (result.type === 'node') expect(result.nodeId).toBe('n1');
+  });
+});
+
+describe('findNearestSnapTarget', () => {
+  const cellSize = 40;
+
+  it('snaps to a nearby port within radius', () => {
+    const nodes = new Map<string, NodeState>();
+    const node = makeNode('n1', 'max', 20, 10, 2, 1);
+    nodes.set('n1', node);
+
+    // Get the actual output port position
+    const portPos = getNodePortPosition(node, 'output', 0, cellSize);
+
+    // Click near but not exactly on the output port (offset by ~1 cell)
+    const result = findNearestSnapTarget(
+      portPos.x + cellSize * 0.8, portPos.y,
+      WIRE_SNAP_RADIUS_CELLS * cellSize,
+      nodes, cellSize,
+    );
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('port');
+    if (result!.type === 'port') {
+      expect(result!.portRef.nodeId).toBe('n1');
+      expect(result!.portRef.side).toBe('output');
+    }
+  });
+
+  it('returns null when no target is within radius', () => {
+    const nodes = new Map<string, NodeState>();
+    nodes.set('n1', makeNode('n1', 'max', 20, 10, 2, 1));
+
+    // Click far from any port (10 cells away)
+    const result = findNearestSnapTarget(
+      5 * cellSize, 5 * cellSize,
+      WIRE_SNAP_RADIUS_CELLS * cellSize,
+      nodes, cellSize,
+    );
+    expect(result).toBeNull();
+  });
+
+  it('respects isValidTarget filter', () => {
+    const nodes = new Map<string, NodeState>();
+    const node = makeNode('n1', 'max', 20, 10, 2, 1);
+    nodes.set('n1', node);
+
+    const portPos = getNodePortPosition(node, 'output', 0, cellSize);
+
+    // Reject all targets via filter
+    const result = findNearestSnapTarget(
+      portPos.x + cellSize * 0.5, portPos.y,
+      WIRE_SNAP_RADIUS_CELLS * cellSize,
+      nodes, cellSize,
+      undefined, undefined, undefined, undefined,
+      () => false,
+    );
+    expect(result).toBeNull();
+  });
+
+  it('prefers the closer target when multiple are within radius', () => {
+    const nodes = new Map<string, NodeState>();
+    // Two nodes, each with an input port at different distances from the test point
+    const nodeA = makeNode('a', 'max', 20, 10, 2, 1);
+    const nodeB = makeNode('b', 'max', 23, 10, 2, 1);
+    nodes.set('a', nodeA);
+    nodes.set('b', nodeB);
+
+    // Get both output port positions
+    const posA = getNodePortPosition(nodeA, 'output', 0, cellSize);
+    const posB = getNodePortPosition(nodeB, 'output', 0, cellSize);
+
+    // Click exactly between them but slightly closer to B
+    const midX = (posA.x + posB.x) / 2 + 1;
+    const midY = (posA.y + posB.y) / 2;
+
+    const result = findNearestSnapTarget(
+      midX, midY,
+      WIRE_SNAP_RADIUS_CELLS * cellSize * 3, // large radius to include both
+      nodes, cellSize,
+    );
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('port');
+    if (result!.type === 'port') {
+      expect(result!.portRef.nodeId).toBe('b');
+    }
+  });
+
+  it('exports WIRE_SNAP_RADIUS_CELLS as a positive number', () => {
+    expect(WIRE_SNAP_RADIUS_CELLS).toBeGreaterThan(0);
+    expect(WIRE_SNAP_RADIUS_CELLS).toBe(2);
   });
 });

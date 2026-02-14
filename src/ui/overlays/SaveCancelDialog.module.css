@@ -1,0 +1,81 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+}
+
+.dialog {
+  background: rgba(14, 14, 24, 0.98);
+  border: 1px solid #2a3632;
+  border-radius: 8px;
+  padding: 24px 32px;
+  min-width: 320px;
+  max-width: 400px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #d8dcd0;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.message {
+  font-size: 13px;
+  color: #8a8e82;
+  margin: 0 0 20px;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn {
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btnSave {
+  background: #203a20;
+  border-color: #3a5a3a;
+  color: #80c080;
+}
+
+.btnSave:hover {
+  background: #2a4a2a;
+  border-color: #80c080;
+}
+
+.btnDiscard {
+  background: #3a2020;
+  border-color: #5a3a3a;
+  color: #c08080;
+}
+
+.btnDiscard:hover {
+  background: #4a2a2a;
+  border-color: #c08080;
+}
+
+.btnCancel {
+  background: none;
+  border-color: #2a3632;
+  color: #8a8e82;
+}
+
+.btnCancel:hover {
+  background: rgba(24, 24, 40, 0.5);
+  border-color: #4a5654;
+}

@@ -1,0 +1,121 @@
+import { useGameStore } from '../../store/index.ts';
+import { bakeGraph } from '../../engine/baking/index.ts';
+import { generateId } from '../../shared/generate-id.ts';
+import type { NodeSwap } from '../../store/slices/navigation-slice.ts';
+import styles from './SaveCancelDialog.module.css';
+
+function getCanvasSnapshot(): string {
+  return document.querySelector('canvas')?.toDataURL() ?? '';
+}
+
+export function SaveCancelDialog() {
+  const overlayType = useGameStore((s) => s.activeOverlay.type);
+
+  if (overlayType !== 'unsaved-changes') return null;
+
+  function handleSave() {
+    const state = useGameStore.getState();
+    const editingUtilityId = state.editingUtilityId;
+    if (!editingUtilityId || !state.activeBoard) return;
+
+    const bakeResult = bakeGraph(state.activeBoard.nodes, state.activeBoard.wires);
+    if (!bakeResult.ok) {
+      state.closeOverlay();
+      return;
+    }
+
+    const { metadata } = bakeResult.value;
+    const cpLayout = metadata.cpLayout;
+    const existingEntry = state.utilityNodes.get(editingUtilityId);
+    const nodeIdInParent = state.editingNodeIdInParent;
+
+    if (existingEntry) {
+      const overwrite = window.confirm(`Overwrite "${existingEntry.title}"?`);
+      if (overwrite) {
+        state.updateUtilityNode(editingUtilityId, metadata, state.activeBoard);
+        state.startZoomTransition('out', getCanvasSnapshot());
+        state.finishEditingUtility();
+      } else {
+        const newName = window.prompt('Name for new custom node:');
+        if (!newName) return;
+        const newUtilityId = generateId();
+        state.addUtilityNode({
+          utilityId: newUtilityId,
+          title: newName,
+          inputCount: metadata.inputCount,
+          outputCount: metadata.outputCount,
+          bakeMetadata: metadata,
+          board: state.activeBoard,
+          versionHash: generateId(),
+          cpLayout,
+        });
+        state.startZoomTransition('out', getCanvasSnapshot());
+        const swap: NodeSwap | undefined = nodeIdInParent ? {
+          nodeId: nodeIdInParent,
+          newType: `utility:${newUtilityId}`,
+          inputCount: metadata.inputCount,
+          outputCount: metadata.outputCount,
+          cpLayout,
+        } : undefined;
+        state.finishEditingUtility(swap);
+      }
+    } else {
+      const name = window.prompt('Name for this custom node:');
+      if (!name) return;
+      state.addUtilityNode({
+        utilityId: editingUtilityId,
+        title: name,
+        inputCount: metadata.inputCount,
+        outputCount: metadata.outputCount,
+        bakeMetadata: metadata,
+        board: state.activeBoard,
+        versionHash: generateId(),
+        cpLayout,
+      });
+      state.startZoomTransition('out', getCanvasSnapshot());
+      const swap: NodeSwap | undefined = nodeIdInParent ? {
+        nodeId: nodeIdInParent,
+        newType: `utility:${editingUtilityId}`,
+        inputCount: metadata.inputCount,
+        outputCount: metadata.outputCount,
+        cpLayout,
+      } : undefined;
+      state.finishEditingUtility(swap);
+    }
+
+    state.closeOverlay();
+  }
+
+  function handleDiscard() {
+    const state = useGameStore.getState();
+    state.startZoomTransition('out', getCanvasSnapshot());
+    state.finishEditingUtility();
+    state.closeOverlay();
+  }
+
+  function handleKeepEditing() {
+    useGameStore.getState().closeOverlay();
+  }
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.dialog}>
+        <h3 className={styles.title}>Unsaved Changes</h3>
+        <p className={styles.message}>
+          You have unsaved changes to this custom node. What would you like to do?
+        </p>
+        <div className={styles.buttons}>
+          <button className={`${styles.btn} ${styles.btnCancel}`} onClick={handleKeepEditing}>
+            Keep Editing
+          </button>
+          <button className={`${styles.btn} ${styles.btnDiscard}`} onClick={handleDiscard}>
+            Discard
+          </button>
+          <button className={`${styles.btn} ${styles.btnSave}`} onClick={handleSave}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

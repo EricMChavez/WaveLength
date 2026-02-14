@@ -8,7 +8,7 @@ import type { RenderMeterState } from '../meters/render-meter.ts';
 import { METER_GRID_ROWS, METER_GRID_COLS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS, meterKey, modeToDirection } from '../meters/meter-types.ts';
 import type { MeterKey } from '../meters/meter-types.ts';
 import { TOTAL_SLOTS, slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
-import { buildSlotConfig, directionIndexToSlot } from '../../puzzle/types.ts';
+import { buildSlotConfig, directionIndexToSlot, slotToDirectionIndex } from '../../puzzle/types.ts';
 import type { SlotConfig } from '../../puzzle/types.ts';
 import { drawNodes } from './render-nodes.ts';
 import { drawWires } from './render-wires.ts';
@@ -22,10 +22,11 @@ import { drawHighlightStreak } from './render-highlight-streak.ts';
 import { HIGHLIGHT_STREAK } from '../../shared/constants/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { renderPlacementGhost } from './render-placement-ghost.ts';
-import { drawLidAnimation, computeProgress, parseDurationMs, drawVictoryBurst, drawNameReveal } from '../animation/index.ts';
+import { drawLidAnimation, computeProgress, parseDurationMs } from '../animation/index.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
 import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts';
 import { getRejectedKnobNodeId } from './rejected-knob.ts';
+import { drawPlaybackBar, getHoveredPlaybackButton } from './render-playback-bar.ts';
 import { getPortGridAnchor, getPortWireDirection, findPath, DIR_E } from '../../shared/routing/index.ts';
 import type { GridPoint } from '../../shared/grid/types.ts';
 import type { KnobInfo } from './render-types.ts';
@@ -33,9 +34,10 @@ import type { NodeState, Wire } from '../../shared/types/index.ts';
 import type { CycleResults } from '../../engine/evaluation/index.ts';
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
-import { isConnectionInputNode, isConnectionOutputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex, isUtilitySlotNode, getUtilitySlotIndex } from '../../puzzle/connection-point-nodes.ts';
+import { isConnectionInputNode, isConnectionOutputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex, isUtilitySlotNode, getUtilitySlotIndex, cpInputId, cpOutputId, creativeSlotId, cpBidirectionalId, utilitySlotId } from '../../puzzle/connection-point-nodes.ts';
+import { findNearestSnapTarget, WIRE_SNAP_RADIUS_CELLS } from './hit-testing.ts';
 
-const PLAYPOINT_RATE = 16; // cycles per second
+const PLAYPOINT_RATE_NORMAL = 16; // cycles per second
 
 /**
  * Extract the flat slot index (0-5) from any CP node type for connected-CP set building.
@@ -141,6 +143,71 @@ let lastPreviewGridCol = -1;
 let lastPreviewGridRow = -1;
 let cachedPreviewPath: GridPoint[] | null = null;
 
+/**
+ * Resolve a connection-point hit to the virtual node's PortRef for routing.
+ * Returns null if the virtual node isn't on the board.
+ */
+function resolveSnapPortRef(
+  hit: ReturnType<typeof findNearestSnapTarget>,
+  nodes: ReadonlyMap<string, NodeState>,
+  fromPort: { nodeId: string; side: 'input' | 'output' },
+  slotConfig?: SlotConfig,
+): { nodeId: string; side: 'input' | 'output'; portIndex: number } | null {
+  if (!hit) return null;
+
+  if (hit.type === 'port') {
+    // Basic validation: must connect output↔input, no self-loops
+    if (hit.portRef.side === fromPort.side) return null;
+    if (hit.portRef.nodeId === fromPort.nodeId) return null;
+    return hit.portRef;
+  }
+
+  if (hit.type === 'connection-point') {
+    const { slotIndex, direction } = hit;
+
+    // Try regular puzzle CP nodes (slot → direction index → node ID)
+    const dirIndex = slotConfig
+      ? slotToDirectionIndex(slotConfig, slotIndex)
+      : slotPerSideIndex(slotIndex);
+    if (dirIndex >= 0) {
+      const nodeId = direction === 'input' ? cpInputId(dirIndex) : cpOutputId(dirIndex);
+      if (nodes.has(nodeId)) {
+        const side = direction === 'input' ? 'output' : 'input';
+        if (side === fromPort.side) return null; // same side → invalid
+        return { nodeId, portIndex: 0, side };
+      }
+    }
+
+    // Try utility slot nodes
+    const utilId = utilitySlotId(slotIndex);
+    if (nodes.has(utilId)) {
+      const node = nodes.get(utilId)!;
+      const side = node.type === 'connection-input' ? 'output' : 'input';
+      if (side === fromPort.side) return null;
+      return { nodeId: utilId, portIndex: 0, side };
+    }
+
+    // Try bidirectional CP nodes
+    const bidirId = cpBidirectionalId(slotIndex);
+    if (nodes.has(bidirId)) {
+      const side: 'input' | 'output' = 'input'; // wire ending at CP → input
+      if (side === fromPort.side) return null;
+      return { nodeId: bidirId, portIndex: 0, side };
+    }
+
+    // Try creative mode slot nodes
+    const creativeId = creativeSlotId(slotIndex);
+    if (nodes.has(creativeId)) {
+      const node = nodes.get(creativeId)!;
+      const side = node.type === 'connection-input' ? 'output' : 'input';
+      if (side === fromPort.side) return null;
+      return { nodeId: creativeId, portIndex: 0, side };
+    }
+  }
+
+  return null;
+}
+
 // Playpoint animation state
 let lastPlaypointTimestamp = 0;
 let playAccumulator = 0;
@@ -241,10 +308,11 @@ export function startRenderLoop(
     const tokens = getThemeTokens();
 
     // Advance playpoint when playing
+    const currentRate = PLAYPOINT_RATE_NORMAL;
     if (state.playMode === 'playing' && lastPlaypointTimestamp > 0) {
       const elapsed = timestamp - lastPlaypointTimestamp;
       playAccumulator += elapsed;
-      const cyclesPerMs = PLAYPOINT_RATE / 1000;
+      const cyclesPerMs = currentRate / 1000;
       const cyclesToAdvance = Math.floor(playAccumulator * cyclesPerMs);
       if (cyclesToAdvance > 0) {
         playAccumulator -= cyclesToAdvance / cyclesPerMs;
@@ -310,8 +378,8 @@ export function startRenderLoop(
       }
     }
 
-    // --- Ceremony animation: read state ---
-    const ceremony = state.ceremonyAnimation;
+    // --- Ceremony state ---
+    const ceremony = state.ceremonyState;
 
     // === Viewport-level rendering (before grid translate) ===
     const devOverrides = getDevOverrides();
@@ -582,17 +650,7 @@ export function startRenderLoop(
       );
     }
 
-    // Draw connection points on top of wires (always visible)
-    renderConnectionPoints(ctx!, tokens, {
-      activePuzzle: state.activePuzzle,
-      perPortMatch: state.perPortMatch,
-      editingUtilityId: state.editingUtilityId,
-      meterSlots: state.meterSlots,
-      cpSignals,
-      connectedOutputCPs,
-    }, cellSize);
-
-    // Wire preview during drawing-wire mode (suppressed when overlay is active)
+    // Wire preview during drawing-wire mode (drawn before CPs so it appears behind them)
     const overlayActive = state.activeOverlay.type !== 'none';
     if (!overlayActive && state.interactionMode.type === 'drawing-wire' && state.mousePosition && state.activeBoard) {
       const cursorGrid = pixelToGrid(state.mousePosition.x, state.mousePosition.y, cellSize);
@@ -607,7 +665,46 @@ export function startRenderLoop(
         if (sourceNode) {
           const sourceAnchor = getPortGridAnchor(sourceNode, fromPort.side, fromPort.portIndex);
           const startDir = getPortWireDirection(sourceNode, fromPort.side, fromPort.portIndex);
-          cachedPreviewPath = findPath(sourceAnchor, cursorGrid, state.occupancy, startDir, DIR_E);
+
+          // Check for snap target within the wire snap radius
+          const maxRadiusPx = WIRE_SNAP_RADIUS_CELLS * cellSize;
+          const wires = state.activeBoard.wires;
+          const snapHit = findNearestSnapTarget(
+            state.mousePosition.x, state.mousePosition.y, maxRadiusPx,
+            state.activeBoard.nodes, cellSize,
+            state.activePuzzle?.slotConfig,
+            state.activePuzzle?.activeInputs,
+            state.activePuzzle?.activeOutputs,
+            state.meterSlots,
+            (hit) => {
+              if (hit.type !== 'port') return true; // CPs validated in resolveSnapPortRef
+              const p = hit.portRef;
+              // Must connect output↔input, no self-loops
+              if (p.side === fromPort.side || p.nodeId === fromPort.nodeId) return false;
+              // Port must not already have a wire
+              return !wires.some((w) =>
+                (w.source.nodeId === p.nodeId && w.source.portIndex === p.portIndex && p.side === 'output') ||
+                (w.target.nodeId === p.nodeId && w.target.portIndex === p.portIndex && p.side === 'input'),
+              );
+            },
+          );
+
+          const snapPort = resolveSnapPortRef(snapHit, state.activeBoard.nodes, fromPort, state.activePuzzle?.slotConfig);
+
+          if (snapPort) {
+            // Route to the snapped target's actual grid anchor with correct direction
+            const targetNode = state.activeBoard.nodes.get(snapPort.nodeId);
+            if (targetNode) {
+              const targetAnchor = getPortGridAnchor(targetNode, snapPort.side, snapPort.portIndex);
+              const endDir = getPortWireDirection(targetNode, snapPort.side, snapPort.portIndex);
+              cachedPreviewPath = findPath(sourceAnchor, targetAnchor, state.occupancy, startDir, endDir);
+            } else {
+              cachedPreviewPath = findPath(sourceAnchor, cursorGrid, state.occupancy, startDir, DIR_E);
+            }
+          } else {
+            // No snap target — route to cursor position
+            cachedPreviewPath = findPath(sourceAnchor, cursorGrid, state.occupancy, startDir, DIR_E);
+          }
         } else {
           cachedPreviewPath = null;
         }
@@ -621,6 +718,16 @@ export function startRenderLoop(
       cachedPreviewPath = null;
     }
 
+    // Draw connection points on top of wires and wire preview (always visible)
+    renderConnectionPoints(ctx!, tokens, {
+      activePuzzle: state.activePuzzle,
+      perPortMatch: state.perPortMatch,
+      editingUtilityId: state.editingUtilityId,
+      meterSlots: state.meterSlots,
+      cpSignals,
+      connectedOutputCPs,
+    }, cellSize);
+
     // Placement ghost (suppressed when overlay is active)
     if (!overlayActive) {
       renderPlacementGhost(ctx!, tokens, {
@@ -633,36 +740,21 @@ export function startRenderLoop(
       }, cellSize);
     }
 
+    // --- Ceremony active check (used for overlay dimming) ---
+    const ceremonyActive = ceremony.type !== 'inactive';
+
+    // Playback bar (persistent UI chrome — always visible)
+    drawPlaybackBar(ctx!, tokens, {
+      playMode: state.playMode,
+      hoveredButton: getHoveredPlaybackButton(),
+    }, cellSize);
+
     // Lid animation overlay (drawn on top of the live board)
     if (lidActive) {
       drawLidAnimation(ctx!, tokens, lidAnim, lidProgress, logicalWidth, logicalHeight);
     }
 
-    // --- Ceremony animation overlays (drawn on top of everything) ---
-    if (ceremony.type === 'victory-burst') {
-      const burstDuration = parseDurationMs(tokens.animCeremonyBurstDuration);
-      const burstProgress = computeProgress(ceremony.startTime, timestamp, burstDuration);
-      drawVictoryBurst(ctx!, tokens, burstProgress, logicalWidth, logicalHeight);
-
-      if (burstProgress >= 1) {
-        state.startNameReveal();
-      }
-    } else if (ceremony.type === 'name-reveal') {
-      const revealDuration = parseDurationMs(tokens.animCeremonyRevealDuration);
-      const revealProgress = computeProgress(ceremony.startTime, timestamp, revealDuration);
-
-      const puzzleName = state.ceremonyPuzzle?.title ?? '';
-      const puzzleDesc = state.ceremonyPuzzle?.description ?? '';
-      drawNameReveal(ctx!, tokens, revealProgress, puzzleName, puzzleDesc, logicalWidth, logicalHeight);
-
-      if (revealProgress >= 1) {
-        // Ceremony canvas phases complete — finalize and show React overlay
-        handleCeremonyCompletion(state);
-      }
-    }
-
     // Dim canvas when an overlay is active (but not during ceremony or lid)
-    const ceremonyActive = ceremony.type !== 'inactive';
     if (overlayActive && !lidActive && !ceremonyActive) {
       ctx!.fillStyle = 'rgba(0,0,0,0.15)';
       ctx!.fillRect(-offset.x, -offset.y, vpWidth, vpHeight);
@@ -680,26 +772,6 @@ export function startRenderLoop(
     running = false;
     cancelAnimationFrame(animationId);
   };
-}
-
-/**
- * Handle ceremony completion: add puzzle node, complete level, dismiss ceremony.
- * Called from render loop when ceremony zoom-out reaches progress >= 1.
- */
-function handleCeremonyCompletion(state: ReturnType<typeof useGameStore.getState>): void {
-  const { ceremonyPuzzle, ceremonyBakeMetadata, ceremonyIsResolve: _ceremonyIsResolve } = state;
-
-  // End animation
-  state.endCeremony();
-
-  if (!ceremonyPuzzle || !ceremonyBakeMetadata) {
-    state.dismissCeremony();
-    return;
-  }
-
-  // Mark level as completed — ceremony stays active for the React overlay
-  // (CompletionCeremony.tsx will call dismissCeremony when user clicks a button)
-  state.completeLevel(ceremonyPuzzle.id);
 }
 
 const CYCLE_COUNT = 256;

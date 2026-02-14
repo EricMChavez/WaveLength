@@ -5,18 +5,14 @@ import { buildSlotConfig } from '../../puzzle/types.ts';
 import styles from './CompletionCeremony.module.css';
 
 export function CompletionCeremony() {
-  const active = useGameStore((s) => s.ceremonyActive);
-  const puzzle = useGameStore((s) => s.ceremonyPuzzle);
-  const isResolve = useGameStore((s) => s.ceremonyIsResolve);
-  const bakeMetadata = useGameStore((s) => s.ceremonyBakeMetadata);
+  const ceremonyState = useGameStore((s) => s.ceremonyState);
 
-  if (!active || !puzzle) return null;
+  if (ceremonyState.type !== 'victory-screen') return null;
+
+  const { puzzle, isResolve, bakeMetadata } = ceremonyState;
 
   function handleContinue() {
     const store = useGameStore.getState();
-
-    // Mark level as completed in progression state
-    store.completeLevel(puzzle!.id);
 
     store.dismissCeremony();
 
@@ -24,7 +20,7 @@ export function CompletionCeremony() {
     const nextIndex = store.currentLevelIndex;
     const nextPuzzle = PUZZLE_LEVELS[nextIndex];
 
-    if (nextPuzzle && nextPuzzle.id !== puzzle!.id) {
+    if (nextPuzzle && nextPuzzle.id !== puzzle.id) {
       store.setCurrentLevel(nextIndex);
       store.loadPuzzle(nextPuzzle);
       store.setActiveBoard(createPuzzleGameboard(nextPuzzle));

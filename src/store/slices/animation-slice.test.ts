@@ -50,10 +50,6 @@ describe('animation-slice', () => {
     it('lidAnimation starts as idle', () => {
       expect(store.getState().lidAnimation.type).toBe('idle');
     });
-
-    it('ceremonyAnimation starts as inactive', () => {
-      expect(store.getState().ceremonyAnimation.type).toBe('inactive');
-    });
   });
 
   describe('startLidOpen', () => {
@@ -196,79 +192,6 @@ describe('animation-slice', () => {
     it('cannot start close while open is running', () => {
       store.getState().startLidOpen(mockOffscreenCanvas());
       store.getState().startLidClose(mockOffscreenCanvas());
-      expect(store.getState().lidAnimation.type).toBe('opening');
-    });
-  });
-
-  describe('ceremony animation - startVictoryBurst', () => {
-    it('transitions from inactive to victory-burst', () => {
-      store.getState().startVictoryBurst();
-
-      const anim = store.getState().ceremonyAnimation;
-      expect(anim.type).toBe('victory-burst');
-      if (anim.type === 'victory-burst') {
-        expect(anim.startTime).toBe(1000);
-      }
-    });
-
-    it('is a no-op when in name-reveal', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startNameReveal();
-      store.getState().startVictoryBurst();
-
-      expect(store.getState().ceremonyAnimation.type).toBe('name-reveal');
-    });
-  });
-
-  describe('ceremony animation - startNameReveal', () => {
-    it('transitions from victory-burst to name-reveal', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startNameReveal();
-
-      const anim = store.getState().ceremonyAnimation;
-      expect(anim.type).toBe('name-reveal');
-      if (anim.type === 'name-reveal') {
-        expect(anim.startTime).toBe(1000);
-      }
-    });
-
-    it('is a no-op when inactive', () => {
-      store.getState().startNameReveal();
-      expect(store.getState().ceremonyAnimation.type).toBe('inactive');
-    });
-  });
-
-  describe('ceremony animation - endCeremony', () => {
-    it('transitions from victory-burst to inactive', () => {
-      store.getState().startVictoryBurst();
-      store.getState().endCeremony();
-      expect(store.getState().ceremonyAnimation.type).toBe('inactive');
-    });
-
-    it('transitions from name-reveal to inactive', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startNameReveal();
-      store.getState().endCeremony();
-      expect(store.getState().ceremonyAnimation.type).toBe('inactive');
-    });
-
-    it('is safe to call when already inactive', () => {
-      store.getState().endCeremony();
-      expect(store.getState().ceremonyAnimation.type).toBe('inactive');
-    });
-  });
-
-  describe('ceremony and lid animations are independent', () => {
-    it('ceremony can run while lid is idle', () => {
-      store.getState().startVictoryBurst();
-      expect(store.getState().ceremonyAnimation.type).toBe('victory-burst');
-      expect(store.getState().lidAnimation.type).toBe('idle');
-    });
-
-    it('lid can run while ceremony is active', () => {
-      store.getState().startVictoryBurst();
-      store.getState().startLidOpen(mockOffscreenCanvas());
-      expect(store.getState().ceremonyAnimation.type).toBe('victory-burst');
       expect(store.getState().lidAnimation.type).toBe('opening');
     });
   });

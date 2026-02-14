@@ -7,6 +7,7 @@ import {
   PLAYABLE_START,
   PLAYABLE_END,
 } from '../../shared/grid/index.ts';
+import { PLAYBACK_BAR } from '../../shared/constants/index.ts';
 import { invalidateGridDotCache } from './render-grid.ts';
 
 /** Minimal ThemeTokens stub with the keys drawGrid uses */
@@ -207,7 +208,17 @@ describe('drawGrid', () => {
       // Dots are drawn on OffscreenCanvas, then composited via drawImage
       const expectedCols = PLAYABLE_END - PLAYABLE_START;
       const expectedRows = GRID_ROWS - 1;
-      const expectedDots = expectedCols * expectedRows;
+      // Subtract dots excluded by playback bar trapezoid (top edge inset by 2 cols)
+      let trapezoidDots = 0;
+      for (let row = PLAYBACK_BAR.ROW_START; row <= PLAYBACK_BAR.ROW_END; row++) {
+        const t = (row - (PLAYBACK_BAR.ROW_END + 1)) / (PLAYBACK_BAR.ROW_START - (PLAYBACK_BAR.ROW_END + 1));
+        const leftEdge = PLAYBACK_BAR.COL_START + t * 2;
+        const rightEdge = PLAYBACK_BAR.COL_END + 1 - t * 2;
+        for (let col = PLAYBACK_BAR.COL_START; col <= PLAYBACK_BAR.COL_END; col++) {
+          if (col >= leftEdge && col <= rightEdge) trapezoidDots++;
+        }
+      }
+      const expectedDots = expectedCols * expectedRows - trapezoidDots;
 
       expect(offscreenArcCalls).toHaveLength(expectedDots);
     });

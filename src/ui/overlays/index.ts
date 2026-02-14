@@ -4,4 +4,5 @@ export { ParameterPopover } from './ParameterPopover.tsx';
 export { WaveformSelectorOverlay } from './WaveformSelectorOverlay.tsx';
 export { LevelSelectOverlay } from './LevelSelectOverlay.tsx';
 export { SavePuzzleDialog } from './SavePuzzleDialog.tsx';
+export { SaveCancelDialog } from './SaveCancelDialog.tsx';
 export { NodeCreationForm } from './NodeCreationForm.tsx';

@@ -63,13 +63,20 @@ export function signalToColor(value: number, tokens: ThemeTokens): string {
 /**
  * Map |value| to a glow radius.
  * 0 for |v| ≤ glowThreshold, ramps linearly to glowMaxRadius at |v| = 100.
+ *
+ * @param glowBoost - 0-1 value that lowers the threshold and increases max radius.
+ *   At glowBoost=1, threshold drops by 50 (glow starts at signal 25) and max radius
+ *   increases by 20 (to 50px). Used during "it-works" ceremony phase.
  */
-export function signalToGlow(value: number): number {
+export function signalToGlow(value: number, glowBoost: number = 0): number {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
 
-  const glowThreshold = useOverrides ? devOverrides.wireStyle.glowThreshold : 75;
-  const glowMaxRadius = useOverrides ? devOverrides.wireStyle.glowMaxRadius : 30;
+  const baseThreshold = useOverrides ? devOverrides.wireStyle.glowThreshold : 75;
+  const baseMaxRadius = useOverrides ? devOverrides.wireStyle.glowMaxRadius : 30;
+
+  const glowThreshold = baseThreshold - 50 * glowBoost;
+  const glowMaxRadius = baseMaxRadius + 20 * glowBoost;
 
   const abs = Math.abs(value);
   if (abs <= glowThreshold) return 0;
@@ -217,6 +224,7 @@ export function drawWires(
   wireValues?: ReadonlyMap<string, number>,
   neutralOnly?: boolean,
   liveWireIds?: ReadonlySet<string>,
+  glowBoost?: number,
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
@@ -254,7 +262,7 @@ export function drawWires(
     const wireSignal = getWireSignal(wire.id, wireValues);
 
     // ── Pass 2: glow (|signal| > 75) — single polyline ──
-    const glow = signalToGlow(wireSignal);
+    const glow = signalToGlow(wireSignal, glowBoost);
     if (glow > 0) {
       ctx.save();
       ctx.strokeStyle = signalToColor(wireSignal, tokens);

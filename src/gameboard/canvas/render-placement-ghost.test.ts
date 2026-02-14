@@ -116,15 +116,15 @@ describe('renderPlacementGhost', () => {
     expect(ctx.restore).toHaveBeenCalled();
   });
 
-  it('snaps position to grid and renders at correct location', () => {
+  it('snaps position to grid and renders centered on cursor', () => {
     const ctx = makeCtx();
     // Mouse at pixel (480, 365) → grid (12, 9) at cellSize 40
+    // memory node: 3 cols x 1 row → centering offset: col - floor(3/2) = 12-1 = 11
+    // getNodeBodyPixelRect: x = 11*40 = 440, bodyTop=-0.5 → y=(9-0.5)*40=340, h=40
     const state = makeState({ mousePosition: { x: 480, y: 365 } });
     renderPlacementGhost(ctx, tokens, state, cellSize);
-    // memory node: 3 cols x 1 row, rotation 0
-    // getNodeBodyPixelRect: bodyTop=-0.5, bodyBottom=0.5 → y=(9-0.5)*40=340, h=40
     expect(ctx.roundRect).toHaveBeenCalledWith(
-      480, 340, 120, 40, expect.any(Number),
+      440, 340, 120, 40, expect.any(Number),
     );
   });
 
