@@ -4,7 +4,7 @@ import type { Vec2, NodeState, NodeRotation } from '../../shared/types/index.ts'
 import type { GridPoint } from '../../shared/grid/types.ts';
 import type { PuzzleNodeEntry, UtilityNodeEntry } from '../../store/slices/palette-slice.ts';
 import type { RenderNodesState, KnobInfo } from './render-types.ts';
-import { pixelToGrid, getNodeGridSizeFromType, canPlaceNode, canMoveNode, PLAYABLE_START, PLAYABLE_END, GRID_ROWS } from '../../shared/grid/index.ts';
+import { pixelToGrid, getNodeGridSizeFromType, canPlaceNode, canMoveNode, GRID_ROWS, getPlayableBounds } from '../../shared/grid/index.ts';
 import { getNodeDefinition, getDefaultParams } from '../../engine/nodes/registry.ts';
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { drawSingleNode } from './render-nodes.ts';
@@ -17,12 +17,13 @@ export interface RenderPlacementGhostState {
   puzzleNodes: ReadonlyMap<string, PuzzleNodeEntry>;
   utilityNodes: ReadonlyMap<string, UtilityNodeEntry>;
   keyboardGhostPosition: GridPoint | null;
+  activeBoardId?: string;
 }
 
 /**
  * Get port counts for a node type.
  */
-function getPortCountsFromType(
+export function getPortCountsFromType(
   nodeType: string,
   puzzleNodes: ReadonlyMap<string, PuzzleNodeEntry>,
   utilityNodes: ReadonlyMap<string, UtilityNodeEntry>,
@@ -130,8 +131,9 @@ function renderPlacingNodeGhost(
   let row: number;
 
   // 1-cell padding inside playable area so port anchors stay routable
-  const minCol = PLAYABLE_START + 1;
-  const maxCol = PLAYABLE_END - cols;
+  const bounds = getPlayableBounds(state.activeBoardId);
+  const minCol = bounds.playableStart + 1;
+  const maxCol = bounds.playableEnd - cols;
   const minRow = 1;
   const maxRow = GRID_ROWS - rows - 1;
 
@@ -144,7 +146,7 @@ function renderPlacingNodeGhost(
     row = Math.max(minRow, Math.min(grid.row - Math.floor(rows / 2), maxRow));
   }
 
-  const valid = canPlaceNode(state.occupancy as boolean[][], col, row, cols, rows);
+  const valid = canPlaceNode(state.occupancy as boolean[][], col, row, cols, rows, bounds);
 
   // Build synthetic node and render state
   const ghostNode = buildGhostNodeState(nodeType, col, row, rotation, state.puzzleNodes, state.utilityNodes);
@@ -184,10 +186,11 @@ function renderDraggingNodeGhost(
 
   // Snap mouse to grid, subtract grab offset so ghost stays under cursor
   const grid = pixelToGrid(state.mousePosition.x, state.mousePosition.y, cellSize);
-  const col = Math.max(PLAYABLE_START + 1, Math.min(grid.col - grabOffset.col, PLAYABLE_END - cols));
+  const bounds = getPlayableBounds(state.activeBoardId);
+  const col = Math.max(bounds.playableStart + 1, Math.min(grid.col - grabOffset.col, bounds.playableEnd - cols));
   const row = Math.max(1, Math.min(grid.row - grabOffset.row, GRID_ROWS - rows - 1));
 
-  const valid = canMoveNode(state.occupancy as boolean[][], draggedNode, col, row, rotation);
+  const valid = canMoveNode(state.occupancy as boolean[][], draggedNode, col, row, rotation, bounds);
 
   // Copy the dragged node with overridden position/rotation
   const ghostNode: NodeState = {

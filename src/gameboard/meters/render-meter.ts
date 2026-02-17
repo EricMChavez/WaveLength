@@ -30,8 +30,8 @@ export interface RenderMeterState {
   playpoint: number;
   /** Whether this meter's connection point has a wire attached */
   isConnected: boolean;
-  /** Whether this output port matches its target across all 256 cycles */
-  isPortMatched: boolean;
+  /** Tri-state border: 'matched' (green), 'mismatched' (red), 'neutral' (gray) */
+  borderState: 'neutral' | 'matched' | 'mismatched';
   /** Whether we're editing a utility node (show direction arrows instead of full meter) */
   isUtilityEditing: boolean;
 }
@@ -80,7 +80,7 @@ export function drawMeter(
     drawMeterHousing(ctx, housingColor, waveformRect, levelBarRect, side);
     const meterInteriorColor = devOverrides.enabled ? devOverrides.colors.meterInterior : tokens.meterInterior;
     drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout, side);
-    drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, false);
+    drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, 'neutral');
     drawMeterStreak(ctx, waveformRect, levelBarRect, side, meterHard, meterSoft);
     // Direction arrow or X
     const dirIndicator: 'input' | 'output' | 'off' = mode === 'off' ? 'off' : mode;
@@ -99,7 +99,7 @@ export function drawMeter(
     drawMeterHousing(ctx, housingColor, waveformRect, levelBarRect, side);
     const meterInteriorColor = devOverrides.enabled ? devOverrides.colors.meterInterior : tokens.meterInterior;
     drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout, side);
-    drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, false);
+    drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, 'neutral');
     drawMeterStreak(ctx, waveformRect, levelBarRect, side, meterHard, meterSoft);
     drawDirectionIndicator(ctx, tokens, waveformRect, side, 'off');
     return;
@@ -188,7 +188,7 @@ export function drawMeter(
   ctx.restore();
 
   // Draw meter border - uses same constrained height as interior
-  drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, state.isPortMatched);
+  drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, state.borderState);
 
   // Needle and connector drawn after border so they render on top.
   // Clip to meter border bounds so needle arm doesn't extend past housing.
@@ -322,14 +322,16 @@ function drawMeterBorder(
   levelBarRect: PixelRect,
   verticalHeightRatio: number,
   side: 'left' | 'right',
-  isPortMatched: boolean,
+  borderState: 'neutral' | 'matched' | 'mismatched',
 ): void {
   const devOverrides = getDevOverrides();
-  const borderColor = isPortMatched
+  const borderColor = borderState === 'matched'
     ? tokens.meterBorderMatch
-    : devOverrides.enabled
-      ? devOverrides.colors.meterBorder
-      : tokens.meterBorder;
+    : borderState === 'mismatched'
+      ? tokens.meterBorderMismatch
+      : devOverrides.enabled
+        ? devOverrides.colors.meterBorder
+        : tokens.meterBorder;
 
   // Compute the same constrained bounds as drawMeterInterior
   const left = Math.min(waveformRect.x, levelBarRect.x);

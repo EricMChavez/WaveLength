@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetroStation — Control Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --beige-light: #e8e0cc;
+    --beige-dark: #b8ad96;
+    --beige-shadow: #998d76;
+    --cream: #f0eade;
+    --led-green: #33ff33;
+    --led-amber: #ffaa00;
+    --screen-bg: #2a3a1a;
+    --screen-text: #33ff66;
+    --label-color: #6b6252;
+    --groove-light: #d8d0bc;
+    --groove-dark: #a89e88;
+    --key-depth: 5px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    background: #706858;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px),
+      repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px);
+    display: flex; justify-content: center; align-items: center;
+    padding: 40px 20px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .machine {
+    width: 100%; max-width: 860px;
+    background: var(--beige-light);
+    border-radius: 18px; padding: 36px 40px 44px;
+    position: relative;
+    box-shadow: 0 2px 0 0 var(--cream), 0 -2px 0 0 var(--beige-dark),
+      inset 0 1px 0 0 rgba(255,255,255,0.4), 0 12px 40px rgba(0,0,0,0.35), 0 4px 8px rgba(0,0,0,0.2);
+    background-image:
+      radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.15) 0%, transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 40%, rgba(0,0,0,0.04) 100%);
+  }
+  .machine::before {
+    content: ''; position: absolute; top: 8px; left: 12px; right: 12px; height: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
+    border-radius: 14px 14px 0 0; pointer-events: none;
+  }
+
+  /* ============================================================
+     KEYCAP SYSTEM
+     
+     .keycap       — outer wrapper, inline-flex
+       .keycap-base  — the full-size base/shell with visible walls
+         .keycap-top  — smaller top face, absolutely positioned
+     
+     The base is a fixed size. The top face is inset by a fixed
+     amount on all sides (--inset), then JS shifts its left/right
+     position within that inset space based on perspective.
+     ============================================================ */
+
+  .keycap {
+    position: relative;
+    display: inline-flex;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .keycap-base {
+    position: relative;
+    display: inline-flex;
+    border-radius: 6px;
+    transition: transform 0.06s ease, box-shadow 0.06s ease;
+    /* The base IS the outer shell — its size comes from the size class */
+  }
+
+  .keycap-top {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 3px;
+    z-index: 1;
+    /* Default inset from all edges — JS overrides left/right */
+    top: 3px;
+    bottom: 8px;
+    left: 7px;
+    right: 7px;
+  }
+
+  /* Size classes go on .keycap-base to define the outer shell size */
+  .keycap-base.sm   { width: 44px;  height: 44px; }
+  .keycap-base.md   { width: 78px;  height: 44px; }
+  .keycap-base.lg   { width: 108px; height: 44px; }
+  .keycap-base.xl   { width: 148px; height: 44px; }
+  .keycap-base.wide { height: 44px; /* width from flex */ }
+  .keycap-base.tall { width: 44px;  height: 96px; }
+  .keycap-base.pow  { width: 60px;  height: 60px; border-radius: 50%; }
+  .keycap-base.rst  { width: 50px;  height: 50px; border-radius: 50%; }
+
+  .keycap.round .keycap-base { border-radius: 50%; }
+  .keycap.round .keycap-top  { border-radius: 50%; top: 5px; bottom: 8px; left: 6px; right: 6px; }
+
+  .keycap-top .key-label {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    line-height: 1;
+  }
+  .keycap-base.sm .key-label { font-size: 13px; letter-spacing: 0; }
+  .keycap-base.pow .key-label { font-size: 20px; }
+  .keycap-base.rst .key-label { font-size: 16px; }
+  .keycap-base.tall .key-label { font-size: 15px; }
+
+  /* ---- Light ---- */
+  .keycap.light .keycap-base {
+    background: linear-gradient(180deg, #ccc4ae 0%, #c0b8a0 50%, #b4ac96 100%);
+    box-shadow:
+      0 var(--key-depth) 0 -1px #a49c88,
+      0 calc(var(--key-depth) + 1px) 0 -1px #928a78,
+      0 calc(var(--key-depth) + 2px) 0 -1px #847c6c,
+      0 calc(var(--key-depth) + 4px) 8px -2px rgba(0,0,0,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .keycap.light .keycap-top {
+    background: linear-gradient(180deg, #ece4d2 0%, #e2dac8 50%, #dcd4c0 100%);
+    color: #4a4236;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-bottom-color: rgba(0,0,0,0.04);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 1px rgba(0,0,0,0.03);
+  }
+  .keycap.light:hover .keycap-top {
+    background: linear-gradient(180deg, #f0e8d6 0%, #e8e0cc 50%, #e2dac6 100%);
+  }
+  .keycap.light:active .keycap-base {
+    transform: translateY(calc(var(--key-depth) - 1px));
+    box-shadow: 0 1px 0 -1px #a49c88, 0 2px 0 -1px #928a78,
+      inset 0 1px 3px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .keycap.light:active .keycap-top {
+    background: linear-gradient(180deg, #ddd6c2 0%, #d6ceb8 50%, #d0c8b2 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+  }
+
+  /* ---- Dark ---- */
+  .keycap.dark .keycap-base {
+    background: linear-gradient(180deg, #3a3630 0%, #302c26 50%, #282420 100%);
+    box-shadow:
+      0 var(--key-depth) 0 -1px #201e1a,
+      0 calc(var(--key-depth) + 1px) 0 -1px #1a1816,
+      0 calc(var(--key-depth) + 2px) 0 -1px #121110,
+      0 calc(var(--key-depth) + 4px) 8px -2px rgba(0,0,0,0.25),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .keycap.dark .keycap-top {
+    background: linear-gradient(180deg, #555048 0%, #4a4640 50%, #42403a 100%);
+    color: #d4ccbc;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-bottom-color: rgba(0,0,0,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 1px rgba(0,0,0,0.06);
+  }
+  .keycap.dark:hover .keycap-top {
+    background: linear-gradient(180deg, #5e5a52 0%, #524e48 50%, #4a4842 100%);
+  }
+  .keycap.dark:active .keycap-base {
+    transform: translateY(calc(var(--key-depth) - 1px));
+    box-shadow: 0 1px 0 -1px #201e1a, 0 2px 0 -1px #1a1816,
+      inset 0 1px 3px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .keycap.dark:active .keycap-top {
+    background: linear-gradient(180deg, #464240 0%, #3e3a38 50%, #363432 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+  }
+
+  /* ---- Accent (orange) ---- */
+  .keycap.accent .keycap-base {
+    background: linear-gradient(180deg, #c05224 0%, #aa481c 50%, #984016 100%);
+    box-shadow:
+      0 var(--key-depth) 0 -1px #843812,
+      0 calc(var(--key-depth) + 1px) 0 -1px #72300e,
+      0 calc(var(--key-depth) + 2px) 0 -1px #62280a,
+      0 calc(var(--key-depth) + 4px) 8px -2px rgba(0,0,0,0.22),
+      inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+  .keycap.accent .keycap-top {
+    background: linear-gradient(180deg, #ea7a48 0%, #de6a38 50%, #d46030 100%);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-bottom-color: rgba(0,0,0,0.08);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.05);
+  }
+  .keycap.accent:hover .keycap-top {
+    background: linear-gradient(180deg, #f08450 0%, #e87440 50%, #de6a38 100%);
+  }
+  .keycap.accent:active .keycap-base {
+    transform: translateY(calc(var(--key-depth) - 1px));
+    box-shadow: 0 1px 0 -1px #843812, 0 2px 0 -1px #72300e,
+      inset 0 1px 3px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .keycap.accent:active .keycap-top {
+    background: linear-gradient(180deg, #d46830 0%, #c85e28 50%, #c05624 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+  }
+
+  /* ============================================================ */
+
+  .vents { display: flex; gap: 4px; justify-content: flex-end; margin-bottom: 20px; padding-right: 8px; }
+  .vent { width: 28px; height: 3px; background: var(--beige-dark); border-radius: 1px; box-shadow: inset 0 1px 1px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.3); }
+
+  .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-left: 4px; }
+  .brand-logo { width: 36px; height: 36px; background: linear-gradient(135deg, #888 0%, #aaa 50%, #777 100%); border-radius: 4px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.2); }
+  .brand-logo::after { content: '◆'; color: #ddd; font-size: 18px; text-shadow: 0 -1px 0 rgba(0,0,0,0.3); }
+  .brand-name { font-size: 13px; font-weight: 700; letter-spacing: 6px; text-transform: uppercase; color: var(--label-color); text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
+  .brand-model { font-size: 10px; color: var(--beige-shadow); letter-spacing: 3px; margin-left: auto; padding-right: 4px; }
+
+  .screen-housing { background: #3a3428; border-radius: 12px; padding: 14px; margin-bottom: 28px; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.15); }
+  .screen { background: var(--screen-bg); border-radius: 6px; padding: 20px 24px; min-height: 120px; position: relative; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.4); }
+  .screen::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px); pointer-events: none; z-index: 2; }
+  .screen::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.3) 100%); pointer-events: none; z-index: 3; }
+  .screen-text { font-family: 'VT323', monospace; font-size: 18px; color: var(--screen-text); line-height: 1.6; text-shadow: 0 0 8px rgba(51,255,102,0.4); position: relative; z-index: 1; }
+  .cursor-blink { display: inline-block; width: 10px; height: 18px; background: var(--screen-text); vertical-align: text-bottom; animation: blink 1s step-end infinite; box-shadow: 0 0 6px rgba(51,255,102,0.5); }
+  @keyframes blink { 50% { opacity: 0; } }
+  .feedback-text { font-family: 'VT323', monospace; font-size: 16px; color: var(--screen-text); text-shadow: 0 0 6px rgba(51,255,102,0.3); }
+
+  .section-label { font-size: 9px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--label-color); margin-bottom: 12px; padding-left: 2px; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
+  .groove-panel { background: var(--groove-light); border-radius: 8px; padding: 18px; margin-bottom: 20px; box-shadow: inset 0 2px 3px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.4); }
+
+  .led { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); vertical-align: middle; }
+  .led.off { background: #4a4a3a; }
+  .led.green { background: var(--led-green); box-shadow: 0 0 6px var(--led-green), 0 0 12px rgba(51,255,51,0.3), inset 0 -1px 1px rgba(0,0,0,0.2); }
+  .led.amber { background: var(--led-amber); box-shadow: 0 0 6px var(--led-amber), 0 0 12px rgba(255,170,0,0.3), inset 0 -1px 1px rgba(0,0,0,0.2); }
+
+  .button-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+  .numpad { display: grid; grid-template-columns: repeat(3, auto); gap: 6px; justify-content: start; }
+  .control-group { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .control-label { font-size: 8px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--label-color); text-shadow: 0 1px 0 rgba(255,255,255,0.3); }
+  .divider { height: 2px; background: linear-gradient(180deg, var(--groove-dark) 0%, var(--groove-light) 100%); margin: 20px 0; border-radius: 1px; }
+
+  .status-bar { display: flex; align-items: center; gap: 20px; padding: 10px 16px; background: var(--groove-light); border-radius: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.08); margin-top: 20px; }
+  .status-item { display: flex; align-items: center; gap: 8px; font-size: 9px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--label-color); }
+
+  .slider-track { width: 140px; height: 6px; background: linear-gradient(180deg, #a89e8a 0%, #c0b8a4 100%); border-radius: 3px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); position: relative; display: inline-block; vertical-align: middle; }
+  .slider-track input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 100%; background: transparent; position: absolute; top: -8px; left: 0; margin: 0; cursor: pointer; }
+  .slider-track input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(145deg, #e8e0cc 0%, #d0c8b2 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 3px 0 #a89e8a, 0 4px 0 #96907e, 0 5px 6px rgba(0,0,0,0.18); cursor: pointer; }
+
+  .top-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .system-controls { display: flex; gap: 10px; align-items: flex-start; }
+
+  .screw { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #b8ad96, #a89e88); box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15); position: absolute; display: flex; align-items: center; justify-content: center; }
+  .screw::after { content: '+'; font-size: 10px; color: rgba(0,0,0,0.25); font-weight: bold; line-height: 1; }
+  .screw.tl { top: 16px; left: 16px; } .screw.tr { top: 16px; right: 16px; }
+  .screw.bl { bottom: 16px; left: 16px; } .screw.br { bottom: 16px; right: 16px; }
+
+  .embossed { font-size: 8px; letter-spacing: 4px; text-transform: uppercase; color: transparent; text-shadow: 0 1px 0 rgba(255,255,255,0.5); -webkit-text-stroke: 0.5px var(--beige-dark); user-select: none; margin-top: 16px; text-align: center; }
+
+  .type-line { overflow: hidden; white-space: nowrap; animation: typeIn 0.6s steps(30) forwards; }
+  @keyframes typeIn { from { width: 0; } to { width: 100%; } }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .screen-text .type-line:nth-child(n+2) { animation: typeIn 0.6s steps(30) forwards, fadeIn 0s forwards; }
+  .screen-text .type-line:nth-child(2) { animation-delay: 0.6s, 0.6s; opacity: 0; }
+  .screen-text .type-line:nth-child(3) { animation-delay: 1.2s, 1.2s; opacity: 0; }
+  .screen-text .type-line:nth-child(4) { animation-delay: 1.8s, 1.8s; opacity: 0; }
+  .screen-text .type-line:nth-child(5) { animation-delay: 2.2s, 2.2s; opacity: 0; }
+
+  /* ============================================================
+     TAPE DECK TRANSPORT BUTTONS
+     
+     Flat-topped, mechanical feel. These sit in a recessed channel
+     and press straight down with a heavy click. Inspired by
+     cassette recorder transport controls.
+     
+     .transport-btn  — the button itself
+     .transport-well — the recessed slot each button sits in
+     ============================================================ */
+
+  .tape-deck {
+    background: #2a2620;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    position: relative;
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,0.5),
+      inset 0 0 16px rgba(0,0,0,0.3),
+      0 1px 0 rgba(255,255,255,0.12);
+  }
+
+  .tape-deck-label {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #7a7060;
+    margin-bottom: 14px;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.5);
+  }
+
+  /* The cassette window */
+  .tape-window {
+    background: #1a1610;
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+  }
+
+  .tape-reel {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #4a4438;
+    background: radial-gradient(circle, #2a2620 30%, #1a1610 70%);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .tape-reel::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 10px; height: 10px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: #3a3630;
+    border: 1.5px solid #4a4438;
+  }
+  .tape-reel.spinning {
+    animation: spin 1.5s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tape-label {
+    font-family: 'VT323', monospace;
+    font-size: 13px;
+    color: #6a6050;
+    letter-spacing: 1px;
+    flex: 1;
+    text-align: center;
+  }
+  .tape-label.active {
+    color: var(--led-amber);
+    text-shadow: 0 0 6px rgba(255,170,0,0.3);
+  }
+
+  .tape-counter {
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    color: var(--led-green);
+    text-shadow: 0 0 6px rgba(51,255,51,0.3);
+    background: #0a0a08;
+    padding: 3px 8px;
+    border-radius: 3px;
+    min-width: 48px;
+    text-align: center;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  /* Transport button channel */
+  .transport-row {
+    display: flex;
+    gap: 0;
+    border-radius: 5px;
+    overflow: hidden;
+    /* Recessed channel the buttons sit in */
+    background: #1a1610;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.03);
+    padding: 3px;
+  }
+
+  .transport-btn {
+    flex: 1;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    border: none;
+    outline: none;
+    position: relative;
+    font-family: 'IBM Plex Mono', monospace;
+    transition: transform 0.04s ease, box-shadow 0.04s ease;
+
+    /* Silver/chrome button face */
+    background: linear-gradient(180deg,
+      #8a8478 0%,
+      #7a746a 20%,
+      #6e685e 50%,
+      #646058 80%,
+      #5a5650 100%
+    );
+    color: #c8c0b4;
+    font-size: 15px;
+    text-shadow: 0 -1px 0 rgba(0,0,0,0.4);
+
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      inset 0 -1px 0 rgba(0,0,0,0.2),
+      0 2px 0 0 #3a3630,
+      0 3px 0 0 #2a2620;
+
+    border-right: 1px solid rgba(0,0,0,0.3);
+  }
+
+  .transport-btn:last-child {
+    border-right: none;
+  }
+
+  .transport-btn:hover {
+    background: linear-gradient(180deg,
+      #948e82 0%,
+      #847e74 20%,
+      #787268 50%,
+      #6e6a62 80%,
+      #64605a 100%
+    );
+  }
+
+  .transport-btn:active, .transport-btn.engaged {
+    transform: translateY(2px);
+    background: linear-gradient(180deg,
+      #5a5650 0%,
+      #646058 20%,
+      #5e5a52 50%,
+      #565248 80%,
+      #4e4a42 100%
+    );
+    box-shadow:
+      inset 0 2px 4px rgba(0,0,0,0.4),
+      inset 0 0 6px rgba(0,0,0,0.2),
+      0 0px 0 0 #3a3630;
+  }
+
+  /* Record button — red accent */
+  .transport-btn.rec-btn {
+    color: #cc3333;
+    text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
+  }
+  .transport-btn.rec-btn.engaged {
+    color: #ff4444;
+    text-shadow: 0 0 8px rgba(255,68,68,0.5);
+  }
+
+  /* Transport symbols */
+  .transport-btn .t-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  /* Small label under the icon */
+  .transport-btn .t-label {
+    position: absolute;
+    bottom: 3px;
+    font-size: 6px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(200,192,180,0.4);
+  }
+  .transport-btn.engaged .t-label {
+    color: rgba(200,192,180,0.6);
+  }
+
+  @media (max-width: 640px) {
+    .machine { padding: 24px 20px 30px; border-radius: 12px; }
+    .top-controls { flex-direction: column; gap: 16px; align-items: flex-start; }
+    .status-bar { flex-wrap: wrap; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="machine" id="machine">
+  <div class="screw tl"></div><div class="screw tr"></div>
+  <div class="screw bl"></div><div class="screw br"></div>
+
+  <div class="vents"><div class="vent"></div><div class="vent"></div><div class="vent"></div><div class="vent"></div><div class="vent"></div><div class="vent"></div><div class="vent"></div></div>
+
+  <div class="brand">
+    <div class="brand-logo"></div>
+    <span class="brand-name">RetroStation</span>
+    <span class="brand-model">Model RS-84</span>
+  </div>
+
+  <div class="screen-housing">
+    <div class="screen">
+      <div class="screen-text" id="screenText">
+        <div class="type-line">RETROSTATION RS-84 BIOS v2.1</div>
+        <div class="type-line">Memory Test... 640K OK</div>
+        <div class="type-line">All systems nominal.</div>
+        <div class="type-line">&nbsp;</div>
+        <div class="type-line">READY. <span class="cursor-blink"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Power + System -->
+  <div class="top-controls">
+    <div style="display:flex; align-items:flex-start; gap: 20px;">
+      <div class="control-group">
+        <div class="keycap accent round" onclick="togglePower()"><div class="keycap-base pow"><div class="keycap-top"><span class="key-label">⏻</span></div></div></div>
+        <span class="control-label">Power</span>
+      </div>
+      <div class="control-group">
+        <div class="keycap dark round" onclick="resetSystem()"><div class="keycap-base rst"><div class="keycap-top"><span class="key-label">↺</span></div></div></div>
+        <span class="control-label">Reset</span>
+      </div>
+    </div>
+    <div class="system-controls">
+      <div class="control-group">
+        <div class="keycap dark" onclick="toggleRocker(this)"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Turbo</span></div></div></div>
+        <span class="control-label">Speed</span>
+      </div>
+      <div class="control-group">
+        <div class="keycap dark" onclick="toggleRocker(this)"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Lock</span></div></div></div>
+        <span class="control-label">Keylock</span>
+      </div>
+      <div class="control-group">
+        <div class="keycap dark" onclick="toggleRocker(this)"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Mute</span></div></div></div>
+        <span class="control-label">Audio</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Function Keys -->
+  <div class="section-label">Function Keys</div>
+  <div class="groove-panel">
+    <div class="button-row">
+      <div class="keycap accent" onclick="screenMsg('F1 — Help')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F1</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F2 — Rename')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F2</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F3 — Search')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F3</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F4 — Address')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F4</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F5 — Refresh')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F5</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F6 — Focus')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F6</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F7 — Caret')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F7</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('F8 — Safe mode')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F8</span></div></div></div>
+      <div style="width:10px;"></div>
+      <div class="keycap dark" onclick="screenMsg('F9 — Build')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F9</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('F10 — Menu')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F10</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('F11 — Full')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F11</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('F12 — Dev')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">F12</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- System Functions -->
+  <div class="section-label">System Functions</div>
+  <div class="groove-panel">
+    <div class="button-row">
+      <div class="keycap light" onclick="screenMsg('Loading file manager...')"><div class="keycap-base lg"><div class="keycap-top"><span class="key-label">Files</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('Opening terminal...')"><div class="keycap-base lg"><div class="keycap-top"><span class="key-label">Terminal</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('Launching editor...')"><div class="keycap-base lg"><div class="keycap-top"><span class="key-label">Editor</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('Network diagnostics...')"><div class="keycap-base lg"><div class="keycap-top"><span class="key-label">Network</span></div></div></div>
+      <div class="keycap accent" onclick="screenMsg('System preferences loaded.')"><div class="keycap-base lg"><div class="keycap-top"><span class="key-label">Settings</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- Applications -->
+  <div class="section-label">Applications</div>
+  <div class="groove-panel">
+    <div class="button-row">
+      <div class="keycap light" onclick="screenMsg('MacWrite 4.0 — Ready')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Write</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('MacPaint — Canvas loaded')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Paint</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('HyperCard — Home stack')"><div class="keycap-base xl"><div class="keycap-top"><span class="key-label">HyperCard</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('Calculator — 0')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Calc</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('Clock: ' + new Date().toLocaleTimeString())"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Clock</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('Puzzle — Shuffling tiles...')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Puzzle</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- Numpad + Nav + Sliders -->
+  <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+    <div>
+      <div class="section-label">Numpad</div>
+      <div class="groove-panel">
+        <div class="numpad">
+          <div class="keycap light" onclick="numpadPress(7)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">7</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(8)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">8</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(9)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">9</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(4)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">4</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(5)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">5</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(6)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">6</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(1)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">1</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(2)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">2</span></div></div></div>
+          <div class="keycap light" onclick="numpadPress(3)"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">3</span></div></div></div>
+          <div class="keycap dark" onclick="numpadPress(0)" style="grid-column: 1 / 3;"><div class="keycap-base md" style="width:100%;"><div class="keycap-top"><span class="key-label">0</span></div></div></div>
+          <div class="keycap accent" onclick="screenMsg('= ' + numBuffer); numBuffer='';"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">Ent</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1; min-width: 200px;">
+      <div class="section-label">Navigation</div>
+      <div class="groove-panel">
+        <div style="display:flex; gap: 8px; align-items:flex-start;">
+          <div class="keycap dark" onclick="screenMsg('ESC')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">Esc</span></div></div></div>
+          <div style="width:6px;"></div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <div class="keycap light" onclick="screenMsg('↑')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">▲</span></div></div></div>
+            <div style="display:flex; gap:4px;">
+              <div class="keycap light" onclick="screenMsg('←')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">◄</span></div></div></div>
+              <div class="keycap light" onclick="screenMsg('↓')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">▼</span></div></div></div>
+              <div class="keycap light" onclick="screenMsg('→')"><div class="keycap-base sm"><div class="keycap-top"><span class="key-label">►</span></div></div></div>
+            </div>
+          </div>
+          <div style="width:6px;"></div>
+          <div class="keycap accent" onclick="screenMsg('ENTER')"><div class="keycap-base tall"><div class="keycap-top"><span class="key-label">↵</span></div></div></div>
+        </div>
+      </div>
+
+      <div class="section-label" style="margin-top:16px;">Volume</div>
+      <div class="groove-panel" style="display:flex; align-items:center; gap:16px;">
+        <span style="font-size:9px; font-weight:600; letter-spacing:1px; color:var(--label-color);">MIN</span>
+        <div class="slider-track"><input type="range" min="0" max="100" value="50" oninput="screenMsg('Volume: '+this.value+'%')"></div>
+        <span style="font-size:9px; font-weight:600; letter-spacing:1px; color:var(--label-color);">MAX</span>
+      </div>
+
+      <div class="section-label" style="margin-top:12px;">Brightness</div>
+      <div class="groove-panel" style="display:flex; align-items:center; gap:16px;">
+        <span style="font-size:9px; font-weight:600; letter-spacing:1px; color:var(--label-color);">◐</span>
+        <div class="slider-track"><input type="range" min="0" max="100" value="70" oninput="adjustBrightness(this.value)"></div>
+        <span style="font-size:9px; font-weight:600; letter-spacing:1px; color:var(--label-color);">●</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Row -->
+  <div style="margin-top: 16px;">
+    <div class="section-label">Command</div>
+    <div class="groove-panel" style="display:flex; gap:8px; align-items:flex-start;">
+      <div class="keycap dark" onclick="screenMsg('CTRL')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Ctrl</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('ALT')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Alt</span></div></div></div>
+      <div class="keycap light" onclick="screenMsg('_')" style="flex:1;"><div class="keycap-base wide" style="width:100%;"><div class="keycap-top"><span class="key-label">Space</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('ALT')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Alt</span></div></div></div>
+      <div class="keycap dark" onclick="screenMsg('Menu')"><div class="keycap-base md"><div class="keycap-top"><span class="key-label">Menu</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- Tape Deck Transport -->
+  <div class="tape-deck">
+    <div class="tape-deck-label">▸ Tape Transport — Deck A</div>
+
+    <div class="tape-window">
+      <div class="tape-reel" id="reelL"></div>
+      <div class="tape-label" id="tapeStatus">NO TAPE LOADED</div>
+      <div class="tape-reel" id="reelR"></div>
+      <div class="tape-counter" id="tapeCounter">000</div>
+    </div>
+
+    <div class="transport-row">
+      <button class="transport-btn" onclick="transportAction('rew', this)" title="Rewind">
+        <span class="t-icon">◄◄</span>
+        <span class="t-label">Rew</span>
+      </button>
+      <button class="transport-btn" onclick="transportAction('play', this)" title="Play">
+        <span class="t-icon">►</span>
+        <span class="t-label">Play</span>
+      </button>
+      <button class="transport-btn" onclick="transportAction('ff', this)" title="Fast Forward">
+        <span class="t-icon">►►</span>
+        <span class="t-label">F.Fwd</span>
+      </button>
+      <button class="transport-btn rec-btn" onclick="transportAction('rec', this)" title="Record">
+        <span class="t-icon">●</span>
+        <span class="t-label">Rec</span>
+      </button>
+      <button class="transport-btn" onclick="transportAction('stop', this)" title="Stop">
+        <span class="t-icon">■</span>
+        <span class="t-label">Stop</span>
+      </button>
+      <button class="transport-btn" onclick="transportAction('pause', this)" title="Pause">
+        <span class="t-icon">❚❚</span>
+        <span class="t-label">Pause</span>
+      </button>
+      <button class="transport-btn" onclick="transportAction('eject', this)" title="Eject">
+        <span class="t-icon">⏏</span>
+        <span class="t-label">Eject</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-item"><span class="led green" id="ledPower"></span> Power</div>
+    <div class="status-item"><span class="led amber" id="ledDisk"></span> Disk</div>
+    <div class="status-item"><span class="led off" id="ledNet"></span> Network</div>
+    <div class="status-item"><span class="led off" id="ledError"></span> Error</div>
+    <div class="status-item" style="margin-left: auto;">640K RAM Free</div>
+  </div>
+  <div class="embossed">Made in Cupertino, California • © 1984</div>
+</div>
+
+<script>
+  let powerOn = true;
+  let numBuffer = '';
+
+  /* ============================================================
+     PERSPECTIVE ENGINE
+     
+     The base is a fixed size. The top face is position:absolute
+     inside it with top/bottom/left/right insets.
+     
+     We shift left & right values based on horizontal position
+     relative to machine center:
+       - Key left of center  → top slides left  (smaller left, larger right)
+       - Key right of center → top slides right (larger left, smaller right)
+     
+     The total horizontal inset stays constant (left + right = constant),
+     only the distribution changes. Same idea vertically but subtle.
+     ============================================================ */
+
+  function applyPerspective() {
+    const machine = document.getElementById('machine');
+    const mRect = machine.getBoundingClientRect();
+    const cx = mRect.left + mRect.width / 2;
+    const cy = mRect.top + mRect.height / 2;
+
+    // Total inset budget (left + right combined)
+    const H_TOTAL = 14;    // total horizontal inset split between left & right
+    const H_MIN = 3.5;    // minimum on the thin side
+    const V_TOP = 3;       // top is always thin (face near physical top)
+    const V_BOTTOM = 8;    // bottom is always thick (depth visible)
+
+    // How much the shift reacts to position
+    const STRENGTH = 0.9;
+
+    document.querySelectorAll('.keycap-top').forEach(top => {
+      const base = top.parentElement;
+      const isRound = top.closest('.keycap.round');
+
+      if (isRound) {
+        // Round keys get uniform inset, slight shift
+        const bRect = base.getBoundingClientRect();
+        const kx = bRect.left + bRect.width / 2;
+        const nx = Math.max(-1, Math.min(1, (kx - cx) / (mRect.width / 2)));
+        const inset = 6;
+        const shift = nx * 3 * STRENGTH;
+        top.style.top = '5px';
+        top.style.bottom = '8px';
+        top.style.left = (inset + shift) + 'px';
+        top.style.right = (inset - shift) + 'px';
+        return;
+      }
+
+      const bRect = base.getBoundingClientRect();
+      const kx = bRect.left + bRect.width / 2;
+      const ky = bRect.top + bRect.height / 2;
+
+      // Normalized position -1 to 1
+      const nx = Math.max(-1, Math.min(1, (kx - cx) / (mRect.width / 2)));
+      const ny = Math.max(-1, Math.min(1, (ky - cy) / (mRect.height / 2)));
+
+      // Horizontal: distribute H_TOTAL between left and right
+      // nx > 0 (right side) → more left inset, less right (top face slides right)
+      const halfRange = (H_TOTAL / 2 - H_MIN);
+      const padLeft  = (H_TOTAL / 2) + nx * halfRange * STRENGTH;
+      const padRight = (H_TOTAL / 2) - nx * halfRange * STRENGTH;
+
+      // Vertical: subtle shift — keys lower get slightly less bottom
+      const vBot = V_BOTTOM - ny * 0.5;
+
+      top.style.top    = V_TOP + 'px';
+      top.style.bottom = Math.max(5, vBot) + 'px';
+      top.style.left   = Math.max(H_MIN, padLeft) + 'px';
+      top.style.right  = Math.max(H_MIN, padRight) + 'px';
+    });
+  }
+
+  window.addEventListener('load', () => requestAnimationFrame(applyPerspective));
+  window.addEventListener('resize', applyPerspective);
+
+  function screenMsg(msg) {
+    if (!powerOn) return;
+    document.getElementById('screenText').innerHTML =
+      `<div class="feedback-text">${msg}</div><div style="margin-top:8px;"><span class="cursor-blink"></span></div>`;
+    flashDisk();
+  }
+
+  function togglePower() {
+    powerOn = !powerOn;
+    const s = document.getElementById('screenText');
+    const l = document.getElementById('ledPower');
+    if (powerOn) {
+      l.className = 'led green';
+      s.innerHTML = '<div class="type-line">RETROSTATION RS-84 BIOS v2.1</div><div class="type-line">System restored.</div><div class="type-line">&nbsp;</div><div class="type-line">READY. <span class="cursor-blink"></span></div>';
+    } else {
+      l.className = 'led off'; s.innerHTML = '';
+      document.getElementById('ledDisk').className = 'led off';
+      document.getElementById('ledNet').className = 'led off';
+    }
+  }
+
+  function resetSystem() {
+    if (!powerOn) return;
+    document.getElementById('screenText').innerHTML = '<div class="feedback-text">Resetting...</div>';
+    flashDisk();
+    setTimeout(() => {
+      document.getElementById('screenText').innerHTML =
+        '<div class="type-line">RETROSTATION RS-84 BIOS v2.1</div><div class="type-line">Memory Test... 640K OK</div><div class="type-line">All systems nominal.</div><div class="type-line">&nbsp;</div><div class="type-line">READY. <span class="cursor-blink"></span></div>';
+    }, 800);
+  }
+
+  function toggleRocker(el) {
+    const t = el.querySelector('.key-label');
+    const isOn = el.dataset.on === '1';
+    el.dataset.on = isOn ? '0' : '1';
+    el.classList.toggle('dark', !isOn ? false : true);
+    el.classList.toggle('accent', !isOn ? true : false);
+    screenMsg(t.textContent + (isOn ? ' — DISABLED' : ' — ENABLED'));
+    // Re-apply perspective since class changed
+    requestAnimationFrame(applyPerspective);
+  }
+
+  function numpadPress(n) {
+    if (!powerOn) return;
+    numBuffer += n;
+    if (numBuffer.length > 12) numBuffer = '' + n;
+    screenMsg('Input: ' + numBuffer);
+  }
+
+  function flashDisk() {
+    const l = document.getElementById('ledDisk');
+    l.className = 'led amber';
+    setTimeout(() => { if (powerOn) l.className = 'led off'; }, 300);
+  }
+
+  function adjustBrightness(val) {
+    if (!powerOn) return;
+    document.querySelector('.screen').style.filter = `brightness(${0.3 + (val / 100) * 0.7})`;
+    screenMsg('Brightness: ' + val + '%');
+  }
+
+  /* ============================================================
+     TAPE TRANSPORT LOGIC
+     ============================================================ */
+  let tapeState = 'stopped';
+  let tapeCounter = 0;
+  let tapeInterval = null;
+
+  function clearTransport() {
+    document.querySelectorAll('.transport-btn').forEach(b => b.classList.remove('engaged'));
+    document.getElementById('reelL').classList.remove('spinning');
+    document.getElementById('reelR').classList.remove('spinning');
+    if (tapeInterval) { clearInterval(tapeInterval); tapeInterval = null; }
+  }
+
+  function transportAction(action, btn) {
+    if (!powerOn) return;
+    clearTransport();
+
+    if (action === 'stop') {
+      tapeState = 'stopped';
+      document.getElementById('tapeStatus').textContent = 'STOPPED';
+      document.getElementById('tapeStatus').classList.remove('active');
+      btn.classList.add('engaged');
+      screenMsg('■ STOP');
+      return;
+    }
+
+    if (action === 'eject') {
+      tapeState = 'stopped';
+      tapeCounter = 0;
+      document.getElementById('tapeCounter').textContent = '000';
+      document.getElementById('tapeStatus').textContent = 'NO TAPE LOADED';
+      document.getElementById('tapeStatus').classList.remove('active');
+      screenMsg('⏏ EJECT');
+      return;
+    }
+
+    if (action === 'pause') {
+      if (tapeState === 'playing' || tapeState === 'recording') {
+        tapeState = 'paused';
+        document.getElementById('tapeStatus').textContent = 'PAUSED';
+        btn.classList.add('engaged');
+        screenMsg('❚❚ PAUSE');
+      }
+      return;
+    }
+
+    btn.classList.add('engaged');
+    document.getElementById('tapeStatus').classList.add('active');
+
+    if (action === 'play') {
+      tapeState = 'playing';
+      document.getElementById('tapeStatus').textContent = '► PLAYING';
+      document.getElementById('reelL').classList.add('spinning');
+      document.getElementById('reelR').classList.add('spinning');
+      tapeInterval = setInterval(() => {
+        tapeCounter++;
+        document.getElementById('tapeCounter').textContent = String(tapeCounter).padStart(3, '0');
+      }, 500);
+      screenMsg('► PLAY');
+    } else if (action === 'rec') {
+      tapeState = 'recording';
+      document.getElementById('tapeStatus').textContent = '● RECORDING';
+      document.getElementById('reelL').classList.add('spinning');
+      document.getElementById('reelR').classList.add('spinning');
+      tapeInterval = setInterval(() => {
+        tapeCounter++;
+        document.getElementById('tapeCounter').textContent = String(tapeCounter).padStart(3, '0');
+      }, 500);
+      screenMsg('● REC');
+    } else if (action === 'ff') {
+      tapeState = 'ff';
+      document.getElementById('tapeStatus').textContent = '►► FAST FWD';
+      document.getElementById('reelR').classList.add('spinning');
+      document.getElementById('reelR').style.animationDuration = '0.4s';
+      tapeInterval = setInterval(() => {
+        tapeCounter += 5;
+        document.getElementById('tapeCounter').textContent = String(tapeCounter).padStart(3, '0');
+      }, 200);
+      screenMsg('►► FAST FORWARD');
+    } else if (action === 'rew') {
+      tapeState = 'rew';
+      document.getElementById('tapeStatus').textContent = '◄◄ REWIND';
+      document.getElementById('reelL').classList.add('spinning');
+      document.getElementById('reelL').style.animationDuration = '0.4s';
+      tapeInterval = setInterval(() => {
+        tapeCounter = Math.max(0, tapeCounter - 5);
+        document.getElementById('tapeCounter').textContent = String(tapeCounter).padStart(3, '0');
+        if (tapeCounter <= 0) clearTransport();
+      }, 200);
+      screenMsg('◄◄ REWIND');
+    }
+  }
+</script>
+
+</body>
+</html>

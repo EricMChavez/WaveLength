@@ -1,5 +1,5 @@
 export type { WaveformShape, WaveformDef, PuzzleTestCase, PuzzleDefinition, CustomWaveformEntry } from './types.ts';
-export { generateWaveformValue } from './waveform-generators.ts';
+export { generateWaveformValue, shapeAtPhase, generateFMSamples } from './waveform-generators.ts';
 export {
   cpInputId,
   cpOutputId,

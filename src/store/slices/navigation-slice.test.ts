@@ -253,6 +253,26 @@ describe('navigation-slice', () => {
     }
   });
 
+  it('zoomIntoMenuNode clears activeBoardReadOnly so destination board is editable', () => {
+    const store = createTestStore();
+    const board: GameboardState = {
+      id: 'motherboard',
+      chips: new Map([
+        ['menu1', { id: 'menu1', type: 'menu-level', position: { col: 15, row: 10 }, params: {}, inputCount: 0, outputCount: 0 }],
+      ]),
+      paths: [],
+    };
+    store.getState().setActiveBoard(board);
+    // Simulate the motherboard being read-only
+    store.setState({ activeBoardReadOnly: true });
+
+    store.getState().zoomIntoMenuNode('menu1');
+
+    expect(store.getState().activeBoardReadOnly).toBe(false);
+    expect(store.getState().boardStack).toHaveLength(1);
+    expect(store.getState().navigationDepth).toBe(1);
+  });
+
   it('startEditingUtility recomputes occupancy and resets meters', () => {
     const store = createTestStore();
     setupBoardWithPuzzleNode(store);

@@ -58,6 +58,8 @@ export interface RenderGridState {
   tutorialTitle?: string;
   /** Optional tutorial message to render on the gameboard surface */
   tutorialMessage?: string;
+  /** When true, use full-width motherboard layout (no meter zones) */
+  isHomeBoard?: boolean;
 }
 
 /** State needed by meter rendering */

@@ -1,14 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { GameboardCanvas } from './gameboard/canvas/index.ts'
 import { SimulationControls } from './ui/controls/SimulationControls.tsx'
-import { GameboardButtons } from './ui/controls/GameboardButtons.tsx'
 import { CompletionCeremony } from './ui/puzzle/CompletionCeremony.tsx'
 import { PaletteModal, ParameterPopover, ContextMenu, WaveformSelectorOverlay, SavePuzzleDialog, NodeCreationForm, SaveCancelDialog } from './ui/overlays/index.ts'
 import { PortConstantInput } from './ui/controls/PortConstantInput.tsx'
 import { useGameStore } from './store/index.ts'
 import type { GameboardState } from './shared/types/index.ts'
 import { RetroPageHost } from './ui/screens/index.ts'
-import { DevTools } from './dev/index.ts'
 import { createMotherboard } from './store/motherboard.ts'
 
 /** Compute 16:9-fitting container dimensions from the window size. */
@@ -78,8 +76,9 @@ function App() {
 
     // On first load, show motherboard with menu nodes + retro main menu screen
     if (!store.activeBoard) {
-      const motherboard = createMotherboard(store.completedLevels, store.isLevelUnlocked, store.customPuzzles);
-      store.setActiveBoard(motherboard);
+      const { board, layout } = createMotherboard(store.completedLevels, store.isLevelUnlocked, store.customPuzzles);
+      store.setActiveBoard(board);
+      store.setMotherboardLayout(layout);
       store.initializeMeters([
         { active: false, direction: 'input' },
         { active: false, direction: 'input' },
@@ -88,10 +87,10 @@ function App() {
         { active: false, direction: 'output' },
         { active: false, direction: 'output' },
       ], 'off');
-      // Motherboard is read-only (no editing, just clicking)
-      useGameStore.setState({ activeBoardReadOnly: true });
+      // Motherboard: allow chip movement for layout design
+      useGameStore.setState({ activeBoardReadOnly: false });
       // Show retro main menu on startup
-      store.showScreen('main-menu');
+      store.showScreen();
     }
   }, [])
 
@@ -115,7 +114,6 @@ function App() {
         }}
       >
         <GameboardCanvas />
-        <GameboardButtons />
         <SimulationControls />
         <PortConstantInput />
         <PaletteModal />
@@ -126,11 +124,8 @@ function App() {
         <SaveCancelDialog />
         <NodeCreationForm />
         <CompletionCeremony />
-        {import.meta.env.DEV && <DevTools />}
+        <RetroPageHost />
       </div>
-
-      {/* Retro pages render outside 16:9 container for mobile responsiveness */}
-      <RetroPageHost />
     </div>
   )
 }

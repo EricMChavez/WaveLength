@@ -4,6 +4,7 @@ import { defineNode } from '../framework';
 export const splitNode = defineNode({
   type: 'split',
   category: 'routing',
+  description: 'Duplicates one signal into two identical outputs',
 
   inputs: [
     { name: 'A', side: 'left', gridPosition: 1 },

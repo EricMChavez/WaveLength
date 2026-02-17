@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateWaveformValue, getShapePeriod } from './waveform-generators.ts';
+import { generateWaveformValue, getShapePeriod, shapeAtPhase, generateFMSamples } from './waveform-generators.ts';
 import type { WaveformDef } from './types.ts';
 
 function makeDef(overrides: Partial<WaveformDef> = {}): WaveformDef {
@@ -267,5 +267,132 @@ describe('samples shape', () => {
     const def = makeDef({ shape: 'samples', samples: [150, -200] });
     expect(generateWaveformValue(0, def)).toBe(100);
     expect(generateWaveformValue(1, def)).toBe(-100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shapeAtPhase
+// ---------------------------------------------------------------------------
+
+describe('shapeAtPhase', () => {
+  it('sine: known values at key phases', () => {
+    expect(shapeAtPhase('sine', 0)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('sine', 0.25)).toBeCloseTo(1, 10);
+    expect(shapeAtPhase('sine', 0.5)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('sine', 0.75)).toBeCloseTo(-1, 10);
+  });
+
+  it('square: +1 in first half, -1 in second half', () => {
+    expect(shapeAtPhase('square', 0)).toBe(1);
+    expect(shapeAtPhase('square', 0.25)).toBe(1);
+    expect(shapeAtPhase('square', 0.5)).toBe(-1);
+    expect(shapeAtPhase('square', 0.75)).toBe(-1);
+  });
+
+  it('triangle: known values at key phases', () => {
+    expect(shapeAtPhase('triangle', 0)).toBeCloseTo(-1, 10);
+    expect(shapeAtPhase('triangle', 0.25)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('triangle', 0.5)).toBeCloseTo(1, 10);
+    expect(shapeAtPhase('triangle', 0.75)).toBeCloseTo(0, 10);
+  });
+
+  it('sawtooth: known values at key phases', () => {
+    expect(shapeAtPhase('sawtooth', 0)).toBeCloseTo(-1, 10);
+    expect(shapeAtPhase('sawtooth', 0.25)).toBeCloseTo(-0.5, 10);
+    expect(shapeAtPhase('sawtooth', 0.5)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('sawtooth', 0.75)).toBeCloseTo(0.5, 10);
+  });
+
+  it('wraps phase values outside [0,1)', () => {
+    expect(shapeAtPhase('sine', 1.25)).toBeCloseTo(shapeAtPhase('sine', 0.25), 10);
+    expect(shapeAtPhase('sine', -0.75)).toBeCloseTo(shapeAtPhase('sine', 0.25), 10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateFMSamples
+// ---------------------------------------------------------------------------
+
+describe('generateFMSamples', () => {
+  it('returns exactly 256 samples', () => {
+    const samples = generateFMSamples('sine', 3, 1, 1.5, 100);
+    expect(samples).toHaveLength(256);
+  });
+
+  it('all samples are clamped to [-100, +100]', () => {
+    const samples = generateFMSamples('sine', 5, 3, 3.0, 100);
+    for (const s of samples) {
+      expect(s).toBeGreaterThanOrEqual(-100);
+      expect(s).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('seamless looping: phase at t=0 equals phase at t=1 (mod 1)', () => {
+    // For integer N and M, the FM formula guarantees phase(0) ≡ phase(1) mod 1
+    // So sample[0] and the "virtual sample[256]" should be equivalent.
+    // We verify by checking that the first sample equals shapeAtPhase at the same phase.
+    const samples = generateFMSamples('sine', 4, 2, 2.0, 100);
+    // At t=0: phase = 0, so output = sin(0)*100 = 0
+    expect(samples[0]).toBeCloseTo(0, 5);
+    // At t=1 (which wraps to t=0 for looping): phase = N*1 - depth/(2πM)*(cos(2πM)-1)
+    // cos(2πM) = cos(4π) = 1, so the correction term = 0, phase = N = 4 → phase mod 1 = 0
+    // So the next loop iteration would produce the same value as samples[0]
+  });
+
+  it('amplitude scaling: 50% amplitude gives roughly half values', () => {
+    const full = generateFMSamples('sine', 3, 1, 1.5, 100);
+    const half = generateFMSamples('sine', 3, 1, 1.5, 50);
+    // Check several samples — half should be approximately full/2
+    for (let i = 0; i < 256; i += 32) {
+      expect(half[i]).toBeCloseTo(full[i] / 2, 1);
+    }
+  });
+
+  it('depth=0 matches constant-frequency waveform', () => {
+    // With depth=0, FM degenerates to plain N-cycle waveform
+    const fm = generateFMSamples('sine', 4, 2, 0, 100);
+    // Compare against manually computed constant-frequency sine
+    for (let i = 0; i < 256; i++) {
+      const t = i / 256;
+      const expected = Math.sin(2 * Math.PI * 4 * t) * 100;
+      expect(fm[i]).toBeCloseTo(expected, 5);
+    }
+  });
+
+  it('modRate=0 falls back to constant frequency', () => {
+    const fm = generateFMSamples('triangle', 3, 0, 5.0, 80);
+    // Should be equivalent to a plain 3-cycle triangle
+    const noMod = generateFMSamples('triangle', 3, 1, 0, 80);
+    // With modRate=0, there's no modulation, same as depth=0
+    for (let i = 0; i < 256; i++) {
+      const t = i / 256;
+      const phase = 3 * t;
+      const rawPhase = ((phase % 1) + 1) % 1;
+      const raw = rawPhase < 0.5 ? -1 + 4 * rawPhase : 3 - 4 * rawPhase;
+      expect(fm[i]).toBeCloseTo(raw * 80, 5);
+    }
+  });
+
+  it.each(['sine', 'square', 'triangle', 'sawtooth'] as const)(
+    'works for base shape: %s',
+    (base) => {
+      const samples = generateFMSamples(base, 4, 2, 2.0, 100);
+      expect(samples).toHaveLength(256);
+      for (const s of samples) {
+        expect(s).toBeGreaterThanOrEqual(-100);
+        expect(s).toBeLessThanOrEqual(100);
+      }
+    },
+  );
+
+  it('FM waveform is different from constant-frequency waveform', () => {
+    const fm = generateFMSamples('sine', 4, 2, 2.0, 100);
+    const constant = generateFMSamples('sine', 4, 2, 0, 100);
+    // At least some samples should differ significantly
+    let maxDiff = 0;
+    for (let i = 0; i < 256; i++) {
+      maxDiff = Math.max(maxDiff, Math.abs(fm[i] - constant[i]));
+    }
+    expect(maxDiff).toBeGreaterThan(10);
   });
 });

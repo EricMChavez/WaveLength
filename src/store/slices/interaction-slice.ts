@@ -5,7 +5,7 @@ import type { GridPoint } from '../../shared/grid/types.ts';
 /** Interaction mode discriminated union */
 export type InteractionMode =
   | { type: 'idle' }
-  | { type: 'placing-node'; nodeType: string; rotation: NodeRotation }
+  | { type: 'placing-node'; nodeType: string; rotation: NodeRotation; dragPlacement?: boolean }
   | { type: 'drawing-wire'; fromPort: PortRef; fromPosition: Vec2 }
   | { type: 'keyboard-wiring'; fromPort: PortRef; validTargets: PortRef[]; targetIndex: number }
   | { type: 'dragging-node'; draggedNode: NodeState; grabOffset: GridPoint; originalPosition: GridPoint; rotation: NodeRotation }

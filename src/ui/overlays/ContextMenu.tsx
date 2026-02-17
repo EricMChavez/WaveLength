@@ -4,6 +4,7 @@ import { buildContextMenuItems } from './context-menu-items.ts';
 import type { ContextMenuItem } from './context-menu-items.ts';
 import { generateId } from '../../shared/generate-id.ts';
 import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
+import { exportCustomPuzzleAsSource } from '../../puzzle/export-puzzle.ts';
 import { captureViewportSnapshot, captureCropSnapshot } from '../../gameboard/canvas/snapshot.ts';
 import { getNodeGridSize } from '../../shared/grid/index.ts';
 import styles from './ContextMenu.module.css';
@@ -55,13 +56,22 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
 
   // Build menu items
   let nodeType = '';
+  let isCustomPuzzle = false;
   if (target.type === 'node') {
-    const node = useGameStore.getState().activeBoard?.chips.get(target.chipId);
+    const state = useGameStore.getState();
+    const node = state.activeBoard?.chips.get(target.chipId);
     nodeType = node?.type ?? '';
+    if (nodeType.startsWith('puzzle:')) {
+      const puzzleId = nodeType.slice('puzzle:'.length);
+      isCustomPuzzle = state.customPuzzles.has(puzzleId);
+    } else if (nodeType.startsWith('menu:custom-')) {
+      const puzzleId = nodeType.slice('menu:custom-'.length);
+      isCustomPuzzle = state.customPuzzles.has(puzzleId);
+    }
   }
 
   const menuTarget = target.type === 'node'
-    ? { type: 'node' as const, chipId: target.chipId, nodeType }
+    ? { type: 'node' as const, chipId: target.chipId, nodeType, isCustomPuzzle }
     : target.type === 'wire'
       ? { type: 'wire' as const, wireId: target.wireId }
       : null;
@@ -110,6 +120,26 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
         if (target.type === 'node') {
           captureAndStartZoomIn(state, target.chipId);
           state.zoomIntoNode(target.chipId);
+        }
+        break;
+      case 'export':
+        if (target.type === 'node') {
+          const exportNode = state.activeBoard?.chips.get(target.chipId);
+          if (exportNode) {
+            let puzzleId: string | null = null;
+            if (exportNode.type.startsWith('puzzle:')) {
+              puzzleId = exportNode.type.slice('puzzle:'.length);
+            } else if (exportNode.type.startsWith('menu:custom-')) {
+              puzzleId = exportNode.type.slice('menu:custom-'.length);
+            }
+            if (puzzleId) {
+              const puzzle = state.customPuzzles.get(puzzleId);
+              if (puzzle) {
+                const source = exportCustomPuzzleAsSource(puzzle);
+                navigator.clipboard.writeText(source);
+              }
+            }
+          }
         }
         break;
       case 'edit':

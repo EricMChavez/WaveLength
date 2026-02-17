@@ -27,7 +27,11 @@ import { registerCropCapture, unregisterCropCapture } from './snapshot.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
 import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts';
 import { getRejectedKnobNodeId } from './rejected-knob.ts';
-import { drawPlaybackBar, getHoveredPlaybackButton } from './render-playback-bar.ts';
+import { drawPlaybackBar, getHoveredPlaybackButton, getPressedPlaybackButton } from './render-playback-bar.ts';
+import { drawBackButton, getHoveredBackButton } from './render-back-button.ts';
+import { drawRecordButton, getHoveredRecordButton, isRecordButtonDisabled, setRecordButtonDisabled } from './render-record-button.ts';
+import { drawMotherboardSections, drawPaginationControls } from './render-motherboard-sections.ts';
+import { drawEdgeCPs } from './render-edge-cps.ts';
 import { playSound } from '../../shared/audio/index.ts';
 import { getPortGridAnchor, getPortWireDirection, findPath, DIR_E } from '../../shared/routing/index.ts';
 import type { GridPoint, GridRect } from '../../shared/grid/types.ts';
@@ -38,6 +42,11 @@ import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { isConnectionInputNode, isConnectionOutputNode, getConnectionPointIndex, isCreativeSlotNode, getCreativeSlotIndex, isBidirectionalCpNode, getBidirectionalCpIndex, isUtilitySlotNode, getUtilitySlotIndex, cpInputId, cpOutputId, creativeSlotId, cpBidirectionalId, utilitySlotId } from '../../puzzle/connection-point-nodes.ts';
 import { findNearestSnapTarget, WIRE_SNAP_RADIUS_CELLS } from './hit-testing.ts';
+import { drawTutorialOverlay } from './render-tutorial-overlay.ts';
+import type { TutorialRenderState } from './render-tutorial-overlay.ts';
+import { drawChipDrawer, updateDrawerAnimation, getDrawerProgress, isDrawerVisible } from './render-chip-drawer.ts';
+import type { ChipDrawerRenderState } from './render-chip-drawer.ts';
+import { buildPaletteItems, computeRemainingBudgets } from '../../ui/overlays/palette-items.ts';
 
 const PLAYPOINT_RATE_NORMAL = 16; // cycles per second
 
@@ -291,6 +300,16 @@ let _liveWireIdsCache: ReadonlySet<string> = new Set();
 let _livenessCycleResults: CycleResults | null = null;
 let _livenessWires: ReadonlyArray<Wire> | null = null;
 
+// Cache: canRecord flag (rebuild when cycleResults changes)
+let _canRecordCache = false;
+let _canRecordCycleResults: CycleResults | null = null;
+
+// Cache: palette items for chip drawer (rebuild when palette/board changes)
+let _paletteItemsCache: ReturnType<typeof buildPaletteItems> = [];
+let _paletteItemsAllowedNodes: unknown = null;
+let _paletteItemsUtilityNodes: unknown = null;
+let _paletteItemsBoardChips: unknown = null;
+
 /**
  * Start the requestAnimationFrame render loop.
  * Reads Zustand via getState() each frame — NOT React hooks.
@@ -459,6 +478,10 @@ export function startRenderLoop(
       if (zoomProgress >= 1) {
         state.endZoomTransition();
         zoomAnimating = false;
+        // Unhide tutorial overlay now that the zoom animation is done
+        if (state.tutorialState.type === 'active' && state.tutorialState.overlayHidden) {
+          state.setTutorialOverlayHidden(false);
+        }
         // Fall through to normal rendering — no blank frame
       }
     }
@@ -486,136 +509,153 @@ export function startRenderLoop(
     // Grid zones and lines (lowest z-order)
     // Show authoring draft during configuring-start/saving, otherwise show puzzle's message
     const isAuthoring = state.authoringPhase !== 'idle';
+    const isHomeBoard = state.activeBoardId === 'motherboard';
     const tutorialTitle = (isAuthoring && state.tutorialTitleDraft)
       ? state.tutorialTitleDraft
       : state.activePuzzle?.tutorialTitle;
     const tutorialMessage = (isAuthoring && state.tutorialMessageDraft)
       ? state.tutorialMessageDraft
       : state.activePuzzle?.tutorialMessage;
-    drawGrid(ctx!, tokens, { tutorialTitle, tutorialMessage }, cellSize);
+    // On the motherboard, sections replace the gameboard background entirely.
+    // On puzzle/utility boards, draw the full-screen gameboard grid as before.
+    if (isHomeBoard && state.motherboardLayout) {
+      drawMotherboardSections(ctx!, tokens, state.motherboardLayout.sections, cellSize);
+    } else {
+      drawGrid(ctx!, tokens, { tutorialTitle, tutorialMessage, isHomeBoard }, cellSize);
+    }
 
     // Read cycle results and playpoint for rendering
     const cycleResults = state.cycleResults;
     const playpoint = state.playpoint;
 
-    // Draw meters in side zones
-    const perSampleMatch = getPerSampleMatch();
-    // Build flat arrays for meter rendering from cycleResults + puzzle (cached)
-    const puzzleId = state.activePuzzle?.id ?? null;
-    const testIndex = state.activeTestCaseIndex;
-    const isCreative = state.isCreativeMode;
-    const creativeSlots = isCreative ? state.creativeSlots : null;
-
-    if (
-      cycleResults !== _meterSignalCycleResults ||
-      puzzleId !== _meterSignalPuzzleId ||
-      testIndex !== _meterSignalTestIndex ||
-      isCreative !== _meterSignalIsCreative ||
-      creativeSlots !== _meterSignalCreativeSlots
-    ) {
-      _meterSignalCache = buildMeterSignalArrays(cycleResults, state);
-      _meterSignalCycleResults = cycleResults;
-      _meterSignalPuzzleId = puzzleId;
-      _meterSignalTestIndex = testIndex;
-      _meterSignalIsCreative = isCreative;
-      _meterSignalCreativeSlots = creativeSlots;
-    }
-    const meterSignalArrays = _meterSignalCache;
-
-    if (puzzleId !== _meterTargetPuzzleId || testIndex !== _meterTargetTestIndex) {
-      _meterTargetCache = buildMeterTargetArrays(state);
-      _meterTargetPuzzleId = puzzleId;
-      _meterTargetTestIndex = testIndex;
-    }
-    const meterTargetArrays = _meterTargetCache;
-
-    // Read wires early so we can compute CP connection status for meters
+    // Read wires early (needed for node/wire rendering on all boards)
     const boardWires = state.activeBoard?.paths ?? null;
 
-    // Build connected output CP set (cached on wires reference)
-    // Output CPs receive signal from the graph — wires target them
-    // Keys: `output:${slotIndex}` uniformly
-    if (boardWires !== _connectedOutputCPsWires) {
-      const set = new Set<string>();
-      if (boardWires) {
-        for (const wire of boardWires) {
-          const targetId = wire.target.chipId;
-          const slotIdx = getCpSlotIdx(targetId, 'output', state.activeBoard?.chips);
-          if (slotIdx >= 0) set.add(`output:${slotIdx}`);
-        }
+    // Meters and connection points (skip on motherboard — no meter zones)
+    let meterSignalArrays: ReadonlyMap<string, number[]> = _meterSignalCache;
+    let connectedOutputCPs: ReadonlySet<string> = _connectedOutputCPsCache;
+    let cpSignals: ReadonlyMap<string, number> = _cpSignalsCache;
+
+    if (!isHomeBoard) {
+      // Draw meters in side zones
+      const perSampleMatch = getPerSampleMatch();
+      // Build flat arrays for meter rendering from cycleResults + puzzle (cached)
+      const puzzleId = state.activePuzzle?.id ?? null;
+      const testIndex = state.activeTestCaseIndex;
+      const isCreative = state.isCreativeMode;
+      const creativeSlots = isCreative ? state.creativeSlots : null;
+
+      if (
+        cycleResults !== _meterSignalCycleResults ||
+        puzzleId !== _meterSignalPuzzleId ||
+        testIndex !== _meterSignalTestIndex ||
+        isCreative !== _meterSignalIsCreative ||
+        creativeSlots !== _meterSignalCreativeSlots
+      ) {
+        _meterSignalCache = buildMeterSignalArrays(cycleResults, state);
+        _meterSignalCycleResults = cycleResults;
+        _meterSignalPuzzleId = puzzleId;
+        _meterSignalTestIndex = testIndex;
+        _meterSignalIsCreative = isCreative;
+        _meterSignalCreativeSlots = creativeSlots;
       }
-      _connectedOutputCPsCache = set;
-      _connectedOutputCPsWires = boardWires;
-    }
-    const connectedOutputCPs = _connectedOutputCPsCache;
+      meterSignalArrays = _meterSignalCache;
 
-    // Build connected input CP set (cached on wires reference)
-    // Input CPs emit signal into the graph — wires source from them
-    // Keys: `input:${slotIndex}` uniformly
-    if (boardWires !== _connectedInputCPsWires) {
-      const set = new Set<string>();
-      if (boardWires) {
-        for (const wire of boardWires) {
-          const sourceId = wire.source.chipId;
-          const slotIdx = getCpSlotIdx(sourceId, 'input', state.activeBoard?.chips);
-          if (slotIdx >= 0) set.add(`input:${slotIdx}`);
-        }
+      if (puzzleId !== _meterTargetPuzzleId || testIndex !== _meterTargetTestIndex) {
+        _meterTargetCache = buildMeterTargetArrays(state);
+        _meterTargetPuzzleId = puzzleId;
+        _meterTargetTestIndex = testIndex;
       }
-      _connectedInputCPsCache = set;
-      _connectedInputCPsWires = boardWires;
+      const meterTargetArrays = _meterTargetCache;
+
+      // Build connected output CP set (cached on wires reference)
+      // Output CPs receive signal from the graph — wires target them
+      // Keys: `output:${slotIndex}` uniformly
+      if (boardWires !== _connectedOutputCPsWires) {
+        const set = new Set<string>();
+        if (boardWires) {
+          for (const wire of boardWires) {
+            const targetId = wire.target.chipId;
+            const slotIdx = getCpSlotIdx(targetId, 'output', state.activeBoard?.chips);
+            if (slotIdx >= 0) set.add(`output:${slotIdx}`);
+          }
+        }
+        _connectedOutputCPsCache = set;
+        _connectedOutputCPsWires = boardWires;
+      }
+      connectedOutputCPs = _connectedOutputCPsCache;
+
+      // Build connected input CP set (cached on wires reference)
+      // Input CPs emit signal into the graph — wires source from them
+      // Keys: `input:${slotIndex}` uniformly
+      if (boardWires !== _connectedInputCPsWires) {
+        const set = new Set<string>();
+        if (boardWires) {
+          for (const wire of boardWires) {
+            const sourceId = wire.source.chipId;
+            const slotIdx = getCpSlotIdx(sourceId, 'input', state.activeBoard?.chips);
+            if (slotIdx >= 0) set.add(`input:${slotIdx}`);
+          }
+        }
+        _connectedInputCPsCache = set;
+        _connectedInputCPsWires = boardWires;
+      }
+
+      // Calculate meter starting offset (meters fill the full height)
+      const meterTopMargin = 0; // in grid rows
+      const meterStride = METER_GRID_ROWS + METER_GAP_ROWS; // rows per meter + gap
+
+      const isUtilityEditing = !!state.editingUtilityId;
+
+      // Single loop over all 6 meter slots (0-2 left, 3-5 right)
+      // Signal keys uniformly use slot index: `${direction}:${slotIndex}`
+      for (let i = 0; i < TOTAL_SLOTS; i++) {
+        const key: MeterKey = meterKey(i);
+        const slot = state.meterSlots.get(key);
+        if (!slot) continue;
+
+        const side = slotSide(i);
+        const perSideIdx = slotPerSideIndex(i);
+        const meterRow = meterTopMargin + perSideIdx * meterStride + METER_VERTICAL_OFFSETS[perSideIdx];
+        const meterCol = side === 'left' ? METER_LEFT_START : METER_RIGHT_START;
+        const meterRect = gridRectToPixels({
+          col: meterCol,
+          row: meterRow,
+          cols: METER_GRID_COLS,
+          rows: METER_GRID_ROWS,
+        }, cellSize);
+
+        const dir = modeToDirection(slot.mode);
+        // Uniform signal key: `${direction}:${slotIndex}`
+        const isConnected = dir === 'input'
+          ? _connectedInputCPsCache.has(`input:${i}`)
+          : connectedOutputCPs.has(`output:${i}`);
+        const renderState: RenderMeterState = {
+          slot,
+          side,
+          signalValues: meterSignalArrays.get(`${dir}:${i}`) ?? null,
+          targetValues: dir === 'output' ? (meterTargetArrays.get(`target:${i}`) ?? null) : null,
+          matchStatus: dir === 'output' ? (perSampleMatch.get(`output:${i}`) ?? null) : undefined,
+          playpoint,
+          isConnected,
+          borderState: dir === 'output' && state.perPortMatch[i] === true
+            ? 'matched'
+            : dir === 'output' && isConnected && meterTargetArrays.has(`target:${i}`)
+              ? 'mismatched'
+              : 'neutral',
+          isUtilityEditing,
+        };
+        drawMeter(ctx!, tokens, renderState, meterRect);
+      }
+
+      // Compute signal values for port/CP coloring from meter signal arrays (cached)
+      if (meterSignalArrays !== _cpSignalsMeterArrays || playpoint !== _cpSignalsPlaypoint) {
+        _cpSignalsCache = computeCpSignals(meterSignalArrays, playpoint);
+        _cpSignalsMeterArrays = meterSignalArrays;
+        _cpSignalsPlaypoint = playpoint;
+      }
+      cpSignals = _cpSignalsCache;
     }
-    const connectedInputCPs = _connectedInputCPsCache;
-
-    // Calculate meter starting offset (meters fill the full height)
-    const meterTopMargin = 0; // in grid rows
-    const meterStride = METER_GRID_ROWS + METER_GAP_ROWS; // rows per meter + gap
-
-    const isUtilityEditing = !!state.editingUtilityId;
-
-    // Single loop over all 6 meter slots (0-2 left, 3-5 right)
-    // Signal keys uniformly use slot index: `${direction}:${slotIndex}`
-    for (let i = 0; i < TOTAL_SLOTS; i++) {
-      const key: MeterKey = meterKey(i);
-      const slot = state.meterSlots.get(key);
-      if (!slot) continue;
-
-      const side = slotSide(i);
-      const perSideIdx = slotPerSideIndex(i);
-      const meterRow = meterTopMargin + perSideIdx * meterStride + METER_VERTICAL_OFFSETS[perSideIdx];
-      const meterCol = side === 'left' ? METER_LEFT_START : METER_RIGHT_START;
-      const meterRect = gridRectToPixels({
-        col: meterCol,
-        row: meterRow,
-        cols: METER_GRID_COLS,
-        rows: METER_GRID_ROWS,
-      }, cellSize);
-
-      const dir = modeToDirection(slot.mode);
-      // Uniform signal key: `${direction}:${slotIndex}`
-      const isConnected = dir === 'input'
-        ? connectedInputCPs.has(`input:${i}`)
-        : connectedOutputCPs.has(`output:${i}`);
-      const renderState: RenderMeterState = {
-        slot,
-        side,
-        signalValues: meterSignalArrays.get(`${dir}:${i}`) ?? null,
-        targetValues: dir === 'output' ? (meterTargetArrays.get(`target:${i}`) ?? null) : null,
-        matchStatus: dir === 'output' ? (perSampleMatch.get(`output:${i}`) ?? null) : undefined,
-        playpoint,
-        isConnected,
-        isPortMatched: dir === 'output' && (state.perPortMatch[i] === true),
-        isUtilityEditing,
-      };
-      drawMeter(ctx!, tokens, renderState, meterRect);
-    }
-
-    // Compute signal values for port/CP coloring from meter signal arrays (cached)
-    if (meterSignalArrays !== _cpSignalsMeterArrays || playpoint !== _cpSignalsPlaypoint) {
-      _cpSignalsCache = computeCpSignals(meterSignalArrays, playpoint);
-      _cpSignalsMeterArrays = meterSignalArrays;
-      _cpSignalsPlaypoint = playpoint;
-    }
-    const cpSignals = _cpSignalsCache;
 
     if (
       cycleResults !== _portSignalsCycleResults ||
@@ -736,6 +776,15 @@ export function startRenderLoop(
       );
     }
 
+    // Motherboard edge CPs and pagination (after nodes, on home board only)
+    if (isHomeBoard && state.motherboardLayout) {
+      drawEdgeCPs(ctx!, tokens, state.motherboardLayout.edgeCPs, playpoint, cellSize);
+      const puzzleSection = state.motherboardLayout.sections.find(s => s.id === 'puzzles');
+      if (puzzleSection) {
+        drawPaginationControls(ctx!, tokens, puzzleSection, state.motherboardLayout.pagination, cellSize);
+      }
+    }
+
     // Wire preview during drawing-wire mode (drawn before CPs so it appears behind them)
     const overlayActive = state.activeOverlay.type !== 'none';
     if (!overlayActive && state.interactionMode.type === 'drawing-wire' && state.mousePosition && state.activeBoard) {
@@ -804,15 +853,17 @@ export function startRenderLoop(
       cachedPreviewPath = null;
     }
 
-    // Draw connection points on top of wires and wire preview (always visible)
-    renderConnectionPoints(ctx!, tokens, {
-      activePuzzle: state.activePuzzle,
-      perPortMatch: state.perPortMatch,
-      editingUtilityId: state.editingUtilityId,
-      meterSlots: state.meterSlots,
-      cpSignals,
-      connectedOutputCPs,
-    }, cellSize);
+    // Draw connection points on top of wires and wire preview (skip on motherboard)
+    if (!isHomeBoard) {
+      renderConnectionPoints(ctx!, tokens, {
+        activePuzzle: state.activePuzzle,
+        perPortMatch: state.perPortMatch,
+        editingUtilityId: state.editingUtilityId,
+        meterSlots: state.meterSlots,
+        cpSignals,
+        connectedOutputCPs,
+      }, cellSize);
+    }
 
     // Placement ghost (suppressed when overlay is active)
     if (!overlayActive) {
@@ -823,6 +874,7 @@ export function startRenderLoop(
         puzzleNodes: state.puzzleNodes,
         utilityNodes: state.utilityNodes,
         keyboardGhostPosition: state.keyboardGhostPosition,
+        activeBoardId: state.activeBoardId,
       }, cellSize);
     }
 
@@ -830,12 +882,85 @@ export function startRenderLoop(
     const ceremonyActive = ceremony.type !== 'inactive';
 
     // Playback bar (persistent UI chrome — skip on home board)
-    const isHomeBoard = state.activeBoardId === 'motherboard';
     if (!isHomeBoard) {
       drawPlaybackBar(ctx!, tokens, {
         playMode: state.playMode,
         hoveredButton: getHoveredPlaybackButton(),
+        pressedButton: getPressedPlaybackButton(),
       }, cellSize);
+    }
+
+    // Back button (top-left, above meter zone — all boards)
+    drawBackButton(ctx!, tokens, {
+      hovered: getHoveredBackButton(),
+    }, cellSize);
+
+    // Record button (top-right, creative mode idle only)
+    if (state.isCreativeMode && state.authoringPhase === 'idle') {
+      // Rebuild canRecord cache when cycleResults changes
+      if (cycleResults !== _canRecordCycleResults) {
+        _canRecordCache = false;
+        if (cycleResults) {
+          const outputCount = cycleResults.outputValues[0]?.length ?? 0;
+          if (outputCount > 0) {
+            outer: for (let oi = 0; oi < outputCount; oi++) {
+              for (let c = 0; c < cycleResults.outputValues.length; c++) {
+                if (cycleResults.outputValues[c][oi] !== 0) {
+                  _canRecordCache = true;
+                  break outer;
+                }
+              }
+            }
+          }
+        }
+        _canRecordCycleResults = cycleResults;
+      }
+      setRecordButtonDisabled(!_canRecordCache);
+      drawRecordButton(ctx!, tokens, {
+        hovered: getHoveredRecordButton(),
+        disabled: !_canRecordCache,
+      }, cellSize);
+    }
+
+    // Chip drawer (bottom, non-motherboard boards only)
+    if (!isHomeBoard) {
+      // Update drawer animation each frame
+      updateDrawerAnimation(timestamp);
+
+      // Rebuild palette items cache when inputs change
+      const allowedNodes = state.activePuzzle?.allowedNodes ?? null;
+      if (
+        allowedNodes !== _paletteItemsAllowedNodes ||
+        state.utilityNodes !== _paletteItemsUtilityNodes ||
+        state.activeBoard?.chips !== _paletteItemsBoardChips
+      ) {
+        const budgets = state.activeBoard
+          ? computeRemainingBudgets(allowedNodes, state.activeBoard.chips)
+          : null;
+        _paletteItemsCache = buildPaletteItems(allowedNodes, state.utilityNodes, budgets);
+        _paletteItemsAllowedNodes = allowedNodes;
+        _paletteItemsUtilityNodes = state.utilityNodes;
+        _paletteItemsBoardChips = state.activeBoard?.chips ?? null;
+      }
+
+      if (isDrawerVisible() || state.interactionMode.type === 'dragging-node') {
+        const drawerRenderState: ChipDrawerRenderState = {
+          paletteItems: _paletteItemsCache,
+          isDraggingNode: state.interactionMode.type === 'dragging-node',
+          puzzleNodes: state.puzzleNodes,
+          utilityNodes: state.utilityNodes,
+        };
+        drawChipDrawer(ctx!, tokens, drawerRenderState, cellSize);
+      } else {
+        // Always draw the handle even when drawer is fully closed
+        const drawerRenderState: ChipDrawerRenderState = {
+          paletteItems: _paletteItemsCache,
+          isDraggingNode: false,
+          puzzleNodes: state.puzzleNodes,
+          utilityNodes: state.utilityNodes,
+        };
+        drawChipDrawer(ctx!, tokens, drawerRenderState, cellSize);
+      }
     }
 
     // Zoom transition: capture second snapshot when in 'capturing' state
@@ -846,10 +971,14 @@ export function startRenderLoop(
         snapCtx.drawImage(canvas, 0, 0);
       }
 
-      // Keep crop visible during capture frame to prevent one-frame flash
+      // Prevent one-frame flash: draw old content over the newly rendered board
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (zoomState.zoomedCrop && zoomState.phase === 'zoom-only') {
-        ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx!.drawImage(zoomState.zoomedCrop, 0, 0, zoomState.zoomedCrop.width, zoomState.zoomedCrop.height,
+                      0, 0, vpWidth, vpHeight);
+      } else {
+        // Combined phase: draw first snapshot (old board) to hide the new board
+        ctx!.drawImage(zoomState.firstSnapshot, 0, 0, zoomState.firstSnapshot.width, zoomState.firstSnapshot.height,
                       0, 0, vpWidth, vpHeight);
       }
 
@@ -907,6 +1036,20 @@ export function startRenderLoop(
     if (overlayActive && !zoomAnimating && !ceremonyActive) {
       ctx!.fillStyle = 'rgba(0,0,0,0.15)';
       ctx!.fillRect(-offset.x, -offset.y, vpWidth, vpHeight);
+    }
+
+    // Tutorial overlay (on top of everything)
+    const tutState = state.tutorialState;
+    if (tutState.type === 'active' && !tutState.overlayHidden) {
+      const tutStep = state.tutorialSteps[tutState.stepIndex];
+      if (tutStep) {
+        ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const tutRenderState: TutorialRenderState = {
+          step: tutStep,
+          stepStartTime: tutState.stepStartTime,
+        };
+        drawTutorialOverlay(ctx!, tokens, tutRenderState, cellSize, offset, vpWidth, vpHeight, timestamp);
+      }
     }
 
     // Reset transform (remove grid translate, keep DPR scale)

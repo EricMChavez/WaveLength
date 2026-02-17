@@ -33,13 +33,18 @@ import { createAuthoringSlice } from './slices/authoring-slice.ts';
 import type { AuthoringSlice } from './slices/authoring-slice.ts';
 import { createScreenSlice } from './slices/screen-slice.ts';
 import type { ScreenSlice } from './slices/screen-slice.ts';
+import { createMotherboardSlice } from './slices/motherboard-slice.ts';
+import type { MotherboardSlice } from './slices/motherboard-slice.ts';
+import { createTutorialSlice } from './slices/tutorial-slice.ts';
+import type { TutorialSlice } from './slices/tutorial-slice.ts';
 import { initPersistence } from './persistence.ts';
 import { initCustomPuzzlePersistence } from './custom-puzzle-persistence.ts';
 import { initCycleRunner } from '../simulation/cycle-runner.ts';
 import { initSoundEffects } from '../shared/audio/index.ts';
 import { initMeterAudioSubscriber } from '../simulation/meter-audio-subscriber.ts';
+import { initTutorialSubscriber } from '../tutorial/tutorial-subscriber.ts';
 
-export type GameStore = GameboardSlice & InteractionSlice & PlaypointSlice & PuzzleSlice & PaletteSlice & CeremonySlice & NavigationSlice & ProgressionSlice & HistorySlice & MeterSlice & RoutingSlice & OverlaySlice & AnimationSlice & CreativeSlice & CustomPuzzleSlice & AuthoringSlice & ScreenSlice;
+export type GameStore = GameboardSlice & InteractionSlice & PlaypointSlice & PuzzleSlice & PaletteSlice & CeremonySlice & NavigationSlice & ProgressionSlice & HistorySlice & MeterSlice & RoutingSlice & OverlaySlice & AnimationSlice & CreativeSlice & CustomPuzzleSlice & AuthoringSlice & ScreenSlice & MotherboardSlice & TutorialSlice;
 
 export const useGameStore = create<GameStore>()((...a) => ({
   ...createGameboardSlice(...a),
@@ -59,6 +64,8 @@ export const useGameStore = create<GameStore>()((...a) => ({
   ...createCustomPuzzleSlice(...a),
   ...createAuthoringSlice(...a),
   ...createScreenSlice(...a),
+  ...createMotherboardSlice(...a),
+  ...createTutorialSlice(...a),
 }));
 
 // Set up undo/redo auto-capture via graphVersion subscriber
@@ -81,6 +88,9 @@ initSoundEffects(useGameStore);
 
 // Set up continuous meter audio (looping tones proportional to signal)
 initMeterAudioSubscriber(useGameStore);
+
+// Set up tutorial state subscriber (advances steps on state changes)
+initTutorialSubscriber(useGameStore);
 
 // DEBUG: expose store for browser console inspection
 if (typeof window !== 'undefined') {

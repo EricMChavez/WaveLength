@@ -17,12 +17,14 @@ export type EscapeAction =
   | 'open-menu'
   | 'close-menu'
   | 'cancel-and-menu'
+  | 'close-drawer'
+  | 'end-tutorial'
   | 'noop';
 
 /** Minimal state interface for escape handler — avoids importing full GameStore */
 export interface EscapeHandlerState {
   activeScreen: string | null;
-  revealScreen: (page: 'main-menu') => void;
+  revealScreen: () => void;
   dismissScreen: () => void;
   hasActiveOverlay: () => boolean;
   isOverlayEscapeDismissible: () => boolean;
@@ -36,6 +38,9 @@ export interface EscapeHandlerState {
   clearSelection: () => void;
   zoomTransitionType: string;
   ceremonyType: string;
+  isTutorialActive: boolean;
+  endTutorial: () => void;
+  isDrawerOpen?: boolean;
 }
 
 /**
@@ -46,7 +51,13 @@ export function getEscapeAction(state: EscapeHandlerState): EscapeAction {
   // 1. Screen active → close it (handled by RetroPageHost capture-phase listener)
   if (state.activeScreen !== null) return 'close-menu';
 
-  // 2. Zoom animation playing → block
+  // 1.5 Drawer open → close it
+  if (state.isDrawerOpen) return 'close-drawer';
+
+  // 2. Tutorial active → end tutorial
+  if (state.isTutorialActive && !state.hasActiveOverlay()) return 'end-tutorial';
+
+  // 3. Zoom animation playing → block
   if (state.zoomTransitionType !== 'idle') return 'noop';
 
   // 3. Ceremony active → block
@@ -75,8 +86,16 @@ export function executeEscapeAction(state: EscapeHandlerState, action: EscapeAct
       state.dismissScreen();
       break;
 
+    case 'end-tutorial':
+      state.endTutorial();
+      break;
+
+    case 'close-drawer':
+      // Drawer close is handled externally (module-level function)
+      break;
+
     case 'open-menu':
-      state.revealScreen('main-menu');
+      state.revealScreen();
       break;
 
     case 'cancel-and-menu': {
@@ -95,7 +114,7 @@ export function executeEscapeAction(state: EscapeHandlerState, action: EscapeAct
         state.clearSelection();
       }
       // Then open menu
-      state.revealScreen('main-menu');
+      state.revealScreen();
       break;
     }
   }

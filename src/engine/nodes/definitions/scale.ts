@@ -6,6 +6,7 @@ export type ScaleParams = { factor: number };
 export const scaleNode = defineNode<ScaleParams>({
   type: 'scale',
   category: 'math',
+  description: 'Multiplies signal strength by a percentage',
 
   inputs: [
     { name: 'A', gridPosition: 0 },

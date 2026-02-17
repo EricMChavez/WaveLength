@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WaveLength — Transition Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0f14;
+    color: #e0e0f0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+    user-select: none;
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    background: #1a1c24;
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .tab-btn {
+    padding: 8px 24px;
+    border: none;
+    background: transparent;
+    color: #9090b0;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab-btn:hover { background: #252730; color: #e0e0f0; }
+  .tab-btn.active { background: #f0a202; color: #0d0f14; }
+
+  /* Canvas container */
+  .canvas-wrap {
+    width: 100%;
+    max-width: 1200px;
+    aspect-ratio: 16/9;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0e0e18;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Controls */
+  .controls {
+    width: 100%;
+    max-width: 1200px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .control-label {
+    font-size: 12px;
+    color: #9090b0;
+    min-width: 80px;
+    text-align: right;
+  }
+
+  /* Segmented control */
+  .seg {
+    display: flex;
+    gap: 2px;
+    background: #1a1c24;
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .seg button {
+    padding: 5px 14px;
+    border: none;
+    background: transparent;
+    color: #9090b0;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .seg button:hover { background: #252730; color: #e0e0f0; }
+  .seg button.active { background: #3c91e6; color: #fff; }
+
+  /* Slider */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: #1a1c24;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #f0a202;
+    cursor: pointer;
+  }
+  .slider-val {
+    font-size: 12px;
+    color: #f0a202;
+    min-width: 48px;
+  }
+
+  /* Select */
+  select {
+    background: #1a1c24;
+    color: #e0e0f0;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    outline: none;
+  }
+
+  /* Timeline scrubber */
+  .timeline-wrap {
+    width: 100%;
+    max-width: 1200px;
+    margin-top: 8px;
+    position: relative;
+    height: 28px;
+    background: #1a1c24;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .timeline-phase1 {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    background: rgba(240, 162, 2, 0.25);
+    pointer-events: none;
+  }
+  .timeline-phase2 {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: rgba(30, 210, 195, 0.25);
+    pointer-events: none;
+  }
+  .timeline-handle {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: #f0a202;
+    pointer-events: none;
+    transition: none;
+  }
+  .tl-label {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    pointer-events: none;
+  }
+
+  /* Play button */
+  .play-btn {
+    padding: 6px 20px;
+    border: none;
+    background: #f0a202;
+    color: #0d0f14;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .play-btn:hover { background: #fbb630; }
+
+  .spacer { flex: 1; }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .control-label { min-width: 60px; font-size: 11px; }
+    .seg button { padding: 4px 10px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-mode="zoom">Zoom Transitions</button>
+  <button class="tab-btn" data-mode="slide">Slide Transitions</button>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="cv"></canvas>
+</div>
+
+<div class="timeline-wrap" id="timeline" style="height:36px;">
+  <div class="timeline-phase1" id="tl-p1"></div>
+  <div class="timeline-phase2" id="tl-p2"></div>
+  <div class="timeline-handle" id="tl-handle"></div>
+  <span class="tl-label" id="tl-label1" style="color:#f0a202;">Zoom</span>
+  <span class="tl-label" id="tl-label2" style="color:#1ED2C3;">Reveal</span>
+</div>
+
+<div class="controls">
+  <div class="control-row">
+    <span class="control-label">Variant</span>
+    <div class="seg" id="variant-seg"></div>
+    <span class="control-label">Direction</span>
+    <div class="seg" id="dir-seg"></div>
+    <span class="spacer"></span>
+    <button class="play-btn" id="play-btn">Play</button>
+  </div>
+  <div class="control-row">
+    <span class="control-label">Speed</span>
+    <div class="seg" id="speed-seg">
+      <button data-val="0.1">0.1x</button>
+      <button data-val="0.25">0.25x</button>
+      <button data-val="0.5">0.5x</button>
+      <button data-val="1" class="active">1x</button>
+    </div>
+    <span class="control-label">Duration</span>
+    <input type="range" id="dur-slider" min="200" max="2000" value="1200" step="50" style="width:140px;">
+    <span class="slider-val" id="dur-val">1200ms</span>
+    <span class="control-label" id="easing-label1">Zoom easing</span>
+    <select id="easing-sel">
+      <option value="ease-in-out-cubic" selected>ease-in-out-cubic</option>
+      <option value="ease-in-expo">ease-in-expo</option>
+      <option value="linear">linear</option>
+      <option value="ease-out-expo">ease-out-expo</option>
+      <option value="spring">spring</option>
+    </select>
+    <span class="control-label" id="easing-label2">Reveal easing</span>
+    <select id="easing-sel2">
+      <option value="spring" selected>spring</option>
+      <option value="ease-in-out-cubic">ease-in-out-cubic</option>
+      <option value="ease-out-expo">ease-out-expo</option>
+      <option value="linear">linear</option>
+      <option value="ease-in-expo">ease-in-expo</option>
+    </select>
+  </div>
+  <div class="control-row" id="zoom-row">
+    <span class="control-label">Zoom</span>
+    <input type="range" id="zoom-start-slider" min="0" max="90" value="20" step="5" style="width:100px;">
+    <span class="slider-val" id="zoom-start-val">20%</span>
+    <span style="color:#9090b0;font-size:12px;margin:0 2px">→</span>
+    <input type="range" id="zoom-end-slider" min="10" max="100" value="100" step="5" style="width:100px;">
+    <span class="slider-val" id="zoom-end-val">100%</span>
+  </div>
+  <div class="control-row" id="reveal-row">
+    <span class="control-label">Reveal</span>
+    <input type="range" id="reveal-start-slider" min="0" max="90" value="0" step="5" style="width:100px;">
+    <span class="slider-val" id="reveal-start-val">0%</span>
+    <span style="color:#9090b0;font-size:12px;margin:0 2px">→</span>
+    <input type="range" id="reveal-end-slider" min="10" max="100" value="60" step="5" style="width:100px;">
+    <span class="slider-val" id="reveal-end-val">60%</span>
+  </div>
+</div>
+
+<script>
+// ── Constants ──
+const COL = {
+  pageBg: '#0d0f14', board: '#0e0e18', gridArea: '#06382f',
+  meterHousing: '#000000', node: '#212121', nodeBottom: '#171717',
+  amber: '#f0a202', blue: '#3c91e6', zero: '#9a9a9a',
+  textPri: '#e0e0f0', textSec: '#9090b0', gridLine: '#318373',
+  teal: '#1ED2C3', error: '#e04040', selection: '#ffffff',
+  target: '#c8c8d8', neutral: '#242424',
+};
+
+// ── Canvas setup ──
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  const wrap = cv.parentElement;
+  const rect = wrap.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  W = Math.round(rect.width);
+  H = Math.round(rect.height);
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!anim.playing && !anim.scrubbing) drawFrame(anim.t);
+}
+window.addEventListener('resize', resize);
+
+// ── Easing functions ──
+function easings(name, t) {
+  switch (name) {
+    case 'linear': return t;
+    case 'ease-in-out-cubic':
+      return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+    case 'ease-in-expo':
+      return t <= 0 ? 0 : Math.pow(2, 10*t - 10);
+    case 'ease-out-expo':
+      return t >= 1 ? 1 : 1 - Math.pow(2, -10*t);
+    case 'spring': {
+      const w = 6.5 * Math.PI;
+      const d = 0.7;
+      return 1 - Math.exp(-d * t * 10) * Math.cos(w * t);
+    }
+    case 'game-default': {
+      // Two-phase: ease-out for first half, ease-in for second half
+      if (t < 0.5) {
+        const u = t * 2;
+        return (1 - Math.pow(1 - u, 3)) * 0.5;
+      }
+      const u = (t - 0.5) * 2;
+      return 0.5 + Math.pow(u, 3) * 0.5;
+    }
+    default: return t;
+  }
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+// ── Drawing helpers ──
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+}
+
+function fillText(text, x, y, color, size, align) {
+  ctx.fillStyle = color;
+  ctx.font = `${size}px 'Segoe UI', system-ui, sans-serif`;
+  ctx.textAlign = align || 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+}
+
+function fillTextBold(text, x, y, color, size, align) {
+  ctx.fillStyle = color;
+  ctx.font = `bold ${size}px 'Segoe UI', system-ui, sans-serif`;
+  ctx.textAlign = align || 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+}
+
+// ── View Drawing ──
+
+// Target rect: node-sized (≈5x3 grid cells on 66x36 grid), placed on the parent gameboard
+const TARGET = { x: 0.42, y: 0.38, w: 5/66, h: 3/36 };
+
+function drawParentView(x, y, w, h) {
+  const cellW = w / 66;
+  const cellH = h / 36;
+
+  // Background
+  ctx.fillStyle = COL.board;
+  ctx.fillRect(x, y, w, h);
+
+  // Left meters (cols 0-9)
+  ctx.fillStyle = COL.meterHousing;
+  ctx.fillRect(x, y, cellW * 10, h);
+
+  // Right meters (cols 56-65)
+  ctx.fillStyle = COL.meterHousing;
+  ctx.fillRect(x + cellW * 56, y, cellW * 10, h);
+
+  // Meter placeholders
+  for (let side = 0; side < 2; side++) {
+    const mx = side === 0 ? x + cellW * 1 : x + cellW * 57;
+    for (let i = 0; i < 3; i++) {
+      const my = y + cellH * (3 + i * 10);
+      const mw = cellW * 8;
+      const mh = cellH * 8;
+      ctx.fillStyle = '#0a0a12';
+      roundRect(mx, my, mw, mh, 2);
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Flat waveform
+      ctx.beginPath();
+      ctx.strokeStyle = i === 0 ? COL.amber : i === 1 ? COL.blue : COL.teal;
+      ctx.lineWidth = 1.5;
+      for (let s = 0; s < 40; s++) {
+        const px = mx + (s / 39) * mw;
+        const py = my + mh/2 + Math.sin(s * 0.3 + i * 1.5 + side) * mh * 0.25;
+        s === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      fillText(side === 0 ? `IN ${i+1}` : `OUT ${i+1}`, mx + mw/2, my - cellH * 0.8, COL.textSec, Math.max(7, cellW * 1.2));
+    }
+  }
+
+  // Grid area (cols 10-55)
+  ctx.fillStyle = COL.gridArea;
+  ctx.fillRect(x + cellW * 10, y, cellW * 46, h);
+
+  // Grid lines
+  ctx.strokeStyle = COL.gridLine;
+  ctx.lineWidth = 0.3;
+  ctx.globalAlpha = 0.3;
+  for (let c = 10; c <= 56; c += 2) {
+    ctx.beginPath();
+    ctx.moveTo(x + c * cellW, y);
+    ctx.lineTo(x + c * cellW, y + h);
+    ctx.stroke();
+  }
+  for (let r = 0; r <= 36; r += 2) {
+    ctx.beginPath();
+    ctx.moveTo(x + 10 * cellW, y + r * cellH);
+    ctx.lineTo(x + 56 * cellW, y + r * cellH);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Other nodes on the parent board
+  const otherNodes = [
+    { col: 16, row: 8, w: 4, h: 3, label: 'Offset' },
+    { col: 22, row: 14, w: 2, h: 2, label: 'Max' },
+    { col: 16, row: 20, w: 4, h: 3, label: 'Scale' },
+    { col: 34, row: 6, w: 2, h: 2, label: 'Split' },
+    { col: 40, row: 18, w: 4, h: 3, label: 'Threshold' },
+    { col: 46, row: 10, w: 2, h: 2, label: 'Min' },
+    { col: 34, row: 24, w: 3, h: 2, label: 'Memory' },
+  ];
+  for (const n of otherNodes) {
+    const nx = x + n.col * cellW;
+    const ny = y + n.row * cellH;
+    const nw = n.w * cellW;
+    const nh = n.h * cellH;
+    ctx.fillStyle = COL.node;
+    roundRect(nx, ny, nw, nh, 3);
+    ctx.fill();
+    ctx.fillStyle = COL.nodeBottom;
+    roundRect(nx, ny + nh * 0.7, nw, nh * 0.3, [0, 0, 3, 3]);
+    ctx.fill();
+    fillText(n.label, nx + nw/2, ny + nh/2 - 1, COL.textPri, Math.max(6, cellW * 0.9));
+  }
+
+  // Wires between nodes
+  ctx.strokeStyle = COL.amber;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.5;
+  const wireSegs = [
+    [[20, 9.5], [22, 9.5], [22, 14]],
+    [[24, 15], [28, 15], [28, 14], [28, 14]],
+    [[20, 21.5], [26, 21.5], [26, 15]],
+    [[36, 7], [40, 7], [40, 19.5]],
+    [[44, 19.5], [46, 19.5], [46, 11]],
+  ];
+  for (const seg of wireSegs) {
+    ctx.beginPath();
+    for (let i = 0; i < seg.length; i++) {
+      const px = x + seg[i][0] * cellW;
+      const py = y + seg[i][1] * cellH;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // The TARGET node — highlighted custom node (the one we zoom into)
+  const tx = x + TARGET.x * w;
+  const ty = y + TARGET.y * h;
+  const tw = TARGET.w * w;
+  const th = TARGET.h * h;
+
+  // Selection glow
+  ctx.shadowColor = COL.amber;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = COL.node;
+  roundRect(tx, ty, tw, th, 3);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = COL.nodeBottom;
+  roundRect(tx, ty + th * 0.7, tw, th * 0.3, [0, 0, 3, 3]);
+  ctx.fill();
+
+  // Selection border
+  ctx.strokeStyle = COL.amber;
+  ctx.lineWidth = 2;
+  roundRect(tx, ty, tw, th, 3);
+  ctx.stroke();
+
+  fillText('Rectifier', tx + tw/2, ty + th * 0.4, COL.amber, Math.max(6, cellW * 0.85));
+  fillText('custom', tx + tw/2, ty + th * 0.7, COL.textSec, Math.max(5, cellW * 0.6));
+
+  // Breadcrumb bar at top
+  ctx.fillStyle = 'rgba(13,15,20,0.8)';
+  ctx.fillRect(x, y, w, cellH * 1.5);
+  fillText('Root > Tutorial', x + w * 0.04, y + cellH * 0.75, COL.textSec, Math.max(7, cellW * 1), 'left');
+}
+
+function drawGameboardView(x, y, w, h) {
+  const cellW = w / 66;
+  const cellH = h / 36;
+
+  // Background
+  ctx.fillStyle = COL.board;
+  ctx.fillRect(x, y, w, h);
+
+  // Left meters (cols 0-9)
+  ctx.fillStyle = COL.meterHousing;
+  ctx.fillRect(x, y, cellW * 10, h);
+
+  // Right meters (cols 56-65)
+  ctx.fillStyle = COL.meterHousing;
+  ctx.fillRect(x + cellW * 56, y, cellW * 10, h);
+
+  // Meter channels
+  for (let side = 0; side < 2; side++) {
+    const mx = side === 0 ? x + cellW * 1 : x + cellW * 57;
+    for (let i = 0; i < 3; i++) {
+      const my = y + cellH * (3 + i * 10);
+      const mw = cellW * 8;
+      const mh = cellH * 8;
+
+      // Waveform area
+      ctx.fillStyle = '#0a0a12';
+      roundRect(mx, my, mw, mh, 2);
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Fake waveform
+      ctx.beginPath();
+      const col = i === 0 ? COL.amber : i === 1 ? COL.blue : COL.teal;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      for (let s = 0; s < 40; s++) {
+        const px = mx + (s / 39) * mw;
+        const py = my + mh/2 + Math.sin(s * 0.4 + i * 2) * mh * 0.3;
+        s === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Label
+      fillText(side === 0 ? `IN ${i+1}` : `OUT ${i+1}`, mx + mw/2, my - cellH * 0.8, COL.textSec, Math.max(7, cellW * 1.2));
+    }
+  }
+
+  // Grid area (cols 10-55)
+  ctx.fillStyle = COL.gridArea;
+  ctx.fillRect(x + cellW * 10, y, cellW * 46, h);
+
+  // Grid lines
+  ctx.strokeStyle = COL.gridLine;
+  ctx.lineWidth = 0.3;
+  ctx.globalAlpha = 0.3;
+  for (let c = 10; c <= 56; c += 2) {
+    ctx.beginPath();
+    ctx.moveTo(x + c * cellW, y);
+    ctx.lineTo(x + c * cellW, y + h);
+    ctx.stroke();
+  }
+  for (let r = 0; r <= 36; r += 2) {
+    ctx.beginPath();
+    ctx.moveTo(x + 10 * cellW, y + r * cellH);
+    ctx.lineTo(x + 56 * cellW, y + r * cellH);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Placeholder nodes
+  const nodes = [
+    { col: 16, row: 6, w: 4, h: 3, label: 'Offset' },
+    { col: 24, row: 10, w: 4, h: 3, label: 'Scale' },
+    { col: 32, row: 5, w: 2, h: 2, label: 'Max' },
+    { col: 38, row: 14, w: 4, h: 3, label: 'Threshold' },
+    { col: 44, row: 8, w: 2, h: 2, label: 'Split' },
+    { col: 20, row: 18, w: 2, h: 2, label: 'Min' },
+    { col: 28, row: 22, w: 3, h: 2, label: 'Memory' },
+  ];
+  for (const n of nodes) {
+    const nx = x + n.col * cellW;
+    const ny = y + n.row * cellH;
+    const nw = n.w * cellW;
+    const nh = n.h * cellH;
+    ctx.fillStyle = COL.node;
+    roundRect(nx, ny, nw, nh, 3);
+    ctx.fill();
+    ctx.fillStyle = COL.nodeBottom;
+    roundRect(nx, ny + nh * 0.7, nw, nh * 0.3, [0, 0, 3, 3]);
+    ctx.fill();
+    fillText(n.label, nx + nw/2, ny + nh/2 - 1, COL.textPri, Math.max(6, cellW * 0.9));
+  }
+
+  // Fake wires between some nodes
+  ctx.strokeStyle = COL.amber;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.6;
+  const wireSegs = [
+    [[20, 7.5], [24, 7.5], [24, 11.5]],
+    [[28, 11.5], [32, 11.5], [32, 6]],
+    [[34, 6], [38, 6], [38, 15.5]],
+    [[42, 15.5], [44, 15.5], [44, 9]],
+  ];
+  for (const seg of wireSegs) {
+    ctx.beginPath();
+    for (let i = 0; i < seg.length; i++) {
+      const px = x + seg[i][0] * cellW;
+      const py = y + seg[i][1] * cellH;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Breadcrumb bar at top
+  ctx.fillStyle = 'rgba(13,15,20,0.8)';
+  ctx.fillRect(x, y, w, cellH * 1.5);
+  fillText('Root > Tutorial > Rectifier', x + w * 0.04, y + cellH * 0.75, COL.textSec, Math.max(7, cellW * 1), 'left');
+}
+
+function drawSlidePageA(x, y, w, h) {
+  ctx.fillStyle = COL.pageBg;
+  ctx.fillRect(x, y, w, h);
+
+  // Title card
+  const cw = w * 0.5, ch = h * 0.35;
+  const cx = x + (w - cw) / 2, cy = y + h * 0.2;
+  ctx.fillStyle = '#1a1c24';
+  roundRect(cx, cy, cw, ch, 8);
+  ctx.fill();
+  fillTextBold('WaveLength', cx + cw/2, cy + ch * 0.35, COL.amber, Math.max(14, w * 0.045));
+  fillText('A Signal Processing Puzzle Game', cx + cw/2, cy + ch * 0.55, COL.textSec, Math.max(9, w * 0.018));
+
+  // Buttons
+  const bw = w * 0.2, bh = h * 0.06;
+  const by = y + h * 0.65;
+  for (let i = 0; i < 3; i++) {
+    const bx = x + w/2 - bw/2;
+    const btnY = by + i * (bh + 8);
+    ctx.fillStyle = i === 0 ? COL.amber : '#1a1c24';
+    roundRect(bx, btnY, bw, bh, 4);
+    ctx.fill();
+    const labels = ['Play', 'Options', 'Credits'];
+    fillText(labels[i], bx + bw/2, btnY + bh/2, i === 0 ? COL.pageBg : COL.textSec, Math.max(9, w * 0.016));
+  }
+
+  // Label
+  fillText('Start Screen', x + w/2, y + h * 0.93, COL.textSec, Math.max(8, w * 0.014));
+}
+
+function drawSlidePageB(x, y, w, h) {
+  ctx.fillStyle = COL.pageBg;
+  ctx.fillRect(x, y, w, h);
+
+  // Header
+  fillTextBold('Level Select', x + w/2, y + h * 0.08, COL.textPri, Math.max(12, w * 0.032));
+
+  // Grid of level cards
+  const cols = 5, rows = 3;
+  const gap = 8;
+  const totalGapX = gap * (cols + 1);
+  const totalGapY = gap * (rows + 1);
+  const cardW = (w * 0.8 - totalGapX) / cols;
+  const cardH = (h * 0.6 - totalGapY) / rows;
+  const startX = x + w * 0.1 + gap;
+  const startY = y + h * 0.15 + gap;
+
+  const levelNames = [
+    'Rectifier', 'Amplifier', 'DC Offset', 'Clipper', 'Square Wave',
+    'Low Pass', 'High Pass', 'Gate', 'Envelope', 'Compressor',
+    'Phase', 'Crossfade', 'Delay', 'Sequencer', 'Mixer',
+  ];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      const cx = startX + c * (cardW + gap);
+      const cy = startY + r * (cardH + gap);
+      const solved = i < 3;
+      ctx.fillStyle = solved ? '#162428' : '#1a1c24';
+      roundRect(cx, cy, cardW, cardH, 4);
+      ctx.fill();
+      if (solved) {
+        ctx.strokeStyle = COL.teal;
+        ctx.lineWidth = 1;
+        roundRect(cx, cy, cardW, cardH, 4);
+        ctx.stroke();
+      }
+      fillText(`${i + 1}`, cx + cardW/2, cy + cardH * 0.35, solved ? COL.teal : COL.textSec, Math.max(8, cardW * 0.22));
+      fillText(levelNames[i], cx + cardW/2, cy + cardH * 0.7, COL.textSec, Math.max(6, cardW * 0.1));
+    }
+  }
+
+  fillText('Level Select', x + w/2, y + h * 0.93, COL.textSec, Math.max(8, w * 0.014));
+}
+
+// ── Target rect pixel coords (within a view at x, y, w, h) ──
+function getTargetRect(x, y, w, h) {
+  return {
+    x: x + TARGET.x * w,
+    y: y + TARGET.y * h,
+    w: TARGET.w * w,
+    h: TARGET.h * h,
+  };
+}
+
+// ── Zoom Transitions ──
+
+function zoomTransform(p) {
+  const tr = getTargetRect(0, 0, W, H);
+  const finalScale = Math.min(W / tr.w, H / tr.h);
+  const scale = lerp(1, finalScale, p);
+  const trCx = tr.x + tr.w/2;
+  const trCy = tr.y + tr.h/2;
+  const tx = lerp(trCx, W/2, p) - trCx * scale;
+  const ty = lerp(trCy, H/2, p) - trCy * scale;
+  // Screen-space target rect
+  const stx = tr.x * scale + tx;
+  const sty = tr.y * scale + ty;
+  const stw = tr.w * scale;
+  const sth = tr.h * scale;
+  return { tr, scale, tx, ty, stx, sty, stw, sth };
+}
+
+function drawPortal(z, revealT) {
+  if (revealT <= 0) return;
+  const slideOff = z.sth * revealT;
+
+  // 1. Gameboard revealed in the bottom portion of target rect
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(z.stx, z.sty, z.stw, z.sth);
+  ctx.clip();
+  ctx.clearRect(z.stx, z.sty, z.stw, z.sth);
+  drawGameboardView(z.stx, z.sty, z.stw, z.sth);
+  ctx.restore();
+
+  // 2. Target rect content slides up ON TOP of parent (extends above target rect)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(z.stx, z.sty - slideOff, z.stw, z.sth);
+  ctx.clip();
+  ctx.translate(z.tx, z.ty - slideOff);
+  ctx.scale(z.scale, z.scale);
+  drawParentView(0, 0, W, H);
+  ctx.restore();
+}
+
+function animProgress(p) {
+  const rawZoom = p <= anim.zoomStart ? 0 : p >= anim.zoomEnd ? 1
+    : (p - anim.zoomStart) / (anim.zoomEnd - anim.zoomStart);
+  const rawReveal = p <= anim.revealStart ? 0 : p >= anim.revealEnd ? 1
+    : (p - anim.revealStart) / (anim.revealEnd - anim.revealStart);
+  return {
+    zoomT: easings(anim.easing, rawZoom),
+    revealT: easings(anim.easing2, rawReveal),
+  };
+}
+
+function drawZoomA(t, reverse) {
+  const p = reverse ? 1 - t : t;
+  const { zoomT, revealT } = animProgress(p);
+  const z = zoomTransform(zoomT);
+
+  // Draw zoomed parent
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+  ctx.translate(z.tx, z.ty);
+  ctx.scale(z.scale, z.scale);
+  drawParentView(0, 0, W, H);
+  ctx.restore();
+
+  // Portal: target rect slides up to reveal gameboard inside
+  drawPortal(z, revealT);
+}
+
+function drawZoomB(t, reverse) {
+  const p = reverse ? 1 - t : t;
+  const { zoomT, revealT } = animProgress(p);
+  const z = zoomTransform(zoomT);
+
+  // Aperture in parent space converges toward target rect
+  const ax = lerp(0, z.tr.x, zoomT);
+  const ay = lerp(0, z.tr.y, zoomT);
+  const aw = lerp(W, z.tr.w, zoomT);
+  const ah = lerp(H, z.tr.h, zoomT);
+
+  // Background
+  ctx.fillStyle = COL.pageBg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw parent within aperture (zoomed)
+  ctx.save();
+  ctx.translate(z.tx, z.ty);
+  ctx.scale(z.scale, z.scale);
+  ctx.beginPath();
+  ctx.rect(ax, ay, aw, ah);
+  ctx.clip();
+  drawParentView(0, 0, W, H);
+  ctx.restore();
+
+  // Aperture in screen space for dark overlay
+  const sax = ax * z.scale + z.tx;
+  const say = ay * z.scale + z.ty;
+  const saw = aw * z.scale;
+  const sah = ah * z.scale;
+
+  ctx.fillStyle = COL.pageBg;
+  ctx.globalAlpha = 0.7 * zoomT;
+  ctx.fillRect(0, 0, W, say);
+  ctx.fillRect(0, say + sah, W, H - say - sah);
+  ctx.fillRect(0, say, sax, sah);
+  ctx.fillRect(sax + saw, say, W - sax - saw, sah);
+  ctx.globalAlpha = 1;
+
+  // Portal
+  drawPortal(z, revealT);
+}
+
+function drawZoomC(t, reverse) {
+  const p = reverse ? 1 - t : t;
+  const { zoomT, revealT } = animProgress(p);
+  const z = zoomTransform(zoomT);
+
+  // Iris corners in parent space converge toward target rect corners
+  const tl = { x: lerp(0, z.tr.x, zoomT), y: lerp(0, z.tr.y, zoomT) };
+  const tr2 = { x: lerp(W, z.tr.x + z.tr.w, zoomT), y: lerp(0, z.tr.y, zoomT) };
+  const bl = { x: lerp(0, z.tr.x, zoomT), y: lerp(H, z.tr.y + z.tr.h, zoomT) };
+  const br = { x: lerp(W, z.tr.x + z.tr.w, zoomT), y: lerp(H, z.tr.y + z.tr.h, zoomT) };
+
+  // Background
+  ctx.fillStyle = COL.pageBg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw parent within iris (zoomed)
+  ctx.save();
+  ctx.translate(z.tx, z.ty);
+  ctx.scale(z.scale, z.scale);
+  ctx.beginPath();
+  ctx.moveTo(tl.x, tl.y);
+  ctx.lineTo(tr2.x, tr2.y);
+  ctx.lineTo(br.x, br.y);
+  ctx.lineTo(bl.x, bl.y);
+  ctx.closePath();
+  ctx.clip();
+  drawParentView(0, 0, W, H);
+  ctx.restore();
+
+  // Iris corners in screen space for overlay
+  const stl = { x: tl.x * z.scale + z.tx, y: tl.y * z.scale + z.ty };
+  const str = { x: tr2.x * z.scale + z.tx, y: tr2.y * z.scale + z.ty };
+  const sbl = { x: bl.x * z.scale + z.tx, y: bl.y * z.scale + z.ty };
+  const sbr = { x: br.x * z.scale + z.tx, y: br.y * z.scale + z.ty };
+
+  ctx.fillStyle = COL.pageBg;
+  ctx.globalAlpha = 0.5 * zoomT;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(stl.x, 0); ctx.lineTo(stl.x, stl.y); ctx.lineTo(0, stl.y); ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(str.x, 0); ctx.lineTo(W, 0); ctx.lineTo(W, str.y); ctx.lineTo(str.x, str.y); ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, sbl.y); ctx.lineTo(sbl.x, sbl.y); ctx.lineTo(sbl.x, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(sbr.x, sbr.y); ctx.lineTo(W, sbr.y); ctx.lineTo(W, H); ctx.lineTo(sbr.x, H); ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Portal
+  drawPortal(z, revealT);
+}
+
+// ── Slide Transitions ──
+
+function drawSlideA(t, reverse) {
+  const p = reverse ? 1 - t : t;
+  const e = easings(anim.easing, p);
+
+  // Old page slides left, new slides in from right
+  const offOld = -W * e;
+  const offNew = W * (1 - e);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+  drawSlidePageA(offOld, 0, W, H);
+  drawSlidePageB(offNew, 0, W, H);
+  ctx.restore();
+}
+
+function drawSlideB(t, reverse) {
+  const p = reverse ? 1 - t : t;
+  const e = easings(anim.easing, p);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+
+  // Old page: slides left slowly + scales down + dims
+  const offOld = -W * 0.3 * e;
+  const scaleOld = lerp(1, 0.92, e);
+  const dimOld = e * 0.5;
+
+  ctx.save();
+  ctx.translate(offOld + W/2, H/2);
+  ctx.scale(scaleOld, scaleOld);
+  ctx.translate(-W/2, -H/2);
+  drawSlidePageA(0, 0, W, H);
+  // Dim overlay
+  ctx.fillStyle = COL.pageBg;
+  ctx.globalAlpha = dimOld;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // New page slides over from right at full scale
+  const offNew = W * (1 - e);
+  drawSlidePageB(offNew, 0, W, H);
+
+  ctx.restore();
+}
+
+// ── Animation State ──
+const anim = {
+  mode: 'zoom',     // 'zoom' | 'slide'
+  variant: 'A',     // 'A' | 'B' | 'C'
+  direction: 'in',  // 'in'/'out' for zoom, 'right'/'left' for slide
+  speed: 1,
+  duration: 1200,
+  easing: 'ease-in-out-cubic',  // zoom / slide easing
+  easing2: 'spring',            // reveal easing
+  zoomStart: 0.2, zoomEnd: 1.0,
+  revealStart: 0, revealEnd: 0.6,
+  t: 0,             // 0-1 progress
+  playing: false,
+  scrubbing: false,
+  startTime: 0,
+  rafId: null,
+};
+
+function drawFrame(t) {
+  ctx.clearRect(0, 0, W, H);
+  const reverse = (anim.mode === 'zoom' && anim.direction === 'out')
+                || (anim.mode === 'slide' && anim.direction === 'left');
+  const ct = clamp01(t);
+
+  if (anim.mode === 'zoom') {
+    if (ct === 0) {
+      if (reverse) drawGameboardView(0, 0, W, H);
+      else drawParentView(0, 0, W, H);
+    } else if (ct >= 1) {
+      if (reverse) drawParentView(0, 0, W, H);
+      else drawGameboardView(0, 0, W, H);
+    } else {
+      switch (anim.variant) {
+        case 'A': drawZoomA(ct, reverse); break;
+        case 'B': drawZoomB(ct, reverse); break;
+        case 'C': drawZoomC(ct, reverse); break;
+      }
+    }
+  } else {
+    if (ct === 0) {
+      if (reverse) drawSlidePageB(0, 0, W, H);
+      else drawSlidePageA(0, 0, W, H);
+    } else if (ct >= 1) {
+      if (reverse) drawSlidePageA(0, 0, W, H);
+      else drawSlidePageB(0, 0, W, H);
+    } else {
+      switch (anim.variant) {
+        case 'A': drawSlideA(ct, reverse); break;
+        case 'B': drawSlideB(ct, reverse); break;
+      }
+    }
+  }
+
+  // Update timeline handle
+  updateTimelineUI(ct);
+}
+
+function tick(now) {
+  if (!anim.playing) return;
+  const elapsed = now - anim.startTime;
+  const totalDur = anim.duration / anim.speed;
+  anim.t = clamp01(elapsed / totalDur);
+  drawFrame(anim.t);
+  if (anim.t >= 1) {
+    anim.playing = false;
+    updatePlayBtn();
+    return;
+  }
+  anim.rafId = requestAnimationFrame(tick);
+}
+
+function play() {
+  if (anim.playing) return;
+  if (anim.t >= 1) anim.t = 0;
+  anim.playing = true;
+  anim.startTime = performance.now() - (anim.t * anim.duration / anim.speed);
+  updatePlayBtn();
+  anim.rafId = requestAnimationFrame(tick);
+}
+
+function pause() {
+  anim.playing = false;
+  if (anim.rafId) cancelAnimationFrame(anim.rafId);
+  updatePlayBtn();
+}
+
+function replay() {
+  anim.t = 0;
+  anim.playing = true;
+  anim.startTime = performance.now();
+  updatePlayBtn();
+  anim.rafId = requestAnimationFrame(tick);
+}
+
+// ── Presets ──
+const PRESETS = {
+  zoomIn:  { duration: 1200, easing: 'ease-in-out-cubic', easing2: 'spring',
+             zoomStart: 0.2, zoomEnd: 1, revealStart: 0, revealEnd: 0.6 },
+  zoomOut: { duration: 1200, easing: 'ease-in-out-cubic', easing2: 'ease-in-out-cubic',
+             zoomStart: 0, zoomEnd: 0.6, revealStart: 0.3, revealEnd: 1 },
+  slide:   { duration: 750, easing: 'spring' },
+};
+
+function applyPreset(name) {
+  Object.assign(anim, PRESETS[name]);
+  syncControlsToState();
+}
+
+function syncControlsToState() {
+  document.getElementById('dur-slider').value = anim.duration;
+  document.getElementById('dur-val').textContent = anim.duration + 'ms';
+  document.getElementById('speed-seg').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.val) === anim.speed);
+  });
+  document.getElementById('easing-sel').value = anim.easing;
+  document.getElementById('easing-sel2').value = anim.easing2;
+  document.getElementById('zoom-start-slider').value = anim.zoomStart * 100;
+  document.getElementById('zoom-start-val').textContent = (anim.zoomStart * 100) + '%';
+  document.getElementById('zoom-end-slider').value = anim.zoomEnd * 100;
+  document.getElementById('zoom-end-val').textContent = (anim.zoomEnd * 100) + '%';
+  document.getElementById('reveal-start-slider').value = anim.revealStart * 100;
+  document.getElementById('reveal-start-val').textContent = (anim.revealStart * 100) + '%';
+  document.getElementById('reveal-end-slider').value = anim.revealEnd * 100;
+  document.getElementById('reveal-end-val').textContent = (anim.revealEnd * 100) + '%';
+}
+
+// ── Controls Wiring ──
+
+function updatePlayBtn() {
+  const btn = document.getElementById('play-btn');
+  btn.textContent = anim.playing ? 'Pause' : (anim.t >= 1 ? 'Replay' : 'Play');
+}
+
+function updateTimelineUI(t) {
+  const handle = document.getElementById('tl-handle');
+  const p1 = document.getElementById('tl-p1');
+  const p2 = document.getElementById('tl-p2');
+  const l1 = document.getElementById('tl-label1');
+  const l2 = document.getElementById('tl-label2');
+
+  if (anim.mode === 'zoom') {
+    // Zoom bar (amber, top half)
+    p1.style.left = (anim.zoomStart * 100) + '%';
+    p1.style.width = ((anim.zoomEnd - anim.zoomStart) * 100) + '%';
+    p1.style.top = '0';
+    p1.style.height = '50%';
+    // Reveal bar (teal, bottom half)
+    p2.style.left = (anim.revealStart * 100) + '%';
+    p2.style.width = ((anim.revealEnd - anim.revealStart) * 100) + '%';
+    p2.style.top = '50%';
+    p2.style.height = '50%';
+    p2.style.display = '';
+    // Labels
+    l1.style.left = (anim.zoomStart * 100) + '%';
+    l1.style.width = ((anim.zoomEnd - anim.zoomStart) * 100) + '%';
+    l1.style.top = '0';
+    l1.style.height = '50%';
+    l1.textContent = 'Zoom';
+    l1.style.display = '';
+    l2.style.left = (anim.revealStart * 100) + '%';
+    l2.style.width = ((anim.revealEnd - anim.revealStart) * 100) + '%';
+    l2.style.top = '50%';
+    l2.style.height = '50%';
+    l2.textContent = 'Reveal';
+    l2.style.display = '';
+  } else {
+    p1.style.left = '0';
+    p1.style.width = '100%';
+    p1.style.top = '0';
+    p1.style.height = '100%';
+    p2.style.display = 'none';
+    l1.style.left = '0';
+    l1.style.width = '100%';
+    l1.style.top = '0';
+    l1.style.height = '100%';
+    l1.textContent = 'Slide';
+    l2.style.display = 'none';
+  }
+
+  handle.style.left = (t * 100) + '%';
+}
+
+function buildVariantSeg() {
+  const seg = document.getElementById('variant-seg');
+  seg.innerHTML = '';
+  const opts = anim.mode === 'zoom' ? ['A', 'B', 'C'] : ['A', 'B'];
+  const labels = anim.mode === 'zoom'
+    ? ['A: Scale', 'B: Clip', 'C: Corner']
+    : ['A: Simple', 'B: Depth'];
+  for (let i = 0; i < opts.length; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = labels[i];
+    btn.dataset.val = opts[i];
+    if (opts[i] === anim.variant) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      anim.variant = opts[i];
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === opts[i]));
+      if (!anim.playing) drawFrame(anim.t);
+    });
+    seg.appendChild(btn);
+  }
+}
+
+function buildDirSeg() {
+  const seg = document.getElementById('dir-seg');
+  seg.innerHTML = '';
+  const opts = anim.mode === 'zoom' ? ['in', 'out'] : ['right', 'left'];
+  const labels = anim.mode === 'zoom' ? ['Zoom In', 'Zoom Out'] : ['Slide Right', 'Slide Left'];
+  for (let i = 0; i < opts.length; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = labels[i];
+    btn.dataset.val = opts[i];
+    if (opts[i] === anim.direction) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      anim.direction = opts[i];
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === opts[i]));
+      if (anim.mode === 'zoom') applyPreset(anim.direction === 'in' ? 'zoomIn' : 'zoomOut');
+      if (!anim.playing) drawFrame(anim.t);
+    });
+    seg.appendChild(btn);
+  }
+}
+
+// Tab bar
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    anim.mode = btn.dataset.mode;
+    anim.variant = 'A';
+    anim.direction = anim.mode === 'zoom' ? 'in' : 'right';
+    anim.t = 0;
+    anim.playing = false;
+    if (anim.rafId) cancelAnimationFrame(anim.rafId);
+    applyPreset(anim.mode === 'zoom' ? 'zoomIn' : 'slide');
+    buildVariantSeg();
+    buildDirSeg();
+    document.getElementById('zoom-row').style.display = anim.mode === 'zoom' ? '' : 'none';
+    document.getElementById('reveal-row').style.display = anim.mode === 'zoom' ? '' : 'none';
+    updateEasingVisibility();
+    updatePlayBtn();
+    drawFrame(0);
+  });
+});
+
+// Speed
+document.getElementById('speed-seg').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    anim.speed = parseFloat(btn.dataset.val);
+    document.getElementById('speed-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    // Adjust startTime so current position stays
+    if (anim.playing) {
+      anim.startTime = performance.now() - (anim.t * anim.duration / anim.speed);
+    }
+  });
+});
+
+// Duration
+const durSlider = document.getElementById('dur-slider');
+const durVal = document.getElementById('dur-val');
+durSlider.addEventListener('input', () => {
+  anim.duration = parseInt(durSlider.value);
+  durVal.textContent = anim.duration + 'ms';
+  if (anim.playing) {
+    anim.startTime = performance.now() - (anim.t * anim.duration / anim.speed);
+  }
+});
+
+// Easing
+document.getElementById('easing-sel').addEventListener('change', (e) => {
+  anim.easing = e.target.value;
+  if (!anim.playing) drawFrame(anim.t);
+});
+document.getElementById('easing-sel2').addEventListener('change', (e) => {
+  anim.easing2 = e.target.value;
+  if (!anim.playing) drawFrame(anim.t);
+});
+
+function updateEasingVisibility() {
+  const isZoom = anim.mode === 'zoom';
+  document.getElementById('easing-label1').textContent = isZoom ? 'Zoom easing' : 'Easing';
+  document.getElementById('easing-label2').style.display = isZoom ? '' : 'none';
+  document.getElementById('easing-sel2').style.display = isZoom ? '' : 'none';
+}
+
+// Zoom & Reveal range sliders
+function wireRangeSlider(sliderId, valId, animProp) {
+  const slider = document.getElementById(sliderId);
+  const val = document.getElementById(valId);
+  slider.addEventListener('input', () => {
+    anim[animProp] = parseInt(slider.value) / 100;
+    val.textContent = slider.value + '%';
+    if (!anim.playing) drawFrame(anim.t);
+  });
+}
+wireRangeSlider('zoom-start-slider', 'zoom-start-val', 'zoomStart');
+wireRangeSlider('zoom-end-slider', 'zoom-end-val', 'zoomEnd');
+wireRangeSlider('reveal-start-slider', 'reveal-start-val', 'revealStart');
+wireRangeSlider('reveal-end-slider', 'reveal-end-val', 'revealEnd');
+
+// Play button
+document.getElementById('play-btn').addEventListener('click', () => {
+  if (anim.playing) pause();
+  else if (anim.t >= 1) replay();
+  else play();
+});
+
+// Timeline scrubber
+const timeline = document.getElementById('timeline');
+let dragging = false;
+
+function scrubTo(e) {
+  const rect = timeline.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  anim.t = clamp01(x / rect.width);
+  anim.scrubbing = true;
+  drawFrame(anim.t);
+  anim.scrubbing = false;
+}
+
+timeline.addEventListener('mousedown', (e) => {
+  dragging = true;
+  if (anim.playing) pause();
+  scrubTo(e);
+});
+window.addEventListener('mousemove', (e) => {
+  if (dragging) scrubTo(e);
+});
+window.addEventListener('mouseup', () => {
+  dragging = false;
+});
+
+// Keyboard: Space = play/pause
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    if (anim.playing) pause();
+    else if (anim.t >= 1) replay();
+    else play();
+  }
+  if (e.code === 'ArrowLeft') {
+    e.preventDefault();
+    if (anim.playing) pause();
+    anim.t = clamp01(anim.t - 0.02);
+    drawFrame(anim.t);
+  }
+  if (e.code === 'ArrowRight') {
+    e.preventDefault();
+    if (anim.playing) pause();
+    anim.t = clamp01(anim.t + 0.02);
+    drawFrame(anim.t);
+  }
+});
+
+// ── Init ──
+buildVariantSeg();
+buildDirSeg();
+updateEasingVisibility();
+resize();
+drawFrame(0);
+</script>
+</body>
+</html>

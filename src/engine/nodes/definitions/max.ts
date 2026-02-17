@@ -4,6 +4,7 @@ import { defineNode } from '../framework';
 export const maxNode = defineNode({
   type: 'max',
   category: 'math',
+  description: 'Outputs the higher of two signals',
 
   inputs: [
     { name: 'A', gridPosition: 0 },

@@ -17,6 +17,15 @@ import {
   setFocusTarget,
   computeValidWiringTargets,
 } from './keyboard-focus.ts';
+import {
+  isDrawerOpen,
+  openDrawer,
+  closeDrawer,
+  getKeyboardSelectedIndex,
+  setKeyboardSelectedIndex,
+  setKeyboardNavigationActive,
+  isKeyboardNavigationActive,
+} from '../../gameboard/canvas/render-chip-drawer.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +44,9 @@ export type KeyboardAction =
   | { type: 'delete-wire'; wireId: string }
   | { type: 'move-ghost'; delta: GridPoint }
   | { type: 'open-palette' }
+  | { type: 'toggle-drawer' }
+  | { type: 'drawer-navigate'; direction: 1 | -1 }
+  | { type: 'drawer-select' }
   | { type: 'rotate-placement' }
   | { type: 'toggle-play' }
   | { type: 'step-playpoint'; delta: number }
@@ -169,11 +181,23 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
     return { type: 'noop' };
   }
 
-  // N → open palette modal
+  // N → toggle chip drawer
   if (key === 'n' && !e.ctrlKey && !e.metaKey) {
     if (isOverlayActive || isReadOnly) return { type: 'noop' };
     if (mode.type !== 'idle') return { type: 'noop' };
-    return { type: 'open-palette' };
+    return { type: 'toggle-drawer' };
+  }
+
+  // Arrow keys while drawer is open → navigate chips
+  if ((key === 'ArrowLeft' || key === 'ArrowRight') && isDrawerOpen() && isKeyboardNavigationActive()) {
+    if (isOverlayActive) return { type: 'noop' };
+    return { type: 'drawer-navigate', direction: key === 'ArrowLeft' ? -1 : 1 };
+  }
+
+  // Enter while drawer is open → select chip
+  if (key === 'Enter' && isDrawerOpen() && isKeyboardNavigationActive()) {
+    if (isOverlayActive) return { type: 'noop' };
+    return { type: 'drawer-select' };
   }
 
   // Space or P → toggle play/pause
@@ -226,6 +250,10 @@ export interface KeyboardActionExecutor {
   togglePlayMode: () => void;
   /** Step playpoint by delta cycles */
   stepPlaypoint: (delta: number) => void;
+  /** Palette items for drawer chip selection */
+  paletteItemCount?: number;
+  /** Callback for selecting a chip from the drawer by index */
+  onDrawerSelect?: (index: number) => void;
 }
 
 export function executeKeyboardAction(action: KeyboardAction, executor: KeyboardActionExecutor): void {
@@ -324,6 +352,33 @@ export function executeKeyboardAction(action: KeyboardAction, executor: Keyboard
     case 'open-palette':
       executor.openOverlay({ type: 'palette-modal' });
       break;
+    case 'toggle-drawer':
+      if (isDrawerOpen()) {
+        closeDrawer();
+      } else {
+        openDrawer();
+        setKeyboardNavigationActive(true);
+        setKeyboardSelectedIndex(0);
+      }
+      break;
+    case 'drawer-navigate': {
+      const count = executor.paletteItemCount ?? 0;
+      if (count === 0) break;
+      const current = getKeyboardSelectedIndex() ?? 0;
+      const next = ((current + action.direction) % count + count) % count;
+      setKeyboardSelectedIndex(next);
+      break;
+    }
+    case 'drawer-select': {
+      const selIdx = getKeyboardSelectedIndex();
+      if (selIdx !== null) {
+        closeDrawer();
+        // The actual startPlacingNode call happens in GameboardCanvas.tsx
+        // via the onDrawerSelect callback, since we need palette item data
+        executor.onDrawerSelect?.(selIdx);
+      }
+      break;
+    }
     case 'rotate-placement':
       executor.rotatePlacement();
       break;

@@ -232,9 +232,9 @@ describe('getKeyboardAction', () => {
     expect(action).toEqual({ type: 'delete-node', chipId: 'n1' });
   });
 
-  it('N returns open-palette in idle mode', () => {
+  it('N returns toggle-drawer in idle mode', () => {
     const action = getKeyboardAction('n', makeKeyEvent(), makeState());
-    expect(action).toEqual({ type: 'open-palette' });
+    expect(action).toEqual({ type: 'toggle-drawer' });
   });
 
   it('Space returns toggle-play in idle mode', () => {

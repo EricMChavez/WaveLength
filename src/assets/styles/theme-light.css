@@ -24,6 +24,7 @@
   --token-color-error: #C43030;
   --token-meter-border: #b0acaa;
   --token-meter-border-match: #27FB6B;
+  --token-meter-border-mismatch: #C43030;
   --token-board-border: #b0aca8;
 
   --token-depth-raised: rgba(0, 0, 0, 0.12);

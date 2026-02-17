@@ -1,4 +1,4 @@
-import { GRID_COLS, GRID_ROWS, PLAYABLE_START, PLAYABLE_END } from './constants.ts';
+import { GRID_COLS, GRID_ROWS, PLAYABLE_START, PLAYABLE_END, MOTHERBOARD_PLAYABLE_START, MOTHERBOARD_PLAYABLE_END } from './constants.ts';
 import { PLAYBACK_BAR } from '../constants/index.ts';
 import type { NodeState, NodeRotation } from '../types/index.ts';
 import type { PuzzleNodeEntry, UtilityNodeEntry } from '../../store/slices/palette-slice.ts';
@@ -20,6 +20,10 @@ export const UTILITY_GRID_ROWS = 3;
 export const PUZZLE_GRID_COLS = 4;
 export const PUZZLE_MIN_GRID_ROWS = 2;
 
+/** Puzzle menu chip footprint — taller to show 3 port positions per side. */
+export const PUZZLE_MENU_GRID_COLS = 6;
+export const PUZZLE_MENU_GRID_ROWS = 4;
+
 /** @deprecated Use FUNDAMENTAL_GRID_COLS instead. */
 export const NODE_GRID_COLS = FUNDAMENTAL_GRID_COLS;
 /** @deprecated Use FUNDAMENTAL_GRID_ROWS instead. */
@@ -37,7 +41,10 @@ export function getNodeGridSize(node: NodeState): { cols: number; rows: number }
   let cols: number;
   let rows: number;
 
-  if (node.type.startsWith('utility:') || node.type === 'custom-blank' || node.type.startsWith('menu:')) {
+  if (node.type.startsWith('menu:') && node.params?.isPuzzleChip) {
+    cols = PUZZLE_MENU_GRID_COLS;
+    rows = PUZZLE_MENU_GRID_ROWS;
+  } else if (node.type.startsWith('utility:') || node.type === 'custom-blank' || node.type.startsWith('menu:')) {
     cols = UTILITY_GRID_COLS;
     rows = UTILITY_GRID_ROWS;
   } else if (node.type.startsWith('puzzle:')) {
@@ -79,6 +86,7 @@ export function getNodeGridSizeFromType(
   let cols: number;
   let rows: number;
 
+  // Note: puzzle menu chips (isPuzzleChip param) are handled in getNodeGridSize via NodeState
   if (nodeType.startsWith('utility:') || nodeType === 'custom-blank' || nodeType.startsWith('menu:')) {
     cols = UTILITY_GRID_COLS;
     rows = UTILITY_GRID_ROWS;
@@ -189,13 +197,16 @@ export function canPlaceNode(
   row: number,
   cols: number = FUNDAMENTAL_GRID_COLS,
   rows: number = FUNDAMENTAL_GRID_ROWS,
+  bounds?: { playableStart: number; playableEnd: number },
 ): boolean {
   const endCol = col + cols;
   const endRow = row + rows;
 
   // 1-cell padding inside playable area so port anchors stay routable
-  const minCol = PLAYABLE_START + 1;
-  const maxCol = PLAYABLE_END; // endCol must be <= PLAYABLE_END (node right edge)
+  const pStart = bounds?.playableStart ?? PLAYABLE_START;
+  const pEnd = bounds?.playableEnd ?? PLAYABLE_END;
+  const minCol = pStart + 1;
+  const maxCol = pEnd; // endCol must be <= playableEnd (node right edge)
   const minRow = 1;
   const maxRow = GRID_ROWS - 1; // endRow must be <= GRID_ROWS - 1
 
@@ -252,6 +263,7 @@ export function canMoveNode(
   newCol: number,
   newRow: number,
   newRotation?: NodeRotation,
+  bounds?: { playableStart: number; playableEnd: number },
 ): boolean {
   if (isConnectionPointNode(node.id)) return false;
 
@@ -265,7 +277,10 @@ export function canMoveNode(
   const rotation = newRotation ?? node.rotation ?? 0;
   let baseCols: number;
   let baseRows: number;
-  if (node.type.startsWith('utility:') || node.type === 'custom-blank' || node.type.startsWith('menu:')) {
+  if (node.type.startsWith('menu:') && node.params?.isPuzzleChip) {
+    baseCols = PUZZLE_MENU_GRID_COLS;
+    baseRows = PUZZLE_MENU_GRID_ROWS;
+  } else if (node.type.startsWith('utility:') || node.type === 'custom-blank' || node.type.startsWith('menu:')) {
     baseCols = UTILITY_GRID_COLS;
     baseRows = UTILITY_GRID_ROWS;
   } else if (node.type.startsWith('puzzle:')) {
@@ -284,5 +299,13 @@ export function canMoveNode(
   const { cols, rows } = getRotatedSize(baseCols, baseRows, rotation);
 
   // Check if the new position is valid
-  return canPlaceNode(tempGrid, newCol, newRow, cols, rows);
+  return canPlaceNode(tempGrid, newCol, newRow, cols, rows, bounds);
+}
+
+/** Return the playable column bounds for the given board ID. */
+export function getPlayableBounds(boardId: string | undefined): { playableStart: number; playableEnd: number } {
+  if (boardId === 'motherboard') {
+    return { playableStart: MOTHERBOARD_PLAYABLE_START, playableEnd: MOTHERBOARD_PLAYABLE_END };
+  }
+  return { playableStart: PLAYABLE_START, playableEnd: PLAYABLE_END };
 }

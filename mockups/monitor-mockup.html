@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WaveLength — Monitor Style Mockup</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=VT323&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d0f14;
+    color: #e0e0f0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+    user-select: none;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 500;
+    color: #9090b0;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* ===== Tab Bar ===== */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+    background: #1a1c24;
+    border-radius: 8px;
+    padding: 3px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .tab-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: #9090b0;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { background: #252730; color: #e0e0f0; }
+  .tab-btn.active { background: #f0a202; color: #0d0f14; }
+
+  /* ===== Gizmo Housing ===== */
+  .gizmo {
+    width: 100%;
+    max-width: 900px;
+    aspect-ratio: 16 / 10;
+    background: #e8e0cc;
+    background-image:
+      radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 60%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 40%, rgba(0, 0, 0, 0.04) 100%);
+    border-radius: 18px;
+    padding: 24px;
+    position: relative;
+    box-shadow:
+      0 2px 0 0 #f0eade,
+      0 -2px 0 0 #b8ad96,
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.4),
+      0 12px 40px rgba(0, 0, 0, 0.35),
+      0 4px 8px rgba(0, 0, 0, 0.2);
+    font-family: 'IBM Plex Mono', monospace;
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    grid-template-rows: 1fr auto;
+    gap: 20px;
+    overflow: hidden;
+  }
+
+  /* Highlight sheen on housing */
+  .gizmo::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 40%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
+  /* ===== Screws ===== */
+  .screw {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #b8ad96, #a89e88);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
+    position: absolute;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
+  .screw::after {
+    content: '+'; font-size: 10px; color: rgba(0,0,0,0.25); font-weight: bold; line-height: 1;
+  }
+  .screw-tl { top: 16px; left: 16px; }
+  .screw-tr { top: 16px; right: 16px; }
+  .screw-bl { bottom: 16px; left: 16px; }
+  .screw-br { bottom: 16px; right: 16px; }
+
+  /* ===== Monitor Area ===== */
+  .monitor-area {
+    grid-row: 1; grid-column: 1;
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+
+  .screen-housing {
+    background: #3a3428;
+    border-radius: 20px;
+    padding: 16px;
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,0.5),
+      inset 0 0 20px rgba(0,0,0,0.3),
+      0 1px 0 rgba(255,255,255,0.15);
+    transition: background 0.3s ease;
+  }
+
+  .screen {
+    flex: 1;
+    padding: 28px 36px;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.3s ease;
+    clip-path: url(#crt-screen);
+  }
+
+  .screen-text {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    line-height: 1.6;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    overflow: hidden;
+    transition: color 0.3s ease, text-shadow 0.3s ease;
+  }
+
+  .screen-text .line { min-height: 1.6em; }
+
+  .cursor {
+    display: inline-block;
+    width: 10px; height: 18px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ===== Shared Lighting Overlays (on .screen) ===== */
+
+  /* Highlight streak — diagonal warm white band at ~50deg */
+  .screen .highlight-streak {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    overflow: hidden;
+  }
+  .screen .highlight-streak::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: linear-gradient(
+      50deg,
+      transparent 25%,
+      rgba(255, 248, 240, 0.025) 30%,
+      rgba(255, 248, 240, 0.06) 34%,
+      rgba(255, 248, 240, 0.025) 38%,
+      transparent 43%
+    );
+    mix-blend-mode: screen;
+  }
+  .screen .highlight-streak::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: linear-gradient(
+      50deg,
+      transparent 15%,
+      rgba(255, 248, 240, 0.04) 25%,
+      rgba(255, 248, 240, 0.08) 35%,
+      rgba(255, 248, 240, 0.04) 45%,
+      transparent 55%
+    );
+    mix-blend-mode: soft-light;
+  }
+
+  /* Noise grain — SVG data URI approach */
+  .screen .noise-grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+  }
+
+  /* Inset depth — dark shadow lower-right, light catch upper-left */
+  .screen .inset-depth {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    box-shadow:
+      inset 3px 3px 8px rgba(0, 0, 0, 0.35),
+      inset -1px -1px 4px rgba(255, 248, 240, 0.03);
+  }
+
+  /* Vignette — radial darkening */
+  .screen .vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+    background: radial-gradient(ellipse 75% 70% at center, transparent 25%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.6) 100%);
+  }
+
+  /* ===== Glass Bulge (convex CRT dome) ===== */
+  .screen .glass-bulge {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 7;
+    background: radial-gradient(
+      ellipse 80% 70% at 45% 40%,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.02) 50%,
+      transparent 75%
+    );
+  }
+  /* Specular reflection arc — overhead light on curved glass */
+  .screen .glass-bulge::before {
+    content: '';
+    position: absolute;
+    top: 2%; left: 8%; right: 35%;
+    height: 30%;
+    border-radius: 0 0 50% 50% / 0 0 100% 100%;
+    background: radial-gradient(
+      ellipse at 50% 90%,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.03) 40%,
+      transparent 70%
+    );
+  }
+  /* Glass edge catch-light — top/left bright, bottom/right shadow */
+  .screen .glass-bulge::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.06),
+      inset 2px 0 0 rgba(255, 255, 255, 0.03),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.12),
+      inset -2px 0 0 rgba(0, 0, 0, 0.08);
+  }
+
+  /* ===== Right Panel ===== */
+  .right-panel {
+    grid-row: 1; grid-column: 2;
+    display: flex; flex-direction: column;
+    gap: 10px;
+    position: relative; z-index: 1;
+  }
+
+  /* Keycap button */
+  .keycap {
+    position: relative;
+    display: flex;
+    cursor: pointer;
+    border: none; background: none; padding: 0; font: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .keycap-base {
+    width: 100%; height: 44px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ccc4ae 0%, #c0b8a0 50%, #b4ac96 100%);
+    box-shadow:
+      0 5px 0 -1px #a49c88,
+      0 6px 0 -1px #928a78,
+      0 7px 0 -1px #847c6c,
+      0 9px 8px -2px rgba(0,0,0,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.06s ease, box-shadow 0.06s ease;
+  }
+  .keycap-top {
+    position: absolute;
+    top: 3px; bottom: 8px; left: 7px; right: 7px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #ece4d2 0%, #e2dac8 50%, #dcd4c0 100%);
+    color: #4a4236;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-bottom-color: rgba(0,0,0,0.04);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 1px rgba(0,0,0,0.03);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600; font-size: 11px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .keycap:hover .keycap-top {
+    background: linear-gradient(180deg, #f0e8d6 0%, #e8e0cc 50%, #e2dac6 100%);
+  }
+  .keycap:active .keycap-base {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 -1px #a49c88, 0 2px 0 -1px #928a78, inset 0 1px 3px rgba(0,0,0,0.12);
+  }
+
+  /* Depressed keycap — teal accent indicator */
+  .keycap.depressed .keycap-base {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 -1px #a49c88, inset 0 2px 4px rgba(0,0,0,0.18);
+  }
+  .keycap.depressed .keycap-top {
+    box-shadow:
+      inset 0 2px 3px rgba(0,0,0,0.12),
+      inset 0 -2px 0 0 #1ED2C3;
+    border-bottom-color: #1ED2C3;
+  }
+
+  /* ===== Play Button — Amber polarity accent ===== */
+  .play-btn {
+    flex: 1; min-height: 80px; margin-top: 10px;
+    position: relative; display: flex;
+    cursor: pointer; border: none; background: none; padding: 0; font: inherit;
+  }
+  .play-btn-base {
+    width: 100%; height: 100%;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #b88a10 0%, #a07808 50%, #8a6804 100%);
+    box-shadow:
+      0 5px 0 -1px #745804,
+      0 6px 0 -1px #644a02,
+      0 7px 0 -1px #544000,
+      0 9px 8px -2px rgba(0,0,0,0.22),
+      inset 0 1px 0 rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.06s ease, box-shadow 0.06s ease;
+  }
+  .play-btn-top {
+    position: absolute;
+    inset: 4px 8px 10px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f5b830 0%, #f0a202 50%, #e09000 100%);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-bottom-color: rgba(0,0,0,0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.3),
+      inset 0 -1px 1px rgba(0,0,0,0.05);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700; font-size: 14px;
+    letter-spacing: 3px; text-transform: uppercase;
+  }
+  .play-btn:hover .play-btn-top {
+    background: linear-gradient(180deg, #f8c240 0%, #f5b020 50%, #f0a202 100%);
+  }
+  .play-btn:active .play-btn-base {
+    transform: translateY(4px);
+    box-shadow:
+      0 1px 0 -1px #745804,
+      0 2px 0 -1px #644a02,
+      inset 0 1px 3px rgba(0,0,0,0.18),
+      0 1px 3px rgba(0,0,0,0.1);
+  }
+  .play-btn:active .play-btn-top {
+    background: linear-gradient(180deg, #d88800 0%, #cc7e00 50%, #c07400 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+  }
+
+  /* ===== Signal Level Bar — Teal-to-Amber polarity gradient ===== */
+  .signal-bar {
+    grid-row: 2; grid-column: 1;
+    position: relative; z-index: 1;
+  }
+  .groove-panel {
+    background: #d8d0bc;
+    border-radius: 8px;
+    padding: 10px 14px;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .bar-label {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 9px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
+    color: #6b6252;
+  }
+  .bar-track {
+    height: 18px; border-radius: 4px;
+    background: #0a1a10;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.3);
+    overflow: hidden;
+    position: relative;
+  }
+  /* Scanline texture on bar track */
+  .bar-track::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px, transparent 2px,
+      rgba(0, 0, 0, 0.06) 2px, rgba(0, 0, 0, 0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+    border-radius: 4px;
+  }
+  .bar-fill {
+    height: 100%; width: 35%; border-radius: 4px;
+    background: linear-gradient(90deg, #28c888 0%, #33e8a0 100%);
+    box-shadow: 0 0 8px rgba(51, 232, 160, 0.3), 0 0 2px rgba(51, 232, 160, 0.5);
+  }
+
+  /* ============================================================= */
+  /* ===== BASE SCREEN STYLE (Plasma/Gas Discharge) =============== */
+  /* ============================================================= */
+
+  /*
+   * All variants share the same plasma-style base:
+   * - Dark background, gameboard green phosphor text with diffuse glow
+   * - Only the screen TEXTURE (.scanlines) differs between variants
+   *
+   * Gameboard surface: #06382f → bright phosphor: #33e8a0
+   */
+
+  .screen {
+    background: #080a08;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .screen-text {
+    color: #33e8a0;
+    text-shadow:
+      0 0 4px rgba(51, 232, 160, 0.7),
+      0 0 20px rgba(40, 200, 140, 0.25),
+      0 0 40px rgba(30, 180, 120, 0.08);
+    letter-spacing: 0.5px;
+  }
+
+  .cursor {
+    background: #33e8a0;
+    box-shadow:
+      0 0 4px rgba(51, 232, 160, 0.8),
+      0 0 16px rgba(51, 232, 160, 0.3);
+  }
+
+  /* Greener highlight streak tint for all variants */
+  .screen .highlight-streak::before {
+    background: linear-gradient(
+      50deg,
+      transparent 25%,
+      rgba(200, 255, 220, 0.025) 30%,
+      rgba(200, 255, 220, 0.06) 34%,
+      rgba(200, 255, 220, 0.025) 38%,
+      transparent 43%
+    );
+  }
+  .screen .highlight-streak::after {
+    background: linear-gradient(
+      50deg,
+      transparent 15%,
+      rgba(200, 255, 220, 0.04) 25%,
+      rgba(200, 255, 220, 0.08) 35%,
+      rgba(200, 255, 220, 0.04) 45%,
+      transparent 55%
+    );
+  }
+
+  /* Shared scanlines base positioning */
+  .screen .scanlines {
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: 2;
+  }
+
+  /* =============================================== */
+  /* ===== TEXTURE 1: Scanlines =================== */
+  /* =============================================== */
+
+  .variant-scanlines .screen .scanlines {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px, transparent 2px,
+      rgba(0, 0, 0, 0.1) 2px, rgba(0, 0, 0, 0.1) 4px
+    );
+  }
+
+  /* =============================================== */
+  /* ===== TEXTURE 2: Phosphor Columns ============ */
+  /* =============================================== */
+
+  .variant-columns .screen .scanlines {
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(51, 232, 160, 0.03) 0px,
+      transparent 1px,
+      transparent 2px,
+      rgba(51, 232, 160, 0.02) 3px,
+      transparent 4px,
+      transparent 5px,
+      rgba(51, 232, 160, 0.01) 6px,
+      transparent 7px,
+      transparent 8px
+    );
+  }
+
+  /* =============================================== */
+  /* ===== TEXTURE 3: Diamond Mesh ================ */
+  /* =============================================== */
+
+  .variant-mesh .screen .scanlines {
+    background:
+      repeating-linear-gradient(
+        45deg,
+        transparent 0px, transparent 7px,
+        rgba(51, 232, 160, 0.025) 7px, rgba(51, 232, 160, 0.025) 8px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        transparent 0px, transparent 7px,
+        rgba(51, 232, 160, 0.025) 7px, rgba(51, 232, 160, 0.025) 8px
+      );
+  }
+
+  /* =============================================== */
+  /* ===== TEXTURE 4: Lenticular ================== */
+  /* =============================================== */
+
+  .variant-lenticular .screen .scanlines {
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(51, 232, 160, 0.02) 0px,
+      transparent 1px,
+      transparent 3px,
+      rgba(0, 0, 0, 0.04) 4px,
+      rgba(0, 0, 0, 0.06) 5px,
+      rgba(0, 0, 0, 0.04) 6px,
+      transparent 7px,
+      transparent 9px,
+      rgba(51, 232, 160, 0.02) 10px
+    );
+  }
+
+  /* =============================================== */
+  /* ===== TEXTURE 5: Clean Glass ================= */
+  /* =============================================== */
+
+  .variant-clean .screen .scanlines {
+    background: none;
+  }
+
+  /* ===== Description panel ===== */
+  .description {
+    width: 100%;
+    max-width: 900px;
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: #1a1c24;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #b0b0c8;
+  }
+  .description h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e0e0f0;
+    margin-bottom: 8px;
+  }
+  .description .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 6px;
+    letter-spacing: 0.5px;
+  }
+  .description .tag-green { background: rgba(51, 232, 160, 0.15); color: #33e8a0; }
+  .description .tag-amber { background: rgba(240, 162, 2, 0.2); color: #f0a202; }
+  .description .tag-teal { background: rgba(30, 210, 195, 0.2); color: #1ED2C3; }
+
+  .description .color-swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin: 0 3px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* ===== Mobile ===== */
+  @media (max-width: 767px) {
+    .gizmo {
+      grid-template-columns: 1fr 90px;
+      padding: 16px;
+      gap: 12px;
+      aspect-ratio: auto;
+      min-height: 400px;
+    }
+    .tab-btn { padding: 6px 10px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SVG clip-path: barrel/pillow shape for CRT screen -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <clipPath id="crt-screen" clipPathUnits="objectBoundingBox">
+      <!-- Barrel edges (Q) with rounded corners (C). Top/bottom bow ~3%, sides ~0.5%, half L/R margin -->
+      <path d="M 0.03 0.04
+               Q 0.5 -0.02   0.97 0.04
+               C 0.978 0.04   0.985 0.057  0.985 0.07
+               Q 0.99 0.5    0.985 0.93
+               C 0.985 0.947  0.978 0.96   0.97 0.96
+               Q 0.5 1.02    0.03 0.96
+               C 0.022 0.96   0.015 0.947  0.015 0.93
+               Q 0.01 0.5    0.015 0.07
+               C 0.015 0.053  0.022 0.04   0.03 0.04
+               Z"/>
+    </clipPath>
+  </defs>
+</svg>
+
+<h1>Monitor Style Alternatives</h1>
+
+<div class="tab-bar" id="tabBar">
+  <button class="tab-btn active" data-variant="scanlines">1: Scanlines</button>
+  <button class="tab-btn" data-variant="columns">2: Phosphor Columns</button>
+  <button class="tab-btn" data-variant="mesh">3: Diamond Mesh</button>
+  <button class="tab-btn" data-variant="lenticular">4: Lenticular</button>
+  <button class="tab-btn" data-variant="clean">5: Clean Glass</button>
+</div>
+
+<div class="gizmo" id="gizmo">
+  <!-- Corner screws -->
+  <div class="screw screw-tl"></div>
+  <div class="screw screw-tr"></div>
+  <div class="screw screw-bl"></div>
+  <div class="screw screw-br"></div>
+
+  <!-- Monitor (row 1, col 1) -->
+  <div class="monitor-area">
+    <div class="screen-housing" id="screenHousing">
+      <div class="screen" id="screen">
+        <!-- Texture layer (scanlines / grid / hex) -->
+        <div class="scanlines"></div>
+        <!-- Noise grain overlay -->
+        <div class="noise-grain"></div>
+        <!-- Inset depth shadows -->
+        <div class="inset-depth"></div>
+        <!-- Highlight streak -->
+        <div class="highlight-streak"></div>
+        <!-- Vignette -->
+        <div class="vignette"></div>
+        <!-- Convex glass dome -->
+        <div class="glass-bulge"></div>
+        <!-- Text content -->
+        <div class="screen-text" id="screenText"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel (row 1, col 2) -->
+  <div class="right-panel">
+    <button class="keycap depressed">
+      <div class="keycap-base"><div class="keycap-top">Home</div></div>
+    </button>
+    <button class="keycap">
+      <div class="keycap-base"><div class="keycap-top">About</div></div>
+    </button>
+    <button class="keycap">
+      <div class="keycap-base"><div class="keycap-top">Settings</div></div>
+    </button>
+    <button class="play-btn">
+      <div class="play-btn-base"><div class="play-btn-top">Play</div></div>
+    </button>
+  </div>
+
+  <!-- Signal Level Bar (row 2, col 1) -->
+  <div class="signal-bar">
+    <div class="groove-panel">
+      <div class="bar-label">
+        <span>Signal Level</span>
+        <span style="letter-spacing: 0; font-size: 10px;">3/12</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Description panel -->
+<div class="description" id="description"></div>
+
+<script>
+// ===== Terminal text content =====
+const TERMINAL_LINES = [
+  'WAVELENGTH SIGNAL PROCESSOR v1.0',
+  '',
+  'Wire together nodes to transform signals.',
+  'Every solved puzzle becomes a reusable node.',
+  '',
+  '7 fundamental nodes. Infinite possibilities.',
+  '',
+  'READY.',
+];
+
+// ===== Variant descriptions =====
+const DESCRIPTIONS = {
+  scanlines: {
+    title: '1. Scanlines',
+    tags: [
+      { cls: 'tag-green', text: 'Classic CRT' },
+    ],
+    text: 'Horizontal scanlines \u2014 the classic CRT look. Every other row is darkened, creating the familiar banded pattern of an interlaced monitor. Most recognizable and retro of the five options.',
+  },
+  columns: {
+    title: '2. Phosphor Columns',
+    tags: [
+      { cls: 'tag-green', text: 'Sub-pixel' },
+    ],
+    text: 'Vertical phosphor stripes mimicking the RGB sub-pixel structure of a CRT or plasma display seen up close. Three repeating column intensities create a subtle vertical rhythm. Evokes looking at a screen through a magnifying glass.',
+  },
+  mesh: {
+    title: '3. Diamond Mesh',
+    tags: [
+      { cls: 'tag-green', text: 'Shadow Mask' },
+    ],
+    text: 'Two sets of diagonal lines crossing at \u00b145\u00b0 create a diamond/rhombus grid. Inspired by CRT shadow masks and aperture grilles. Gives the screen a woven, industrial feel \u2014 like looking through a fine wire mesh.',
+  },
+  lenticular: {
+    title: '4. Lenticular',
+    tags: [
+      { cls: 'tag-green', text: 'Ribbed Glass' },
+    ],
+    text: 'Alternating bands of light and dark create a horizontal ribbed pattern, like looking through lenticular lens plastic or ridged glass. Thicker than scanlines with a more pronounced optical quality. Has a subtle 3D-like depth.',
+  },
+  clean: {
+    title: '5. Clean Glass',
+    tags: [
+      { cls: 'tag-green', text: 'No Texture' },
+    ],
+    text: 'No screen texture at all \u2014 just the pure glow of the phosphor text through clean glass. The lighting effects (highlight streak, noise grain, vignette, inset shadows) are still present, giving it a polished, modern feel. Maximally readable.',
+  },
+};
+
+// ===== Typewriter animation =====
+const CHAR_DELAY = 25;
+const LINE_DELAY = 80;
+const FLASH_DELAY = 150;
+
+let activeVariant = null;
+let typewriterRAF = 0;
+
+function startTypewriter(variant) {
+  cancelAnimationFrame(typewriterRAF);
+
+  const screenText = document.getElementById('screenText');
+  screenText.innerHTML = '';
+
+  let lineIdx = 0;
+  let charIdx = 0;
+  let lastTime = 0;
+  let accumulated = 0;
+  let phase = 'flash';
+  let flashStart = 0;
+
+  // Build output structure
+  const lineElements = [];
+  for (let i = 0; i < TERMINAL_LINES.length; i++) {
+    const div = document.createElement('div');
+    div.className = 'line';
+    div.innerHTML = '\u00A0';
+    screenText.appendChild(div);
+    lineElements.push(div);
+  }
+
+  // Cursor element
+  const cursorSpan = document.createElement('span');
+  cursorSpan.className = 'cursor';
+
+  function formatText(text) {
+    return text;
+  }
+
+  function tick(time) {
+    if (phase === 'flash') {
+      if (flashStart === 0) flashStart = time;
+      if (time - flashStart < FLASH_DELAY) {
+        typewriterRAF = requestAnimationFrame(tick);
+        return;
+      }
+      phase = 'typing';
+      lastTime = time;
+    }
+
+    const delta = time - lastTime;
+    lastTime = time;
+    accumulated += delta;
+
+    let changed = false;
+    while (accumulated > 0 && lineIdx < TERMINAL_LINES.length) {
+      const currentLine = TERMINAL_LINES[lineIdx];
+
+      if (charIdx === 0 && lineIdx > 0) {
+        if (accumulated < LINE_DELAY) break;
+        accumulated -= LINE_DELAY;
+      }
+
+      if (charIdx < currentLine.length) {
+        if (accumulated < CHAR_DELAY) break;
+        accumulated -= CHAR_DELAY;
+        charIdx++;
+        changed = true;
+      } else {
+        lineIdx++;
+        charIdx = 0;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      for (let i = 0; i < TERMINAL_LINES.length; i++) {
+        if (i < lineIdx) {
+          lineElements[i].innerHTML = formatText(TERMINAL_LINES[i]) || '\u00A0';
+        } else if (i === lineIdx) {
+          const partial = TERMINAL_LINES[i].slice(0, charIdx);
+          lineElements[i].innerHTML = formatText(partial) || '\u00A0';
+        } else {
+          lineElements[i].innerHTML = '\u00A0';
+        }
+      }
+    }
+
+    if (lineIdx >= TERMINAL_LINES.length) {
+      // Done typing — append cursor
+      const lastLine = lineElements[lineElements.length - 1];
+      lastLine.appendChild(cursorSpan);
+      return;
+    }
+
+    // Append cursor to current line
+    if (lineIdx < lineElements.length) {
+      lineElements[lineIdx].appendChild(cursorSpan);
+    }
+
+    typewriterRAF = requestAnimationFrame(tick);
+  }
+
+  typewriterRAF = requestAnimationFrame(tick);
+}
+
+// ===== Tab switching =====
+function switchVariant(variant) {
+  if (variant === activeVariant) return;
+  activeVariant = variant;
+
+  // Update tab bar
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.variant === variant);
+  });
+
+  // Update gizmo class
+  const gizmo = document.getElementById('gizmo');
+  gizmo.className = 'gizmo variant-' + variant;
+
+  // Update description
+  const desc = DESCRIPTIONS[variant];
+  const descEl = document.getElementById('description');
+  const tagsHtml = desc.tags.map(t => `<span class="tag ${t.cls}">${t.text}</span>`).join('');
+  descEl.innerHTML = `
+    <h2>${desc.title}</h2>
+    <p>${tagsHtml}</p>
+    <p style="margin-top: 8px">${desc.text}</p>
+  `;
+
+  // Restart typewriter
+  startTypewriter(variant);
+}
+
+// ===== Init =====
+document.getElementById('tabBar').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  switchVariant(btn.dataset.variant);
+});
+
+// Initial state
+switchVariant('scanlines');
+</script>
+</body>
+</html>

@@ -90,6 +90,11 @@ export const createCreativeSlice: StateCreator<CreativeSlice> = (set, get) => ({
   },
 
   exitCreativeMode: () => {
+    // Only save state if we're actually in creative mode — calling this
+    // when not in creative mode would incorrectly snapshot the current
+    // board (e.g. motherboard) as savedCreativeState.
+    if (!get().isCreativeMode) return;
+
     // Snapshot current state before leaving creative mode
     const fullStore = get() as unknown as {
       activeBoard: GameboardState | null;

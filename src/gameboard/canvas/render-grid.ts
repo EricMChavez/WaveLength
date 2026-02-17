@@ -9,6 +9,8 @@ import {
   PLAYABLE_END,
   METER_RIGHT_START,
   METER_RIGHT_END,
+  MOTHERBOARD_PLAYABLE_START,
+  MOTHERBOARD_PLAYABLE_END,
 } from '../../shared/grid/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { GAMEBOARD_STYLE, HIGHLIGHT_STREAK, DEPTH, PLAYBACK_BAR } from '../../shared/constants/index.ts';
@@ -21,6 +23,8 @@ let _dotCache: OffscreenCanvas | null = null;
 let _dotCacheCellSize = 0;
 let _dotCacheColor = '';
 let _dotCacheOpacity = 0;
+let _dotCachePlayableStart = 0;
+let _dotCachePlayableEnd = 0;
 
 /** Invalidate the dot matrix cache (used in tests). */
 export function invalidateGridDotCache(): void {
@@ -28,6 +32,8 @@ export function invalidateGridDotCache(): void {
   _dotCacheCellSize = 0;
   _dotCacheColor = '';
   _dotCacheOpacity = 0;
+  _dotCachePlayableStart = 0;
+  _dotCachePlayableEnd = 0;
 }
 
 /**
@@ -64,9 +70,11 @@ export function drawGrid(
   const totalHeight = GRID_ROWS * cellSize;
   const cornerRadius = cellSize * GAMEBOARD_STYLE.CORNER_RADIUS_RATIO;
 
-  // 1. Playable area flat background
-  const playableX = PLAYABLE_START * cellSize;
-  const playableCols = PLAYABLE_END - PLAYABLE_START + 1;
+  // 1. Playable area flat background (wider on motherboard — no meter zones)
+  const pStart = state.isHomeBoard ? MOTHERBOARD_PLAYABLE_START : PLAYABLE_START;
+  const pEnd = state.isHomeBoard ? MOTHERBOARD_PLAYABLE_END : PLAYABLE_END;
+  const playableX = pStart * cellSize;
+  const playableCols = pEnd - pStart + 1;
   const playableWidth = playableCols * cellSize;
   ctx.fillStyle = useOverrides ? devOverrides.colors.gameboardBackground : tokens.gridArea;
   ctx.beginPath();
@@ -88,7 +96,7 @@ export function drawGrid(
   }
 
   // 4. Dot matrix at grid intersections in the playable area (OffscreenCanvas cached)
-  const dotCanvas = getDotMatrixCache(cellSize, gridLineColor, lineOpacity);
+  const dotCanvas = getDotMatrixCache(cellSize, gridLineColor, lineOpacity, pStart, pEnd);
   if (dotCanvas) {
     ctx.save();
     // Clip to rounded rect so dots don't appear in corners
@@ -177,14 +185,21 @@ export function drawGrid(
  * Get or regenerate the dot matrix OffscreenCanvas cache.
  * Only redraws when cellSize or grid line color changes.
  */
-function getDotMatrixCache(cellSize: number, color: string, opacity: number): OffscreenCanvas | null {
-  if (_dotCache && _dotCacheCellSize === cellSize && _dotCacheColor === color && _dotCacheOpacity === opacity) {
+function getDotMatrixCache(
+  cellSize: number, color: string, opacity: number,
+  playableStart = PLAYABLE_START, playableEnd = PLAYABLE_END,
+): OffscreenCanvas | null {
+  if (
+    _dotCache && _dotCacheCellSize === cellSize && _dotCacheColor === color &&
+    _dotCacheOpacity === opacity && _dotCachePlayableStart === playableStart &&
+    _dotCachePlayableEnd === playableEnd
+  ) {
     return _dotCache;
   }
 
   if (typeof OffscreenCanvas === 'undefined') return null;
 
-  const playableCols = PLAYABLE_END - PLAYABLE_START + 1;
+  const playableCols = playableEnd - playableStart + 1;
   const width = playableCols * cellSize;
   const height = GRID_ROWS * cellSize;
 
@@ -196,18 +211,13 @@ function getDotMatrixCache(cellSize: number, color: string, opacity: number): Of
   const dotRadius = Math.max(1, cellSize * 0.06);
 
   ctx.beginPath();
-  for (let col = PLAYABLE_START + 1; col <= PLAYABLE_END; col++) {
+  for (let col = playableStart + 1; col <= playableEnd; col++) {
     // Offset relative to playable start since canvas starts at playableX
-    const x = (col - PLAYABLE_START) * cellSize;
+    const x = (col - playableStart) * cellSize;
     for (let row = 1; row < GRID_ROWS; row++) {
-      // Skip dots inside the playback bar trapezoid (bottom edge inset by 2 cols each side)
-      if (row >= PLAYBACK_BAR.ROW_START && row <= PLAYBACK_BAR.ROW_END) {
-        // t: 0 at top (wider), 1 at bottom (narrower) — matches getTrapezoidPoints() inset
-        const t = (row - PLAYBACK_BAR.ROW_START) / (PLAYBACK_BAR.ROW_END + 1 - PLAYBACK_BAR.ROW_START);
-        const leftEdge = PLAYBACK_BAR.COL_START + t * 2;
-        const rightEdge = PLAYBACK_BAR.COL_END + 1 - t * 2;
-        if (col >= leftEdge && col <= rightEdge) continue;
-      }
+      // Skip dots inside the playback bar rectangle (+ 1 row for button protrusion)
+      if (row >= PLAYBACK_BAR.ROW_START && row <= PLAYBACK_BAR.ROW_END + 1 &&
+          col >= PLAYBACK_BAR.COL_START && col <= PLAYBACK_BAR.COL_END + 1) continue;
       const y = row * cellSize;
       ctx.moveTo(x + dotRadius, y);
       ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
@@ -219,6 +229,8 @@ function getDotMatrixCache(cellSize: number, color: string, opacity: number): Of
   _dotCacheCellSize = cellSize;
   _dotCacheColor = color;
   _dotCacheOpacity = opacity;
+  _dotCachePlayableStart = playableStart;
+  _dotCachePlayableEnd = playableEnd;
   return canvas;
 }
 

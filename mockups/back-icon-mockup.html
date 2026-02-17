@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Back/Up Icon Concepts — Perspective Trapezoid + Arrow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 40px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #F5AF28;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 40px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #16213e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #F5AF28; }
+  .card h3 {
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 4px;
+    font-weight: 400;
+  }
+  .card .label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin-bottom: 16px;
+  }
+  .icon-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    margin: 20px 0;
+  }
+  .icon-row svg { filter: drop-shadow(0 0 6px rgba(245,175,40,0.3)); }
+  .size-label {
+    font-size: 11px;
+    color: #666;
+  }
+  .notes {
+    font-size: 12px;
+    color: #888;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+  .section-title {
+    font-size: 18px;
+    color: #F5AF28;
+    margin: 48px 0 24px;
+    text-align: center;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .preview-strip {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    align-items: center;
+    padding: 32px;
+    border-radius: 8px;
+    margin: 24px auto;
+    max-width: 1200px;
+    background: #0a0a1a;
+  }
+  .preview-item {
+    text-align: center;
+  }
+  .preview-item .size-label { margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Back / Zoom-Out Icon Concepts</h1>
+<p class="subtitle">Perspective trapezoid (gameboard receding into depth) + arrow rising out of the plane</p>
+
+<!--
+  TRAPEZOID COORDINATES (48x48 viewBox):
+  Bottom-left:  (4, 37)   Bottom-right: (44, 37)   — wide near edge
+  Top-left:     (12, 17)  Top-right:    (36, 17)   — narrow far edge
+  Center top:   (24, 17)  Center bottom: (24, 37)
+  Arrow tip:    (24, 5-8)
+-->
+
+<!-- ========== CONCEPT A ========== -->
+<div class="section-title">A — Simple Trapezoid + Straight Arrow</div>
+<div class="grid">
+
+  <div class="card">
+    <h3>A1</h3>
+    <div class="label">Centered arrow, sharp tip</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="29" x2="24" y2="7" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,13 24,7 30,13" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="29" x2="24" y2="7" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,13 24,7 30,13" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="29" x2="24" y2="7" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,14 24,7 31,14" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Clean and direct. Arrow exits the receding plane straight up.</div>
+  </div>
+
+  <div class="card">
+    <h3>A2</h3>
+    <div class="label">Arrow exits through gap in top edge</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <!-- Trapezoid with gap at top center -->
+          <path d="M20,17 L12,17 L4,37 L44,37 L36,17 L28,17" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <line x1="24" y1="30" x2="24" y2="5" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,11 24,5 30,11" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M20,17 L12,17 L4,37 L44,37 L36,17 L28,17" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <line x1="24" y1="30" x2="24" y2="5" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,11 24,5 30,11" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M19,17 L12,17 L4,37 L44,37 L36,17 L29,17" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <line x1="24" y1="30" x2="24" y2="5" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,12 24,5 31,12" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Gap in top (far) edge — arrow "escapes" through the opening.</div>
+  </div>
+
+  <div class="card">
+    <h3>A3</h3>
+    <div class="label">Short stubby arrow, thick weight</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,19 L36,19 L44,38 L4,38 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="9" stroke="#F5AF28" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="16,15 24,7 32,15" stroke="#F5AF28" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,19 L36,19 L44,38 L4,38 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="9" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="16,15 24,7 32,15" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,19 L36,19 L44,38 L4,38 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="9" stroke="#F5AF28" stroke-width="5" stroke-linecap="round"/>
+          <polyline points="16,15 24,7 32,15" stroke="#F5AF28" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Bold and punchy. Short emphatic arrow.</div>
+  </div>
+</div>
+
+<!-- ========== CONCEPT B ========== -->
+<div class="section-title">B — Curved / Arcing Arrow</div>
+<div class="grid">
+
+  <div class="card">
+    <h3>B1</h3>
+    <div class="label">Curved arrow sweeping up-right</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <path d="M20,31 C20,21 24,13 34,8" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <polyline points="29,6 34,8 32,13" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <path d="M20,31 C20,21 24,13 34,8" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <polyline points="29,6 34,8 32,13" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <path d="M20,31 C20,21 24,13 34,8" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <polyline points="29,6 34,8 32,13" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Dynamic sweep. Feels like ejection from the plane.</div>
+  </div>
+
+  <div class="card">
+    <h3>B2</h3>
+    <div class="label">Centered, wide chevron arrowhead</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="29" x2="24" y2="5" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="15,12 24,4 33,12" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="29" x2="24" y2="5" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="15,12 24,4 33,12" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="29" x2="24" y2="5" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="15,12 24,4 33,12" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Extra-wide chevron head. Balanced, strong upward thrust.</div>
+  </div>
+</div>
+
+<!-- ========== CONCEPT C ========== -->
+<div class="section-title">C — Depth / Nesting</div>
+<div class="grid">
+
+  <div class="card">
+    <h3>C1</h3>
+    <div class="label">Nested trapezoid (parent behind)</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <!-- Outer (parent) - faint, slightly larger -->
+          <path d="M10,15 L38,15 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="1.5" opacity="0.3" fill="none" stroke-linejoin="round"/>
+          <!-- Inner (current) -->
+          <path d="M14,19 L34,19 L40,35 L8,35 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="6" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M10,15 L38,15 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="2" opacity="0.3" fill="none" stroke-linejoin="round"/>
+          <path d="M14,19 L34,19 L40,35 L8,35 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="6" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M10,15 L38,15 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="3" opacity="0.3" fill="none" stroke-linejoin="round"/>
+          <path d="M14,19 L34,19 L40,35 L8,35 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="6" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,13 24,6 31,13" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Two nested planes. Faint outer = parent board you're returning to.</div>
+  </div>
+
+  <div class="card">
+    <h3>C2</h3>
+    <div class="label">3D box with side face visible</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <!-- Top face (the gameboard) -->
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <!-- Bottom edge (3D thickness) -->
+          <line x1="4" y1="37" x2="4" y2="41" stroke="#F5AF28" stroke-width="1.5" opacity="0.4"/>
+          <line x1="44" y1="37" x2="44" y2="41" stroke="#F5AF28" stroke-width="1.5" opacity="0.4"/>
+          <line x1="4" y1="41" x2="44" y2="41" stroke="#F5AF28" stroke-width="1.5" opacity="0.4"/>
+          <!-- Arrow -->
+          <line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="4" y1="37" x2="4" y2="41" stroke="#F5AF28" stroke-width="2" opacity="0.4"/>
+          <line x1="44" y1="37" x2="44" y2="41" stroke="#F5AF28" stroke-width="2" opacity="0.4"/>
+          <line x1="4" y1="41" x2="44" y2="41" stroke="#F5AF28" stroke-width="2" opacity="0.4"/>
+          <line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="4" y1="37" x2="4" y2="41" stroke="#F5AF28" stroke-width="3" opacity="0.4"/>
+          <line x1="44" y1="37" x2="44" y2="41" stroke="#F5AF28" stroke-width="3" opacity="0.4"/>
+          <line x1="4" y1="41" x2="44" y2="41" stroke="#F5AF28" stroke-width="3" opacity="0.4"/>
+          <line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,13 24,6 31,13" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Visible front thickness gives the plane a slab-like 3D feel.</div>
+  </div>
+
+  <div class="card">
+    <h3>C3</h3>
+    <div class="label">Stacked layers + arrow</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <!-- Bottom layer (grandparent) -->
+          <path d="M12,23 L36,23 L44,39 L4,39 Z" stroke="#F5AF28" stroke-width="1.5" opacity="0.2" fill="none" stroke-linejoin="round"/>
+          <!-- Middle layer (parent) -->
+          <path d="M12,20 L36,20 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="1.5" opacity="0.45" fill="none" stroke-linejoin="round"/>
+          <!-- Top layer (current) -->
+          <path d="M12,17 L36,17 L44,35 L4,35 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <!-- Arrow -->
+          <line x1="24" y1="28" x2="24" y2="5" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,11 24,5 30,11" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,23 L36,23 L44,39 L4,39 Z" stroke="#F5AF28" stroke-width="2" opacity="0.2" fill="none" stroke-linejoin="round"/>
+          <path d="M12,20 L36,20 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2" opacity="0.45" fill="none" stroke-linejoin="round"/>
+          <path d="M12,17 L36,17 L44,35 L4,35 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="5" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,11 24,5 30,11" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,23 L36,23 L44,39 L4,39 Z" stroke="#F5AF28" stroke-width="3" opacity="0.2" fill="none" stroke-linejoin="round"/>
+          <path d="M12,20 L36,20 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" opacity="0.45" fill="none" stroke-linejoin="round"/>
+          <path d="M12,17 L36,17 L44,35 L4,35 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="28" x2="24" y2="5" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,12 24,5 31,12" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Stacked perspective planes = depth levels. Arrow pops out of the stack.</div>
+  </div>
+</div>
+
+<!-- ========== CONCEPT D ========== -->
+<div class="section-title">D — Minimalist / Abstract</div>
+<div class="grid">
+
+  <div class="card">
+    <h3>D1</h3>
+    <div class="label">Plane pushed down, tall arrow</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,22 L36,22 L44,40 L4,40 Z" stroke="#F5AF28" stroke-width="2" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="33" x2="24" y2="4" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,10 24,4 30,10" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,22 L36,22 L44,40 L4,40 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="33" x2="24" y2="4" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,10 24,4 30,10" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,22 L36,22 L44,40 L4,40 Z" stroke="#F5AF28" stroke-width="3.5" fill="none" stroke-linejoin="round"/>
+          <line x1="24" y1="33" x2="24" y2="4" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,11 24,4 31,11" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Plane sits low, long arrow dominates. Maximum upward motion.</div>
+  </div>
+
+  <div class="card">
+    <h3>D2</h3>
+    <div class="label">Dashed plane, gap for arrow</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <!-- Dashed trapezoid with gap at top center -->
+          <path d="M20,17 L12,17 L4,37 L44,37 L36,17 L28,17" stroke="#F5AF28" stroke-width="2" stroke-dasharray="4 3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <line x1="24" y1="30" x2="24" y2="7" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,13 24,7 30,13" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M20,17 L12,17 L4,37 L44,37 L36,17 L28,17" stroke="#F5AF28" stroke-width="2.5" stroke-dasharray="4 3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <line x1="24" y1="30" x2="24" y2="7" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,13 24,7 30,13" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M19,17 L12,17 L4,37 L44,37 L36,17 L29,17" stroke="#F5AF28" stroke-width="3" stroke-dasharray="5 3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <line x1="24" y1="30" x2="24" y2="7" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,14 24,7 31,14" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Dashed border = transient / "you're leaving this plane." Solid arrow = where you're going.</div>
+  </div>
+
+  <div class="card">
+    <h3>D3</h3>
+    <div class="label">Grid lines inside the plane</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <!-- Perspective grid lines inside trapezoid -->
+          <!-- Verticals (converge toward top) -->
+          <line x1="16" y1="17" x2="14" y2="37" stroke="#F5AF28" stroke-width="0.8" opacity="0.25"/>
+          <line x1="24" y1="17" x2="24" y2="37" stroke="#F5AF28" stroke-width="0.8" opacity="0.25"/>
+          <line x1="32" y1="17" x2="34" y2="37" stroke="#F5AF28" stroke-width="0.8" opacity="0.25"/>
+          <!-- Horizontals -->
+          <line x1="8" y1="27" x2="40" y2="27" stroke="#F5AF28" stroke-width="0.8" opacity="0.25"/>
+          <!-- Arrow -->
+          <line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="16" y1="17" x2="14" y2="37" stroke="#F5AF28" stroke-width="1" opacity="0.25"/>
+          <line x1="24" y1="17" x2="24" y2="37" stroke="#F5AF28" stroke-width="1" opacity="0.25"/>
+          <line x1="32" y1="17" x2="34" y2="37" stroke="#F5AF28" stroke-width="1" opacity="0.25"/>
+          <line x1="8" y1="27" x2="40" y2="27" stroke="#F5AF28" stroke-width="1" opacity="0.25"/>
+          <line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="16" y1="17" x2="14" y2="37" stroke="#F5AF28" stroke-width="1.5" opacity="0.2"/>
+          <line x1="24" y1="17" x2="24" y2="37" stroke="#F5AF28" stroke-width="1.5" opacity="0.2"/>
+          <line x1="32" y1="17" x2="34" y2="37" stroke="#F5AF28" stroke-width="1.5" opacity="0.2"/>
+          <line x1="8" y1="27" x2="40" y2="27" stroke="#F5AF28" stroke-width="1.5" opacity="0.2"/>
+          <line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,13 24,6 31,13" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Grid lines follow the perspective. Most literal "gameboard" read.</div>
+  </div>
+</div>
+
+<!-- ========== CONCEPT E ========== -->
+<div class="section-title">E — Zoom-Out Metaphor</div>
+<div class="grid">
+
+  <div class="card">
+    <h3>E1</h3>
+    <div class="label">Expanding corners (zoom out)</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <!-- Outer expanding trapezoid -->
+          <path d="M10,14 L38,14 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <!-- Inner shrinking trapezoid -->
+          <path d="M16,19 L32,19 L37,33 L11,33 Z" stroke="#F5AF28" stroke-width="1.5" opacity="0.45" fill="none" stroke-linejoin="round"/>
+          <!-- Corner expansion arrows -->
+          <polyline points="2,37 2,41 6,41" stroke="#F5AF28" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="46,37 46,41 42,41" stroke="#F5AF28" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="10,14 7,10 11,10" stroke="#F5AF28" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="38,14 41,10 37,10" stroke="#F5AF28" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M10,14 L38,14 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <path d="M16,19 L32,19 L37,33 L11,33 Z" stroke="#F5AF28" stroke-width="2" opacity="0.45" fill="none" stroke-linejoin="round"/>
+          <polyline points="2,37 2,41 6,41" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="46,37 46,41 42,41" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="10,14 7,10 11,10" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="38,14 41,10 37,10" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M10,14 L38,14 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <path d="M16,19 L32,19 L37,33 L11,33 Z" stroke="#F5AF28" stroke-width="2.5" opacity="0.45" fill="none" stroke-linejoin="round"/>
+          <polyline points="2,37 2,42 7,42" stroke="#F5AF28" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="46,37 46,42 41,42" stroke="#F5AF28" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="10,14 6,9 11,9" stroke="#F5AF28" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="38,14 42,9 37,9" stroke="#F5AF28" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Corner arrows = "expanding outward." No upward arrow — the zoom-out IS the metaphor.</div>
+  </div>
+
+  <div class="card">
+    <h3>E2</h3>
+    <div class="label">Perspective lines + arrow</div>
+    <div class="icon-row">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          <!-- Vanishing point lines from top corners -->
+          <line x1="12" y1="17" x2="18" y2="10" stroke="#F5AF28" stroke-width="1.5" opacity="0.35"/>
+          <line x1="36" y1="17" x2="30" y2="10" stroke="#F5AF28" stroke-width="1.5" opacity="0.35"/>
+          <!-- Arrow -->
+          <line x1="24" y1="29" x2="24" y2="4" stroke="#F5AF28" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="18,10 24,4 30,10" stroke="#F5AF28" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">48px</div>
+      </div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/>
+          <line x1="12" y1="17" x2="18" y2="10" stroke="#F5AF28" stroke-width="2" opacity="0.35"/>
+          <line x1="36" y1="17" x2="30" y2="10" stroke="#F5AF28" stroke-width="2" opacity="0.35"/>
+          <line x1="24" y1="29" x2="24" y2="4" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="18,10 24,4 30,10" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">32px</div>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+          <path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linejoin="round"/>
+          <line x1="12" y1="17" x2="18" y2="10" stroke="#F5AF28" stroke-width="2.5" opacity="0.35"/>
+          <line x1="36" y1="17" x2="30" y2="10" stroke="#F5AF28" stroke-width="2.5" opacity="0.35"/>
+          <line x1="24" y1="29" x2="24" y2="4" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/>
+          <polyline points="17,11 24,4 31,11" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="size-label">24px</div>
+      </div>
+    </div>
+    <div class="notes">Converging lines from far edge suggest depth. Arrow rises from the vanishing point.</div>
+  </div>
+</div>
+
+<!-- ========== In Context Preview ========== -->
+<div class="section-title">Side-by-Side Comparison (32px on dark)</div>
+<div class="preview-strip">
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><line x1="24" y1="29" x2="24" y2="7" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,13 24,7 30,13" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">A1</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M20,17 L12,17 L4,37 L44,37 L36,17 L28,17" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><line x1="24" y1="30" x2="24" y2="5" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,11 24,5 30,11" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">A2</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M12,19 L36,19 L44,38 L4,38 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><line x1="24" y1="28" x2="24" y2="9" stroke="#F5AF28" stroke-width="4" stroke-linecap="round"/><polyline points="16,15 24,7 32,15" stroke="#F5AF28" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">A3</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><path d="M20,31 C20,21 24,13 34,8" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round"/><polyline points="29,6 34,8 32,13" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">B1</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M10,15 L38,15 L46,37 L2,37 Z" stroke="#F5AF28" stroke-width="2" opacity="0.3" fill="none" stroke-linejoin="round"/><path d="M14,19 L34,19 L40,35 L8,35 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><line x1="24" y1="28" x2="24" y2="6" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">C1</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M12,23 L36,23 L44,39 L4,39 Z" stroke="#F5AF28" stroke-width="2" opacity="0.2" fill="none" stroke-linejoin="round"/><path d="M12,20 L36,20 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="2" opacity="0.45" fill="none" stroke-linejoin="round"/><path d="M12,17 L36,17 L44,35 L4,35 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><line x1="24" y1="28" x2="24" y2="5" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,11 24,5 30,11" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">C3</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M20,17 L12,17 L4,37 L44,37 L36,17 L28,17" stroke="#F5AF28" stroke-width="2.5" stroke-dasharray="4 3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><line x1="24" y1="30" x2="24" y2="7" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,13 24,7 30,13" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">D2</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><line x1="16" y1="17" x2="14" y2="37" stroke="#F5AF28" stroke-width="1" opacity="0.25"/><line x1="24" y1="17" x2="24" y2="37" stroke="#F5AF28" stroke-width="1" opacity="0.25"/><line x1="32" y1="17" x2="34" y2="37" stroke="#F5AF28" stroke-width="1" opacity="0.25"/><line x1="8" y1="27" x2="40" y2="27" stroke="#F5AF28" stroke-width="1" opacity="0.25"/><line x1="24" y1="29" x2="24" y2="6" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,12 24,6 30,12" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">D3</div>
+  </div>
+  <div class="preview-item">
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><path d="M12,17 L36,17 L44,37 L4,37 Z" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linejoin="round"/><line x1="12" y1="17" x2="18" y2="10" stroke="#F5AF28" stroke-width="2" opacity="0.35"/><line x1="36" y1="17" x2="30" y2="10" stroke="#F5AF28" stroke-width="2" opacity="0.35"/><line x1="24" y1="29" x2="24" y2="4" stroke="#F5AF28" stroke-width="3" stroke-linecap="round"/><polyline points="18,10 24,4 30,10" stroke="#F5AF28" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="size-label">E2</div>
+  </div>
+</div>
+
+</body>
+</html>

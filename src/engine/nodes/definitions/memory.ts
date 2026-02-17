@@ -17,6 +17,7 @@ export function createMemoryState(): MemoryState {
 export const memoryNode = defineNode({
   type: 'memory',
   category: 'timing',
+  description: 'Outputs the previous cycle\'s input value',
 
   inputs: [{ name: 'A', gridPosition: 0 }],
   outputs: [{ name: 'Out', gridPosition: 0 }],

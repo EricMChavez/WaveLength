@@ -4,6 +4,7 @@ import { defineNode } from '../framework';
 export const minNode = defineNode({
   type: 'min',
   category: 'math',
+  description: 'Outputs the lower of two signals',
 
   inputs: [
     { name: 'A', gridPosition: 0 },

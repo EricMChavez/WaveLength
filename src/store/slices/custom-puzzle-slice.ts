@@ -103,14 +103,10 @@ export const createCustomPuzzleSlice: StateCreator<CustomPuzzleSlice> = (set, ge
     // Cast get() to full store type to access other slices
     // This is safe because Zustand composes all slices into one store
     const store = get() as unknown as {
-      exitCreativeMode: () => void;
       setActiveBoard: (board: GameboardState) => void;
       loadPuzzle: (puzzle: PuzzleDefinition) => void;
       initializeMeters: (config: SlotConfig, inactiveMode?: MeterMode) => void;
     };
-
-    // Exit creative mode
-    store.exitCreativeMode();
 
     // Build gameboard with CP nodes based on slot configuration
     const nodes = new Map<string, NodeState>();

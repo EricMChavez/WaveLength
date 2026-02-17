@@ -11,6 +11,8 @@ export {
   PLAYABLE_END,
   METER_RIGHT_START,
   METER_RIGHT_END,
+  MOTHERBOARD_PLAYABLE_START,
+  MOTHERBOARD_PLAYABLE_END,
 } from './constants';
 export {
   NODE_GRID_COLS,
@@ -23,6 +25,8 @@ export {
   PUZZLE_MIN_GRID_ROWS,
   getNodeGridSize,
   getNodeGridSizeFromType,
+  PUZZLE_MENU_GRID_COLS,
+  PUZZLE_MENU_GRID_ROWS,
   createOccupancyGrid,
   markNodeOccupied,
   clearNodeOccupied,
@@ -30,6 +34,7 @@ export {
   canPlaceNode,
   canMoveNode,
   mergeOccupancy,
+  getPlayableBounds,
 } from './occupancy';
 export { getCellSize, setCellSize } from './cell-size-ref';
 export {

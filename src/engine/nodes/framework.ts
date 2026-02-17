@@ -118,6 +118,8 @@ export interface NodeDefinition<TParams extends Record<string, ParamValue> = Rec
   type: string;
   /** Category for palette grouping */
   category: NodeCategory;
+  /** Short description shown in chip drawer tooltip */
+  description?: string;
 
   // ─── Interface ──────────────────────────────────────────────────────────────
   /** Input port definitions (order matters) */

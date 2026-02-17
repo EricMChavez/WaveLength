@@ -208,17 +208,14 @@ describe('drawGrid', () => {
       // Dots are drawn on OffscreenCanvas, then composited via drawImage
       const expectedCols = PLAYABLE_END - PLAYABLE_START;
       const expectedRows = GRID_ROWS - 1;
-      // Subtract dots excluded by playback bar trapezoid (bottom edge inset by 2 cols)
-      let trapezoidDots = 0;
-      for (let row = Math.max(PLAYBACK_BAR.ROW_START, 1); row <= PLAYBACK_BAR.ROW_END; row++) {
-        const t = (row - PLAYBACK_BAR.ROW_START) / (PLAYBACK_BAR.ROW_END + 1 - PLAYBACK_BAR.ROW_START);
-        const leftEdge = PLAYBACK_BAR.COL_START + t * 2;
-        const rightEdge = PLAYBACK_BAR.COL_END + 1 - t * 2;
-        for (let col = PLAYBACK_BAR.COL_START; col <= PLAYBACK_BAR.COL_END; col++) {
-          if (col >= leftEdge && col <= rightEdge) trapezoidDots++;
+      // Subtract dots excluded by playback bar rectangle (+ 1 row for button protrusion)
+      let barDots = 0;
+      for (let row = Math.max(PLAYBACK_BAR.ROW_START, 1); row <= PLAYBACK_BAR.ROW_END + 1; row++) {
+        for (let col = PLAYABLE_START + 1; col <= PLAYABLE_END; col++) {
+          if (col >= PLAYBACK_BAR.COL_START && col <= PLAYBACK_BAR.COL_END + 1) barDots++;
         }
       }
-      const expectedDots = expectedCols * expectedRows - trapezoidDots;
+      const expectedDots = expectedCols * expectedRows - barDots;
 
       expect(offscreenArcCalls).toHaveLength(expectedDots);
     });

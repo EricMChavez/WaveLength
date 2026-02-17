@@ -6,6 +6,7 @@ export type OffsetParams = { amount: number };
 export const offsetNode = defineNode<OffsetParams>({
   type: 'offset',
   category: 'math',
+  description: 'Shifts signal up or down by a fixed amount',
 
   inputs: [
     { name: 'A' },

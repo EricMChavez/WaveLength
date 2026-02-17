@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playback Controls — 5 Cassette Transport Mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* ===== Page Layout ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0d0f14;
+  color: #ccc;
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 40px 20px;
+  min-height: 100vh;
+}
+
+h1 {
+  text-align: center;
+  font-size: 24px;
+  color: #f0a202;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  letter-spacing: 2px;
+  margin-bottom: 48px;
+}
+
+.designs {
+  display: flex;
+  flex-direction: column;
+  gap: 80px;
+  max-width: 900px;
+  margin: 0 auto;
+  align-items: center;
+}
+
+.design-block { width: 100%; }
+
+.design-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #f0a202;
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
+.design-desc {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 16px;
+  padding-left: 4px;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   GAMEBOARD CONTEXT
+   ============================================================================= */
+
+.gameboard-context {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: visible;  /* allow buttons to protrude below housing */
+}
+
+/* Inner surface: clips dot pattern and streak to the rounded rect */
+.gameboard-surface {
+  position: absolute;
+  inset: 0;
+  background: #06382f;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    inset 3px 3px 12px rgba(0, 0, 0, 0.45),
+    inset -1px -1px 6px rgba(255, 248, 240, 0.02);
+}
+
+.gameboard-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, #318373 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.gameboard-surface::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(
+    50deg,
+    transparent 30%,
+    rgba(200, 255, 220, 0.015) 35%,
+    rgba(200, 255, 220, 0.04) 38%,
+    rgba(200, 255, 220, 0.015) 41%,
+    transparent 46%
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* The bar is positioned so its top edge is hidden behind the gameboard
+   border. It pokes out from under it — no green gap visible. */
+.bar-anchor {
+  position: absolute;
+  top: -2px;  /* tuck top edge behind the gameboard border lip */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;  /* above the border overlays so buttons are clickable */
+}
+
+/* Thin gameboard border lip — sits visually on top of bar edges
+   but the bar z-index is higher so buttons remain interactive */
+.border-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  z-index: 6;
+  pointer-events: none;
+  background: #06382f;
+  border-radius: 10px 10px 0 0;
+}
+
+.border-shadow {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 10px;
+  z-index: 7;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.35) 0%,
+    rgba(0, 0, 0, 0.08) 50%,
+    transparent 100%
+  );
+  border-radius: 10px 10px 0 0;
+}
+
+
+/* =============================================================================
+   SHARED BAR STRUCTURE
+   Beige side panels + dark tray + 4 chunky buttons
+   Matches cassette recorder reference: housing flanks sides only,
+   buttons sit exposed in a recessed dark channel.
+   ============================================================================= */
+
+.bar {
+  display: flex;
+  align-items: flex-start;  /* buttons hang below, not stretch */
+  width: 380px;
+  height: 48px;
+}
+
+/* --- Side panels (beige ears with screws) --- */
+.side-panel {
+  width: 28px;
+  height: 48px;  /* match bar height — buttons protrude past this */
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #ddd6c2 0%, #ccc4ae 40%, #c0b8a0 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* Screw at ~31px from top = inline with button icon centers
+     (4px tray padding + 54px button / 2 = 31px, minus 5px screw radius) */
+  padding-top: 26px;
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  /* Subtle plastic sheen */
+  background-image:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 70%),
+    linear-gradient(180deg, #ddd6c2 0%, #ccc4ae 40%, #c0b8a0 100%);
+}
+
+.side-panel.left {
+  border-radius: 0 0 0 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.side-panel.right {
+  border-radius: 0 0 8px 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Screw */
+.screw {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b8ad96, #a89e88);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
+}
+
+.screw::after {
+  content: '+';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 8px;
+  color: rgba(0, 0, 0, 0.25);
+  font-weight: bold;
+  line-height: 1;
+}
+
+/* --- Button tray (dark recessed channel) --- */
+.btn-tray {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  padding: 4px 0 0 0;  /* dark cavity visible above buttons */
+  height: 100%;
+  position: relative;
+  overflow: visible;  /* buttons protrude below the tray */
+  /* Dark cavity behind buttons */
+  background: #1a1816;
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.8);
+}
+
+/* --- Buttons (chunky cassette-style, significant push travel) ---
+   Buttons are taller than the housing so they protrude below the
+   side panels. Dark cavity is visible above each button.
+   Pressing shifts the button DOWN via translateY — the depressed
+   button hangs even lower than the others. */
+.bar-btn {
+  flex: 1;
+  height: 54px;  /* taller than the 48px bar — protrudes ~10px below */
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: inherit;
+  position: relative;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 0.05s ease;
+}
+
+.bar-btn svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.05s ease;
+}
+
+/* Pressed state: button shifts down, darkens via inset overlay, icon glows white */
+.bar-btn:active {
+  transform: translateY(8px);
+  border-top-color: transparent;
+  /* Darken background without affecting child SVG */
+  box-shadow: inset 0 0 0 100px rgba(0, 0, 0, 0.35);
+}
+.bar-btn:active svg {
+  transform: translateY(-1px);
+  fill: #fff !important;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9))
+         drop-shadow(0 0 10px rgba(255, 255, 255, 0.4));
+}
+
+/* Held/toggled state (play button stays depressed) */
+.bar-btn.active {
+  transform: translateY(8px);
+  border-top-color: transparent;
+  box-shadow: inset 0 0 0 100px rgba(0, 0, 0, 0.35);
+}
+.bar-btn.active svg {
+  transform: translateY(-1px);
+  fill: #fff !important;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9))
+         drop-shadow(0 0 10px rgba(255, 255, 255, 0.4));
+}
+
+
+/* =============================================================================
+   DESIGN 1: MATTE CHARCOAL
+   Classic cassette recorder. Flat matte dark buttons, uniform color.
+   ============================================================================= */
+
+.bar-1 .btn-tray { background: #1c1a18; }
+
+.bar-1 .bar-btn {
+  background: linear-gradient(180deg, #4a4844 0%, #3e3c38 60%, #363432 100%);
+}
+
+.bar-1 .bar-btn svg {
+  fill: #999;
+  transition: fill 0.08s, filter 0.08s;
+}
+
+.bar-1 .bar-btn:hover {
+  background: linear-gradient(180deg, #524e4a 0%, #464440 60%, #3e3c3a 100%);
+}
+.bar-1 .bar-btn:hover svg { fill: #ccc; }
+
+
+/* =============================================================================
+   DESIGN 2: WARM CHARCOAL
+   Warm brown-tinted buttons, uniform color.
+   ============================================================================= */
+
+.bar-2 .btn-tray { background: #1e1c18; }
+
+.bar-2 .bar-btn {
+  background: linear-gradient(180deg, #504a42 0%, #443e38 60%, #3c3630 100%);
+}
+
+.bar-2 .bar-btn svg {
+  fill: #9a9080;
+  transition: fill 0.08s, filter 0.08s;
+}
+
+.bar-2 .bar-btn:hover {
+  background: linear-gradient(180deg, #585048 0%, #4c4640 60%, #444038 100%);
+}
+.bar-2 .bar-btn:hover svg { fill: #c8b8a0; }
+
+
+/* =============================================================================
+   DESIGN 3: COOL SLATE
+   Blue-grey buttons for contrast against the warm beige housing.
+   ============================================================================= */
+
+.bar-3 .btn-tray { background: #181a1e; }
+
+.bar-3 .bar-btn {
+  background: linear-gradient(180deg, #484c52 0%, #3c4048 60%, #343840 100%);
+}
+
+.bar-3 .bar-btn svg {
+  fill: #8890a0;
+  transition: fill 0.08s, filter 0.08s;
+}
+
+.bar-3 .bar-btn:hover {
+  background: linear-gradient(180deg, #50545a 0%, #444850 60%, #3c4048 100%);
+}
+.bar-3 .bar-btn:hover svg { fill: #b0b8c8; }
+
+
+/* =============================================================================
+   DESIGN 4: DARK WALNUT
+   Warm dark brown with subtle woodgrain texture.
+   ============================================================================= */
+
+.bar-4 .btn-tray { background: #1a1614; }
+
+.bar-4 .bar-btn {
+  background: linear-gradient(180deg, #4c4238 0%, #403830 60%, #38302a 100%);
+  /* Subtle woodgrain micro-texture */
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.008) 1px, transparent 2px),
+    linear-gradient(180deg, #4c4238 0%, #403830 60%, #38302a 100%);
+}
+
+.bar-4 .bar-btn svg {
+  fill: #988878;
+  transition: fill 0.08s, filter 0.08s;
+}
+
+.bar-4 .bar-btn:hover {
+  background: linear-gradient(180deg, #544a40 0%, #484038 60%, #403832 100%);
+}
+.bar-4 .bar-btn:hover svg { fill: #c0a890; }
+
+
+/* =============================================================================
+   DESIGN 5: JET BLACK
+   Deep black buttons matching gameboard darkness.
+   ============================================================================= */
+
+.bar-5 .btn-tray { background: #121214; }
+
+.bar-5 .bar-btn {
+  background: linear-gradient(180deg, #3a3a3e 0%, #2e2e32 60%, #26262a 100%);
+}
+
+.bar-5 .bar-btn svg {
+  fill: #7a7a88;
+  transition: fill 0.08s, filter 0.08s;
+}
+
+.bar-5 .bar-btn:hover {
+  background: linear-gradient(180deg, #424248 0%, #36363c 60%, #2e2e34 100%);
+}
+.bar-5 .bar-btn:hover svg { fill: #b0b0c0; }
+
+</style>
+</head>
+<body>
+
+<!-- Shared SVG icon definitions -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <symbol id="icon-prev" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="3" height="14"/>
+      <polygon points="19,5 9,12 19,19"/>
+    </symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24">
+      <polygon points="7,4 20,12 7,20"/>
+    </symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24">
+      <rect x="5" y="5" width="14" height="14" rx="1"/>
+    </symbol>
+    <symbol id="icon-next" viewBox="0 0 24 24">
+      <polygon points="5,5 15,12 5,19"/>
+      <rect x="18" y="5" width="3" height="14"/>
+    </symbol>
+  </defs>
+</svg>
+
+<h1>Playback Controls</h1>
+<p class="subtitle">Cassette Transport — Beige Side Housing + Dark Chunky Buttons</p>
+
+<div class="designs">
+
+  <!-- ===== DESIGN 1: MATTE CHARCOAL + RED ===== -->
+  <div class="design-block">
+    <div class="design-label">1. Matte Charcoal</div>
+    <div class="design-desc">Classic cassette recorder. Flat matte dark buttons. Closest to the reference image.</div>
+    <div class="gameboard-context">
+      <div class="gameboard-surface"></div>
+      <div class="border-overlay"></div>
+      <div class="border-shadow"></div>
+      <div class="bar-anchor">
+        <div class="bar bar-1">
+          <div class="side-panel left"><div class="screw"></div></div>
+          <div class="btn-tray">
+            <button class="bar-btn" title="Previous"><svg><use href="#icon-prev"/></svg></button>
+            <button class="bar-btn play-btn active" title="Play"><svg><use href="#icon-play"/></svg></button>
+            <button class="bar-btn" title="Stop"><svg><use href="#icon-stop"/></svg></button>
+            <button class="bar-btn" title="Next"><svg><use href="#icon-next"/></svg></button>
+          </div>
+          <div class="side-panel right"><div class="screw"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DESIGN 2: WARM CHARCOAL + AMBER ===== -->
+  <div class="design-block">
+    <div class="design-label">2. Warm Charcoal</div>
+    <div class="design-desc">Warm brown-tinted buttons with an earthy tone.</div>
+    <div class="gameboard-context">
+      <div class="gameboard-surface"></div>
+      <div class="border-overlay"></div>
+      <div class="border-shadow"></div>
+      <div class="bar-anchor">
+        <div class="bar bar-2">
+          <div class="side-panel left"><div class="screw"></div></div>
+          <div class="btn-tray">
+            <button class="bar-btn" title="Previous"><svg><use href="#icon-prev"/></svg></button>
+            <button class="bar-btn play-btn active" title="Play"><svg><use href="#icon-play"/></svg></button>
+            <button class="bar-btn" title="Stop"><svg><use href="#icon-stop"/></svg></button>
+            <button class="bar-btn" title="Next"><svg><use href="#icon-next"/></svg></button>
+          </div>
+          <div class="side-panel right"><div class="screw"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DESIGN 3: COOL SLATE + ORANGE ===== -->
+  <div class="design-block">
+    <div class="design-label">3. Cool Slate</div>
+    <div class="design-desc">Blue-grey buttons contrasting warm beige housing.</div>
+    <div class="gameboard-context">
+      <div class="gameboard-surface"></div>
+      <div class="border-overlay"></div>
+      <div class="border-shadow"></div>
+      <div class="bar-anchor">
+        <div class="bar bar-3">
+          <div class="side-panel left"><div class="screw"></div></div>
+          <div class="btn-tray">
+            <button class="bar-btn" title="Previous"><svg><use href="#icon-prev"/></svg></button>
+            <button class="bar-btn play-btn active" title="Play"><svg><use href="#icon-play"/></svg></button>
+            <button class="bar-btn" title="Stop"><svg><use href="#icon-stop"/></svg></button>
+            <button class="bar-btn" title="Next"><svg><use href="#icon-next"/></svg></button>
+          </div>
+          <div class="side-panel right"><div class="screw"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DESIGN 4: DARK WALNUT + FOREST GREEN ===== -->
+  <div class="design-block">
+    <div class="design-label">4. Dark Walnut</div>
+    <div class="design-desc">Warm dark brown buttons with subtle woodgrain texture.</div>
+    <div class="gameboard-context">
+      <div class="gameboard-surface"></div>
+      <div class="border-overlay"></div>
+      <div class="border-shadow"></div>
+      <div class="bar-anchor">
+        <div class="bar bar-4">
+          <div class="side-panel left"><div class="screw"></div></div>
+          <div class="btn-tray">
+            <button class="bar-btn" title="Previous"><svg><use href="#icon-prev"/></svg></button>
+            <button class="bar-btn play-btn active" title="Play"><svg><use href="#icon-play"/></svg></button>
+            <button class="bar-btn" title="Stop"><svg><use href="#icon-stop"/></svg></button>
+            <button class="bar-btn" title="Next"><svg><use href="#icon-next"/></svg></button>
+          </div>
+          <div class="side-panel right"><div class="screw"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DESIGN 5: JET BLACK + TEAL ===== -->
+  <div class="design-block">
+    <div class="design-label">5. Jet Black</div>
+    <div class="design-desc">Deep black buttons matching gameboard darkness.</div>
+    <div class="gameboard-context">
+      <div class="gameboard-surface"></div>
+      <div class="border-overlay"></div>
+      <div class="border-shadow"></div>
+      <div class="bar-anchor">
+        <div class="bar bar-5">
+          <div class="side-panel left"><div class="screw"></div></div>
+          <div class="btn-tray">
+            <button class="bar-btn" title="Previous"><svg><use href="#icon-prev"/></svg></button>
+            <button class="bar-btn play-btn active" title="Play"><svg><use href="#icon-play"/></svg></button>
+            <button class="bar-btn" title="Stop"><svg><use href="#icon-stop"/></svg></button>
+            <button class="bar-btn" title="Next"><svg><use href="#icon-next"/></svg></button>
+          </div>
+          <div class="side-panel right"><div class="screw"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Toggle active state on click for interactive preview
+document.querySelectorAll('.bar-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const bar = btn.closest('.bar');
+    const isPlay = btn.classList.contains('play-btn');
+    const isStop = btn.getAttribute('title') === 'Stop';
+
+    if (isStop) {
+      bar.querySelectorAll('.bar-btn').forEach(b => b.classList.remove('active'));
+    } else if (isPlay) {
+      btn.classList.toggle('active');
+    }
+  });
+});
+</script>
+
+</body>
+</html>

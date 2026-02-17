@@ -14,79 +14,56 @@ function createTestStore() {
 
 describe('screen-slice', () => {
   describe('initial state', () => {
-    it('starts with null activeScreen and idle transition', () => {
+    it('starts with null activeScreen, idle transition, and generation 0', () => {
       const { state } = createTestStore();
       expect(state.activeScreen).toBe(null);
       expect(state.screenTransition).toEqual({ type: 'idle' });
+      expect(state.tabSwitchGeneration).toBe(0);
     });
   });
 
   describe('showScreen', () => {
-    it('sets activeScreen instantly with idle transition', () => {
+    it('sets activeScreen to home with idle transition', () => {
       const { state } = createTestStore();
-      state.showScreen('main-menu');
-      expect(state.activeScreen).toBe('main-menu');
+      state.showScreen();
+      expect(state.activeScreen).toBe('home');
       expect(state.screenTransition).toEqual({ type: 'idle' });
     });
   });
 
-  describe('navigateToPage', () => {
-    it('slides left when navigating from main-menu to about', () => {
+  describe('switchTab', () => {
+    it('switches to a different tab and bumps generation', () => {
       const { state } = createTestStore();
-      state.showScreen('main-menu');
-      state.navigateToPage('about');
-      expect(state.screenTransition).toEqual({
-        type: 'sliding-page',
-        from: 'main-menu',
-        to: 'about',
-        direction: 'left',
-      });
+      state.showScreen();
+      state.switchTab('settings');
+      expect(state.activeScreen).toBe('settings');
+      expect(state.tabSwitchGeneration).toBe(1);
     });
 
-    it('slides right when navigating from main-menu to settings', () => {
+    it('does nothing when switching to the same tab', () => {
       const { state } = createTestStore();
-      state.showScreen('main-menu');
-      state.navigateToPage('settings');
-      expect(state.screenTransition).toEqual({
-        type: 'sliding-page',
-        from: 'main-menu',
-        to: 'settings',
-        direction: 'right',
-      });
+      state.showScreen();
+      state.switchTab('home');
+      expect(state.activeScreen).toBe('home');
+      expect(state.tabSwitchGeneration).toBe(0);
     });
 
-    it('slides right when navigating from about to main-menu', () => {
+    it('increments generation on each switch', () => {
       const { state } = createTestStore();
-      state.showScreen('about');
-      state.navigateToPage('main-menu');
-      expect(state.screenTransition).toEqual({
-        type: 'sliding-page',
-        from: 'about',
-        to: 'main-menu',
-        direction: 'right',
-      });
-    });
-
-    it('does nothing when navigating to the same page', () => {
-      const { state } = createTestStore();
-      state.showScreen('main-menu');
-      state.navigateToPage('main-menu');
-      expect(state.screenTransition).toEqual({ type: 'idle' });
-    });
-
-    it('does nothing when no active screen', () => {
-      const { state } = createTestStore();
-      state.navigateToPage('about');
-      expect(state.screenTransition).toEqual({ type: 'idle' });
+      state.showScreen();
+      state.switchTab('settings');
+      state.switchTab('about');
+      state.switchTab('home');
+      expect(state.tabSwitchGeneration).toBe(3);
     });
   });
 
   describe('dismissScreen', () => {
     it('starts sliding-down transition', () => {
       const { state } = createTestStore();
-      state.showScreen('main-menu');
+      state.showScreen();
       state.dismissScreen();
-      expect(state.screenTransition).toEqual({ type: 'sliding-down', page: 'main-menu' });
+      expect(state.screenTransition).toEqual({ type: 'sliding-down' });
     });
 
     it('does nothing when no active screen', () => {
@@ -97,35 +74,27 @@ describe('screen-slice', () => {
   });
 
   describe('revealScreen', () => {
-    it('starts sliding-up transition and sets activeScreen', () => {
+    it('starts sliding-up transition and sets activeScreen to home', () => {
       const { state } = createTestStore();
-      state.revealScreen('main-menu');
-      expect(state.activeScreen).toBe('main-menu');
-      expect(state.screenTransition).toEqual({ type: 'sliding-up', page: 'main-menu' });
+      state.revealScreen();
+      expect(state.activeScreen).toBe('home');
+      expect(state.screenTransition).toEqual({ type: 'sliding-up' });
     });
 
     it('does nothing when a screen is already active', () => {
       const { state } = createTestStore();
-      state.showScreen('main-menu');
-      state.revealScreen('about');
-      expect(state.activeScreen).toBe('main-menu');
+      state.showScreen();
+      state.switchTab('settings');
+      state.revealScreen();
+      expect(state.activeScreen).toBe('settings');
       expect(state.screenTransition).toEqual({ type: 'idle' });
     });
   });
 
   describe('completeScreenTransition', () => {
-    it('completes sliding-page: sets activeScreen to target', () => {
-      const { state } = createTestStore();
-      state.showScreen('main-menu');
-      state.navigateToPage('about');
-      state.completeScreenTransition();
-      expect(state.activeScreen).toBe('about');
-      expect(state.screenTransition).toEqual({ type: 'idle' });
-    });
-
     it('completes sliding-down: clears activeScreen', () => {
       const { state } = createTestStore();
-      state.showScreen('main-menu');
+      state.showScreen();
       state.dismissScreen();
       state.completeScreenTransition();
       expect(state.activeScreen).toBe(null);
@@ -134,9 +103,9 @@ describe('screen-slice', () => {
 
     it('completes sliding-up: keeps activeScreen, clears transition', () => {
       const { state } = createTestStore();
-      state.revealScreen('main-menu');
+      state.revealScreen();
       state.completeScreenTransition();
-      expect(state.activeScreen).toBe('main-menu');
+      expect(state.activeScreen).toBe('home');
       expect(state.screenTransition).toEqual({ type: 'idle' });
     });
 

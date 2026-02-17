@@ -26,6 +26,8 @@ export const createProgressionSlice: StateCreator<ProgressionSlice> = (set, get)
       const next = new Set(state.completedLevels);
       next.add(puzzleId);
 
+      if (PUZZLE_LEVELS.length === 0) return { completedLevels: next };
+
       // Advance currentLevelIndex to the next uncompleted level
       const currentPuzzle = PUZZLE_LEVELS[state.currentLevelIndex];
       if (currentPuzzle && currentPuzzle.id === puzzleId) {
@@ -38,14 +40,16 @@ export const createProgressionSlice: StateCreator<ProgressionSlice> = (set, get)
     }),
 
   setCurrentLevel: (index) =>
-    set(() => ({
-      currentLevelIndex: Math.max(0, Math.min(index, PUZZLE_LEVELS.length - 1)),
-    })),
+    set(() => {
+      if (PUZZLE_LEVELS.length === 0) return { currentLevelIndex: 0 };
+      return { currentLevelIndex: Math.max(0, Math.min(index, PUZZLE_LEVELS.length - 1)) };
+    }),
 
   getUnlockedPuzzleIds: () => get().completedLevels,
 
   isLevelUnlocked: (index) => {
     if (index === 0) return true;
+    if (PUZZLE_LEVELS.length === 0) return false;
     if (index < 0 || index >= PUZZLE_LEVELS.length) return false;
     const previousPuzzle = PUZZLE_LEVELS[index - 1];
     return get().completedLevels.has(previousPuzzle.id);

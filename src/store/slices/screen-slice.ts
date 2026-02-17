@@ -1,65 +1,61 @@
 import type { StateCreator } from 'zustand';
 
-export type ScreenPage = 'main-menu' | 'about' | 'settings';
-
-/** Ordering for slide direction: navigating to a higher index slides left, lower slides right */
-const PAGE_ORDER: ScreenPage[] = ['settings', 'main-menu', 'about'];
+export type GizmoTab = 'home' | 'settings' | 'about';
 
 export type ScreenTransition =
   | { type: 'idle' }
-  | { type: 'sliding-page'; from: ScreenPage; to: ScreenPage; direction: 'left' | 'right' }
-  | { type: 'sliding-down'; page: ScreenPage }
-  | { type: 'sliding-up'; page: ScreenPage };
+  | { type: 'sliding-down' }
+  | { type: 'sliding-up' };
 
 export interface ScreenSlice {
-  activeScreen: ScreenPage | null;
+  activeScreen: GizmoTab | null;
   screenTransition: ScreenTransition;
-  showScreen: (page: ScreenPage) => void;
-  navigateToPage: (to: ScreenPage) => void;
+  tabSwitchGeneration: number;
+
+  switchTab: (tab: GizmoTab) => void;
   dismissScreen: () => void;
-  revealScreen: (page: ScreenPage) => void;
+  revealScreen: () => void;
+  showScreen: () => void;
   completeScreenTransition: () => void;
 }
 
 export const createScreenSlice: StateCreator<ScreenSlice> = (set, get) => ({
   activeScreen: null,
   screenTransition: { type: 'idle' },
+  tabSwitchGeneration: 0,
 
-  showScreen: (page) => set({ activeScreen: page, screenTransition: { type: 'idle' } }),
-
-  navigateToPage: (to) => {
+  switchTab: (tab) => {
     const { activeScreen } = get();
-    if (!activeScreen || activeScreen === to) return;
-    const fromIndex = PAGE_ORDER.indexOf(activeScreen);
-    const toIndex = PAGE_ORDER.indexOf(to);
-    const direction = toIndex > fromIndex ? 'left' : 'right';
+    if (activeScreen === tab) return;
     set({
-      screenTransition: { type: 'sliding-page', from: activeScreen, to, direction },
+      activeScreen: tab,
+      tabSwitchGeneration: get().tabSwitchGeneration + 1,
     });
   },
+
+  showScreen: () => set({
+    activeScreen: 'home',
+    screenTransition: { type: 'idle' },
+  }),
 
   dismissScreen: () => {
     const { activeScreen } = get();
     if (!activeScreen) return;
-    set({
-      screenTransition: { type: 'sliding-down', page: activeScreen },
-    });
+    set({ screenTransition: { type: 'sliding-down' } });
   },
 
-  revealScreen: (page) => {
+  revealScreen: () => {
     const { activeScreen } = get();
     if (activeScreen) return;
     set({
-      activeScreen: page,
-      screenTransition: { type: 'sliding-up', page },
+      activeScreen: 'home',
+      screenTransition: { type: 'sliding-up' },
     });
   },
 
   completeScreenTransition: () => {
     const { screenTransition } = get();
-    if (screenTransition.type === 'sliding-page') {
-      set({ activeScreen: screenTransition.to, screenTransition: { type: 'idle' } });
-    } else if (screenTransition.type === 'sliding-down') {
+    if (screenTransition.type === 'sliding-down') {
       set({ activeScreen: null, screenTransition: { type: 'idle' } });
     } else if (screenTransition.type === 'sliding-up') {
       set({ screenTransition: { type: 'idle' } });

@@ -8,6 +8,7 @@ import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { getNodeDefinition } from '../../engine/nodes/registry.ts';
 import { getNodePortPosition, getNodeBodyPixelRect, getPortPhysicalSide } from './port-positions.ts';
 import { isConnectionPointNode } from '../../puzzle/connection-point-nodes.ts';
+import { PUZZLE_MENU_GRID_ROWS } from '../../shared/grid/index.ts';
 import { getDevOverrides } from '../../dev/index.ts';
 import { drawKnob } from './render-knob.ts';
 import { signalToColor, signalToGlow } from './render-wires.ts';
@@ -113,8 +114,14 @@ export function drawNodes(
   for (const node of state.chips.values()) {
     if (isConnectionPointNode(node.id)) continue;
     drawNodeBody(ctx, tokens, state, node, cellSize);
-    const isLive = state.liveNodeIds.has(node.id);
-    drawNodePorts(ctx, tokens, node, cellSize, isLive ? state.portSignals : EMPTY_PORT_SIGNALS, state.connectedInputPorts);
+
+    // Puzzle menu chips render port indicators from slot params instead of real ports
+    if (node.params?.isPuzzleChip) {
+      drawMenuChipPorts(ctx, tokens, node, cellSize);
+    } else {
+      const isLive = state.liveNodeIds.has(node.id);
+      drawNodePorts(ctx, tokens, node, cellSize, isLive ? state.portSignals : EMPTY_PORT_SIGNALS, state.connectedInputPorts);
+    }
   }
 
   // Second pass: draw selection highlight on top of all nodes
@@ -401,6 +408,46 @@ function drawNodePorts(
     const pos = getNodePortPosition(node, 'output', i, cellSize);
     const signalValue = portSignals.get(`${node.id}:output:${i}`) ?? 0;
     drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, { type: 'plug' });
+  }
+}
+
+/**
+ * Draw port indicators on a puzzle menu chip based on its slot params.
+ * Slot params are stored as slot0..slot5: 0=inactive, 1=active input, 2=active output.
+ * Input slots render as sockets, output slots render as plugs.
+ * 3 positions per side (slots 0-2 left, 3-5 right), spaced evenly within the 6x4 body.
+ */
+function drawMenuChipPorts(
+  ctx: CanvasRenderingContext2D,
+  tokens: ThemeTokens,
+  node: NodeState,
+  cellSize: number,
+): void {
+  const portRadius = NODE_STYLE.PORT_RADIUS_RATIO * cellSize;
+  const chipCols = 6; // PUZZLE_MENU_GRID_COLS
+  const chipRows = PUZZLE_MENU_GRID_ROWS;
+
+  for (let i = 0; i < 6; i++) {
+    const slotVal = node.params[`slot${i}`] as number;
+    if (!slotVal) continue; // 0 or undefined = inactive
+
+    const isLeft = i < 3;
+    const perSideIdx = isLeft ? i : i - 3;
+
+    // Port position: edge of chip body, evenly spaced vertically
+    const x = isLeft
+      ? node.position.col * cellSize
+      : (node.position.col + chipCols) * cellSize;
+    const y = (node.position.row + Math.floor(perSideIdx * chipRows / 3)) * cellSize;
+
+    if (slotVal === 1) {
+      // Input ports show as sockets
+      const openDir = isLeft ? 'left' : 'right';
+      drawPort(ctx, tokens, x, y, portRadius, 0, { type: 'socket', openingDirection: openDir });
+    } else {
+      // Output ports show as plugs
+      drawPort(ctx, tokens, x, y, portRadius, 0, { type: 'plug' });
+    }
   }
 }
 

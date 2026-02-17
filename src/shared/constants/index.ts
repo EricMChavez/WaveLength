@@ -125,7 +125,46 @@ export const PLAYBACK_BAR = {
   COL_START: 24,
   COL_END: 41,    // inclusive
   ROW_START: 0,
-  ROW_END: 1,     // inclusive (top of grid)
+  ROW_END: 1,     // inclusive — occupancy region (blocks node placement)
+  HEIGHT_CELLS: 1.5, // visual height in grid cells
+} as const;
+
+/** Back button grid region (above top-left meter, visible on all boards) */
+export const BACK_BUTTON = {
+  COL_START: 0,
+  COL_END: 3,     // inclusive — 4 cols wide
+  ROW_START: 0,
+  ROW_END: 1,     // inclusive — 2 rows tall
+} as const;
+
+/** Record button grid region (top-right, creative mode only) */
+export const RECORD_BUTTON = {
+  COL_START: 62,
+  COL_END: 65,    // inclusive — 4 cols wide
+  ROW_START: 0,
+  ROW_END: 1,     // inclusive — 2 rows tall
+} as const;
+
+/** Chip drawer grid region (bottom of gameboard) */
+export const CHIP_DRAWER = {
+  HANDLE_COL_START: 18,
+  HANDLE_COL_END: 47,
+  HANDLE_ROW: 35,          // bottom row, 1 row tall
+  TRAY_COL_START: 18,
+  TRAY_COL_END: 47,
+  TRAY_HEIGHT_ROWS: 12,    // slides up from bottom
+  /** Duration of drawer open animation in ms */
+  OPEN_DURATION_MS: 300,
+  /** Duration of drawer close animation in ms */
+  CLOSE_DURATION_MS: 200,
+  /** Tooltip delay in ms before showing description */
+  TOOLTIP_DELAY_MS: 300,
+  /** Chip slot width in grid cells */
+  SLOT_COLS: 6,
+  /** Chip slot height in grid cells */
+  SLOT_ROWS: 5,
+  /** Mini cellSize ratio for chip rendering inside drawer */
+  MINI_CELL_RATIO: 0.6,
 } as const;
 
 /** Display labels for node types (derived from registry for v2 nodes) */

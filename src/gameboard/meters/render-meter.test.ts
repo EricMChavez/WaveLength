@@ -24,6 +24,7 @@ const mockTokens: ThemeTokens = {
   meterNeedle: '#fff',
   meterBorder: '#666',
   meterBorderMatch: '#063',
+  meterBorderMismatch: '#e04040',
   boardBorder: '#555',
   depthRaised: '#aaa',
   depthSunken: '#222',
@@ -76,7 +77,7 @@ describe('drawMeter', () => {
   it('hidden mode makes no canvas calls', () => {
     const ctx = createMockCtx();
     const slot: MeterSlotState = { mode: 'hidden' };
-    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, isPortMatched: false, isUtilityEditing: false };
+    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, borderState: 'neutral', isUtilityEditing: false };
     drawMeter(ctx, mockTokens, state, testRect);
     expect(ctx._calls).toHaveLength(0);
   });
@@ -84,7 +85,7 @@ describe('drawMeter', () => {
   it('off mode draws housing and direction indicator but no channels', () => {
     const ctx = createMockCtx();
     const slot: MeterSlotState = { mode: 'off' };
-    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, isPortMatched: false, isUtilityEditing: false };
+    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, borderState: 'neutral', isUtilityEditing: false };
     drawMeter(ctx, mockTokens, state, testRect);
 
     // Should draw housing + interior + border + streak + direction indicator
@@ -97,7 +98,7 @@ describe('drawMeter', () => {
   it('input mode draws interior, centerline, and channels', () => {
     const ctx = createMockCtx();
     const slot: MeterSlotState = { mode: 'output' };
-    const state: RenderMeterState = { slot, side: 'right', signalValues: [50, -30], targetValues: null, playpoint: 0, isConnected: true, isPortMatched: false, isUtilityEditing: false };
+    const state: RenderMeterState = { slot, side: 'right', signalValues: [50, -30], targetValues: null, playpoint: 0, isConnected: true, borderState: 'neutral', isUtilityEditing: false };
     drawMeter(ctx, mockTokens, state, testRect);
 
     // Housing + interior + level bar use roundRect+fill; streak uses fillRect
@@ -112,7 +113,7 @@ describe('drawMeter', () => {
   it('utility editing draws housing + direction indicator only', () => {
     const ctx = createMockCtx();
     const slot: MeterSlotState = { mode: 'input' };
-    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, isPortMatched: false, isUtilityEditing: true };
+    const state: RenderMeterState = { slot, side: 'left', signalValues: null, targetValues: null, playpoint: 0, isConnected: false, borderState: 'neutral', isUtilityEditing: true };
     drawMeter(ctx, mockTokens, state, testRect);
 
     // Should draw housing + interior + border + streak + direction indicator

@@ -251,6 +251,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
     // Don't set activeBoard here — the caller (menu-navigation.ts) sets it
     set({
       boardStack: newStack,
+      activeBoardReadOnly: false,
       navigationDepth: newStack.length,
       selectedNodeId: null,
     });
@@ -265,17 +266,22 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
 
     // If returning to the home board, rebuild it with fresh progression state
     if (entry.board.id === 'motherboard') {
-      const freshBoard = createMotherboard(state.completedLevels, state.isLevelUnlocked, state.customPuzzles);
+      const currentPage = state.motherboardLayout?.pagination?.currentPage;
+      const { board: freshBoard, layout } = createMotherboard(
+        state.completedLevels, state.isLevelUnlocked, state.customPuzzles,
+        currentPage,
+      );
       set({
         boardStack: newStack,
         activeBoard: freshBoard,
         activeBoardId: freshBoard.id,
         portConstants: entry.portConstants,
-        activeBoardReadOnly: true,
+        activeBoardReadOnly: false,
         navigationDepth: newStack.length,
         selectedNodeId: null,
         occupancy: recomputeOccupancy(freshBoard.chips),
         meterSlots: entry.meterSlots,
+        motherboardLayout: layout,
       });
       return;
     }

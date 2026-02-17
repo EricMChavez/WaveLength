@@ -63,6 +63,37 @@ describe('buildContextMenuItems', () => {
     expect(items.find((i) => i.action === 'set-params')).toBeFalsy();
     expect(items.find((i) => i.action === 'delete-node')).toBeFalsy();
   });
+
+  it('returns Export for custom puzzle node on gameboard', () => {
+    const items = buildContextMenuItems({ type: 'node', chipId: 'n1', nodeType: 'puzzle:my-puzzle', isCustomPuzzle: true });
+    expect(items.find((i) => i.action === 'export')).toBeTruthy();
+  });
+
+  it('returns Export for custom puzzle node on motherboard', () => {
+    const items = buildContextMenuItems({ type: 'node', chipId: 'n1', nodeType: 'menu:custom-my-puzzle', isCustomPuzzle: true });
+    expect(items.find((i) => i.action === 'export')).toBeTruthy();
+  });
+
+  it('does not return Export for built-in puzzle node', () => {
+    const items = buildContextMenuItems({ type: 'node', chipId: 'n1', nodeType: 'puzzle:half-wave' });
+    expect(items.find((i) => i.action === 'export')).toBeFalsy();
+  });
+
+  it('returns both Inspect and Export for custom puzzle node on gameboard', () => {
+    const items = buildContextMenuItems({ type: 'node', chipId: 'n1', nodeType: 'puzzle:my-puzzle', isCustomPuzzle: true });
+    const inspect = items.find((i) => i.action === 'inspect');
+    const exportItem = items.find((i) => i.action === 'export');
+    expect(inspect).toBeTruthy();
+    expect(exportItem).toBeTruthy();
+    // Export comes after Inspect
+    expect(items.indexOf(exportItem!)).toBeGreaterThan(items.indexOf(inspect!));
+  });
+
+  it('returns Export without Inspect for motherboard custom node', () => {
+    const items = buildContextMenuItems({ type: 'node', chipId: 'n1', nodeType: 'menu:custom-my-puzzle', isCustomPuzzle: true });
+    expect(items.find((i) => i.action === 'inspect')).toBeFalsy();
+    expect(items.find((i) => i.action === 'export')).toBeTruthy();
+  });
 });
 
 describe('hasEditableParams', () => {

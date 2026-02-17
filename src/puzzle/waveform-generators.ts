@@ -77,6 +77,79 @@ export function generateWaveformValue(tick: number, def: WaveformDef): number {
   return clamp(scaled);
 }
 
+// ---------------------------------------------------------------------------
+// FM (Frequency-Modulated) waveform generation
+// ---------------------------------------------------------------------------
+
+type FMBaseShape = 'sine' | 'square' | 'triangle' | 'sawtooth';
+
+/**
+ * Map a normalized phase [0,1) to a raw value [-1,+1] for a base shape.
+ * Phase wraps via modular arithmetic so any real value is valid.
+ */
+export function shapeAtPhase(base: FMBaseShape, phase: number): number {
+  // Normalize to [0,1)
+  const t = ((phase % 1) + 1) % 1;
+
+  switch (base) {
+    case 'sine':
+      return Math.sin(2 * Math.PI * t);
+    case 'square':
+      return t < 0.5 ? 1 : -1;
+    case 'triangle':
+      return t < 0.5 ? -1 + 4 * t : 3 - 4 * t;
+    case 'sawtooth':
+      return -1 + 2 * t;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Generate 256 FM-modulated samples using sinusoidal phase accumulation.
+ *
+ * phase(t) = N*t - depth/(2π*M) * (cos(2πMt) - 1)
+ * output = baseShape(phase mod 1) * amplitude
+ *
+ * Perfect looping is guaranteed when N and M are integers.
+ *
+ * @param baseShape  Base waveform shape
+ * @param baseCycles Number of base cycles over 256 samples (N)
+ * @param modRate    Modulation rate — cycles of the modulator per 256 samples (M)
+ * @param depth      Modulation depth (higher = more FM)
+ * @param amplitude  Output amplitude (0–100)
+ * @returns 256 clamped samples in [-100, +100]
+ */
+export function generateFMSamples(
+  baseShape: FMBaseShape,
+  baseCycles: number,
+  modRate: number,
+  depth: number,
+  amplitude: number,
+): number[] {
+  const NUM_SAMPLES = 256;
+  const samples: number[] = new Array(NUM_SAMPLES);
+  const twoPi = 2 * Math.PI;
+
+  for (let i = 0; i < NUM_SAMPLES; i++) {
+    const t = i / NUM_SAMPLES; // normalized time [0, 1)
+
+    let phase: number;
+    if (modRate === 0) {
+      // No modulation — constant frequency
+      phase = baseCycles * t;
+    } else {
+      // FM: phase(t) = N*t - depth/(2π*M) * (cos(2πMt) - 1)
+      phase = baseCycles * t - (depth / (twoPi * modRate)) * (Math.cos(twoPi * modRate * t) - 1);
+    }
+
+    const raw = shapeAtPhase(baseShape, phase);
+    samples[i] = clamp(raw * amplitude);
+  }
+
+  return samples;
+}
+
 /** Get the canonical period for a waveform shape. */
 export function getShapePeriod(shape: WaveformShape): number {
   // Strip -reduced suffix for period calculation

@@ -6,6 +6,7 @@ export type ThresholdParams = { level: number };
 export const thresholdNode = defineNode<ThresholdParams>({
   type: 'threshold',
   category: 'math',
+  description: 'Outputs +100 or -100 based on whether input exceeds a level',
 
   inputs: [
     { name: 'A' },

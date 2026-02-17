@@ -8,7 +8,7 @@ export interface ContextMenuItem {
 }
 
 export type ContextTarget =
-  | { type: 'node'; chipId: string; nodeType: string; locked?: boolean }
+  | { type: 'node'; chipId: string; nodeType: string; locked?: boolean; isCustomPuzzle?: boolean }
   | { type: 'wire'; wireId: string };
 
 /**
@@ -32,6 +32,10 @@ export function buildContextMenuItems(
 
     if (target.nodeType.startsWith('puzzle:')) {
       items.push({ id: 'inspect', label: 'Inspect', action: 'inspect' });
+    }
+
+    if (target.isCustomPuzzle) {
+      items.push({ id: 'export', label: 'Export', action: 'export' });
     }
 
     if (target.nodeType.startsWith('utility:') || target.nodeType === 'custom-blank') {

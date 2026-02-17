@@ -18,3 +18,7 @@ export const PLAYABLE_END = 55;
 /** Right meter zone: columns 56-65 (10 columns for analog meters) */
 export const METER_RIGHT_START = 56;
 export const METER_RIGHT_END = 65;
+
+/** Motherboard playable area (no meters, 2-col margin each side) */
+export const MOTHERBOARD_PLAYABLE_START = 2;
+export const MOTHERBOARD_PLAYABLE_END = 63;

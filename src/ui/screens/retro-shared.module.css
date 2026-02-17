@@ -130,23 +130,25 @@
 /* ===== CRT Screen ===== */
 .screenHousing {
   background: #3a3428;
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 20px;
+  padding: 16px;
   margin-bottom: 28px;
+  overflow: hidden;
   box-shadow:
     inset 0 2px 6px rgba(0, 0, 0, 0.5),
     inset 0 0 20px rgba(0, 0, 0, 0.3),
     0 1px 0 rgba(255, 255, 255, 0.15);
+  container-type: inline-size;
 }
 
 .screen {
-  background: #2a3a1a;
-  border-radius: 6px;
-  padding: 20px 24px;
+  background: #080a08;
+  padding: 28px 36px;
   min-height: 120px;
   position: relative;
   overflow: hidden;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+  clip-path: url(#crt-screen);
 }
 
 /* Scanlines */
@@ -158,41 +160,170 @@
     0deg,
     transparent 0px,
     transparent 2px,
-    rgba(0, 0, 0, 0.08) 2px,
-    rgba(0, 0, 0, 0.08) 4px
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
   );
   pointer-events: none;
   z-index: 2;
 }
 
-/* Vignette */
+/* Vignette — enhanced for convex glass depth */
 .screen::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.3) 100%);
+  background: radial-gradient(ellipse 75% 70% at center, transparent 25%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.6) 100%);
   pointer-events: none;
   z-index: 3;
 }
 
+/* ===== CRT Glass Overlays ===== */
+
+/* Diagonal highlight streak */
+.highlightStreak {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.highlightStreak::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(
+    50deg,
+    transparent 25%,
+    rgba(200, 255, 220, 0.025) 30%,
+    rgba(200, 255, 220, 0.06) 34%,
+    rgba(200, 255, 220, 0.025) 38%,
+    transparent 43%
+  );
+  mix-blend-mode: screen;
+}
+
+.highlightStreak::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(
+    50deg,
+    transparent 15%,
+    rgba(200, 255, 220, 0.04) 25%,
+    rgba(200, 255, 220, 0.08) 35%,
+    rgba(200, 255, 220, 0.04) 45%,
+    transparent 55%
+  );
+  mix-blend-mode: soft-light;
+}
+
+/* Noise grain texture */
+.noiseGrain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* Inset depth shadows */
+.insetDepth {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow:
+    inset 3px 3px 8px rgba(0, 0, 0, 0.35),
+    inset -1px -1px 4px rgba(255, 248, 240, 0.03);
+}
+
+/* Convex glass dome highlight */
+.glassBulge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+  background: radial-gradient(
+    ellipse 80% 70% at 45% 40%,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 50%,
+    transparent 75%
+  );
+}
+
+/* Specular reflection arc */
+.glassBulge::before {
+  content: '';
+  position: absolute;
+  top: 2%; left: 8%; right: 35%;
+  height: 30%;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  background: radial-gradient(
+    ellipse at 50% 90%,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0.03) 40%,
+    transparent 70%
+  );
+}
+
+/* Glass edge catch-light */
+.glassBulge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.06),
+    inset 2px 0 0 rgba(255, 255, 255, 0.03),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.12),
+    inset -2px 0 0 rgba(0, 0, 0, 0.08);
+}
+
+/* ===== ASCII Art Title ===== */
+.asciiArtWrap {
+  width: 100%;
+  overflow: hidden;
+  margin-bottom: 0.57cqi;
+}
+
+.asciiArt {
+  font-family: 'VT323', monospace;
+  font-size: 1.7cqi;
+  line-height: 1.1;
+  white-space: pre;
+  margin: 0;
+  color: inherit;
+}
+
 .screenText {
   font-family: 'VT323', monospace;
-  font-size: 18px;
-  color: #33ff66;
+  font-size: 1.7cqi;
+  color: #33e8a0;
   line-height: 1.6;
-  text-shadow: 0 0 8px rgba(51, 255, 102, 0.4);
+  text-shadow:
+    0 0 4px rgba(51, 232, 160, 0.7),
+    0 0 20px rgba(40, 200, 140, 0.25),
+    0 0 40px rgba(30, 180, 120, 0.08);
+  letter-spacing: 0.5px;
   position: relative;
   z-index: 1;
 }
 
 .cursorBlink {
   display: inline-block;
-  width: 10px;
-  height: 18px;
-  background: #33ff66;
+  width: 0.71cqi;
+  height: 1.27cqi;
+  background: #33e8a0;
   vertical-align: text-bottom;
   animation: blink 1s step-end infinite;
-  box-shadow: 0 0 6px rgba(51, 255, 102, 0.5);
+  box-shadow:
+    0 0 4px rgba(51, 232, 160, 0.8),
+    0 0 16px rgba(51, 232, 160, 0.3);
 }
 
 @keyframes blink {
@@ -300,7 +431,7 @@
 }
 
 .keyLabel {
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.5px;
   line-height: 1;
 }
@@ -311,6 +442,16 @@
 .sizeLg { width: 108px; height: 44px; }
 .sizeXl { width: 148px; height: 44px; }
 .sizeWide { height: 44px; width: 100%; }
+
+/* ===== Depressed Toggle State (radio button behavior) ===== */
+.keycapDepressed .keycapBase {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 -1px #a49c88, inset 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+
+.keycapDepressed .keycapTop {
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.12);
+}
 
 /* ===== Light Keycap ===== */
 .keycapLight .keycapBase {
@@ -526,4 +667,5 @@
   .cursorBlink {
     animation: none;
   }
+
 }

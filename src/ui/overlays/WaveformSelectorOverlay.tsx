@@ -5,6 +5,7 @@ import { creativeSlotId } from '../../puzzle/connection-point-nodes.ts';
 import { slotSide, slotPerSideIndex } from '../../shared/grid/slot-helpers.ts';
 import { CUSTOM_WAVEFORMS } from '../../puzzle/custom-waveforms.ts';
 import { extractOutputSamples, formatCustomWaveformEntry } from '../../puzzle/export-waveform.ts';
+import { generateFMSamples, shapeAtPhase } from '../../puzzle/waveform-generators.ts';
 import styles from './WaveformSelectorOverlay.module.css';
 
 type WizardStep = 'direction' | 'shape' | 'frequency' | 'amplitude';
@@ -35,6 +36,21 @@ const AMPLITUDES: Array<{ value: number; label: string }> = [
 ];
 
 const PERIOD_MAP: Record<Frequency, number> = { full: 256, half: 128, third: 256 / 3, quarter: 64, fifth: 256 / 5, sixth: 256 / 6 };
+
+interface FMPreset {
+  label: string;
+  baseCycles: number;
+  modRate: number;
+  depth: number;
+  description: string;
+}
+
+const FM_PRESETS: FMPreset[] = [
+  { label: 'Gentle FM', baseCycles: 3, modRate: 1, depth: 1.5, description: 'Slow wobble' },
+  { label: 'Moderate FM', baseCycles: 4, modRate: 2, depth: 2.0, description: 'Medium warble' },
+  { label: 'Intense FM', baseCycles: 5, modRate: 3, depth: 3.0, description: 'Fast vibrato' },
+  { label: 'Deep FM', baseCycles: 6, modRate: 1, depth: 4.0, description: 'Heavy sweep' },
+];
 
 /** Mini SVG preview of a waveform shape */
 function WaveformIcon({ shape, amplitude = 1 }: { shape: BaseShape | 'output' | 'off' | 'custom'; amplitude?: number }) {
@@ -193,6 +209,35 @@ function AmplitudeIcon({ base, freq, amplitudePercent }: { base: BaseShape; freq
   void amplitudePercent;
 }
 
+/** FM frequency icon: renders the actual FM-modulated shape in a 28x16 SVG */
+function FMFrequencyIcon({ base, preset }: { base: BaseShape; preset: FMPreset }) {
+  const width = 28;
+  const height = 16;
+  const mid = height / 2;
+  const amp = 6;
+  const usable = width - 4;
+  const x0 = 2;
+  const numPoints = 56; // enough resolution for a small icon
+
+  const points: string[] = [];
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    const twoPi = 2 * Math.PI;
+    const phase = preset.baseCycles * t -
+      (preset.depth / (twoPi * preset.modRate)) * (Math.cos(twoPi * preset.modRate * t) - 1);
+    const val = shapeAtPhase(base, phase);
+    const px = x0 + t * usable;
+    const py = mid - val * amp;
+    points.push(`${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`);
+  }
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <path d={points.join(' ')} fill="none" stroke="#F5AF28" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function StepIndicator({ currentStep }: { currentStep: 'shape' | 'frequency' | 'amplitude' }) {
   const steps = ['shape', 'frequency', 'amplitude'] as const;
   const currentIdx = steps.indexOf(currentStep);
@@ -230,6 +275,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   const [step, setStep] = useState<WizardStep>('direction');
   const [selectedShape, setSelectedShape] = useState<BaseShape>('sine');
   const [selectedFrequency, setSelectedFrequency] = useState<Frequency>('full');
+  const [selectedFMPreset, setSelectedFMPreset] = useState<FMPreset | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -328,22 +374,50 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
 
   const handleSelectFrequency = useCallback((freq: Frequency) => {
     setSelectedFrequency(freq);
+    setSelectedFMPreset(null);
+    setStep('amplitude');
+  }, []);
+
+  const handleSelectFMPreset = useCallback((preset: FMPreset) => {
+    setSelectedFMPreset(preset);
     setStep('amplitude');
   }, []);
 
   const handleSelectAmplitude = useCallback((amplitudePercent: number) => {
     ensureInputDirection();
-    const shape: WaveformShape = `${selectedShape}-${selectedFrequency}` as WaveformShape;
-    const waveform: WaveformDef = {
-      shape,
-      amplitude: amplitudePercent,
-      period: PERIOD_MAP[selectedFrequency],
-      phase: 0,
-      offset: 0,
-    };
-    setCreativeSlotWaveform(slotIndex, waveform);
+
+    if (selectedFMPreset) {
+      // FM path: generate 256 samples and store as shape='samples'
+      const samples = generateFMSamples(
+        selectedShape,
+        selectedFMPreset.baseCycles,
+        selectedFMPreset.modRate,
+        selectedFMPreset.depth,
+        amplitudePercent,
+      );
+      const waveform: WaveformDef = {
+        shape: 'samples',
+        amplitude: 100,
+        period: 256,
+        phase: 0,
+        offset: 0,
+        samples,
+      };
+      setCreativeSlotWaveform(slotIndex, waveform);
+    } else {
+      // Constant-frequency path
+      const shape: WaveformShape = `${selectedShape}-${selectedFrequency}` as WaveformShape;
+      const waveform: WaveformDef = {
+        shape,
+        amplitude: amplitudePercent,
+        period: PERIOD_MAP[selectedFrequency],
+        phase: 0,
+        offset: 0,
+      };
+      setCreativeSlotWaveform(slotIndex, waveform);
+    }
     closeOverlay();
-  }, [slotIndex, selectedShape, selectedFrequency, ensureInputDirection, setCreativeSlotWaveform, closeOverlay]);
+  }, [slotIndex, selectedShape, selectedFrequency, selectedFMPreset, ensureInputDirection, setCreativeSlotWaveform, closeOverlay]);
 
   const handleExport = useCallback(async () => {
     const cycleResults = useGameStore.getState().cycleResults;
@@ -360,7 +434,10 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   const handleBack = useCallback(() => {
     if (step === 'shape') setStep('direction');
     else if (step === 'frequency') setStep('shape');
-    else if (step === 'amplitude') setStep('frequency');
+    else if (step === 'amplitude') {
+      setSelectedFMPreset(null);
+      setStep('frequency');
+    }
   }, [step]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -507,6 +584,21 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
                     <FrequencyIcon base={selectedShape} freq={f.freq} />
                   </div>
                   <span className={styles.waveformLabel}>{f.label} ({f.cycles})</span>
+                </button>
+              ))}
+
+              <div className={styles.divider} />
+              <div className={styles.sectionHeader}>FM (Variable Speed)</div>
+              {FM_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  className={styles.item}
+                  onClick={() => handleSelectFMPreset(preset)}
+                >
+                  <div className={styles.waveformIcon}>
+                    <FMFrequencyIcon base={selectedShape} preset={preset} />
+                  </div>
+                  <span className={styles.waveformLabel}>{preset.label}</span>
                 </button>
               ))}
             </>

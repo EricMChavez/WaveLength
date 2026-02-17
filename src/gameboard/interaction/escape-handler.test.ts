@@ -19,6 +19,8 @@ function makeState(overrides: Partial<EscapeHandlerState> = {}): EscapeHandlerSt
     clearSelection: vi.fn(),
     zoomTransitionType: 'idle',
     ceremonyType: 'inactive',
+    isTutorialActive: false,
+    endTutorial: vi.fn(),
     ...overrides,
   };
 }
@@ -28,12 +30,12 @@ describe('escape-handler', () => {
     it('opens menu when nothing is active', () => {
       const state = makeState();
       expect(handleEscape(state)).toBe('open-menu');
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
     });
 
     it('closes menu when screen is active', () => {
       const state = makeState({
-        activeScreen: 'main-menu',
+        activeScreen: 'home',
       });
       expect(handleEscape(state)).toBe('close-menu');
       expect(state.dismissScreen).toHaveBeenCalledOnce();
@@ -73,7 +75,7 @@ describe('escape-handler', () => {
       });
       expect(handleEscape(state)).toBe('cancel-and-menu');
       expect(state.closeOverlay).toHaveBeenCalledOnce();
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
     });
 
     it('cancels wire drawing then opens menu', () => {
@@ -82,7 +84,7 @@ describe('escape-handler', () => {
       });
       expect(handleEscape(state)).toBe('cancel-and-menu');
       expect(state.cancelWireDraw).toHaveBeenCalledOnce();
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
     });
 
     it('cancels keyboard wiring then opens menu', () => {
@@ -91,7 +93,7 @@ describe('escape-handler', () => {
       });
       expect(handleEscape(state)).toBe('cancel-and-menu');
       expect(state.cancelKeyboardWiring).toHaveBeenCalledOnce();
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
     });
 
     it('cancels node placement then opens menu', () => {
@@ -100,7 +102,7 @@ describe('escape-handler', () => {
       });
       expect(handleEscape(state)).toBe('cancel-and-menu');
       expect(state.cancelPlacing).toHaveBeenCalledOnce();
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
     });
 
     it('commits knob adjust then opens menu', () => {
@@ -109,7 +111,7 @@ describe('escape-handler', () => {
       });
       expect(handleEscape(state)).toBe('cancel-and-menu');
       expect(state.commitKnobAdjust).toHaveBeenCalledOnce();
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
     });
 
     it('clears selection then opens menu', () => {
@@ -118,14 +120,39 @@ describe('escape-handler', () => {
       });
       expect(handleEscape(state)).toBe('cancel-and-menu');
       expect(state.clearSelection).toHaveBeenCalledOnce();
-      expect(state.revealScreen).toHaveBeenCalledWith('main-menu');
+      expect(state.revealScreen).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('end-tutorial', () => {
+    it('ends tutorial when active and no overlay', () => {
+      const state = makeState({ isTutorialActive: true });
+      expect(handleEscape(state)).toBe('end-tutorial');
+      expect(state.endTutorial).toHaveBeenCalledOnce();
+    });
+
+    it('does not end tutorial when overlay is active', () => {
+      const state = makeState({
+        isTutorialActive: true,
+        hasActiveOverlay: vi.fn(() => true),
+        isOverlayEscapeDismissible: vi.fn(() => true),
+      });
+      expect(getEscapeAction(state)).toBe('cancel-and-menu');
+    });
+
+    it('screen close takes precedence over tutorial end', () => {
+      const state = makeState({
+        activeScreen: 'home',
+        isTutorialActive: true,
+      });
+      expect(getEscapeAction(state)).toBe('close-menu');
     });
   });
 
   describe('precedence ordering', () => {
     it('screen close takes highest precedence', () => {
       const state = makeState({
-        activeScreen: 'main-menu',
+        activeScreen: 'home',
         interactionMode: { type: 'drawing-wire' },
       });
       expect(getEscapeAction(state)).toBe('close-menu');

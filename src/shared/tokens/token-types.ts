@@ -24,6 +24,7 @@ export const TOKEN_KEYS = [
   'colorError',
   'meterBorder',
   'meterBorderMatch',
+  'meterBorderMismatch',
   'boardBorder',
 
   // Depth
@@ -87,6 +88,7 @@ export const TOKEN_CSS_MAP: Record<TokenKey, string> = {
   colorError: '--token-color-error',
   meterBorder: '--token-meter-border',
   meterBorderMatch: '--token-meter-border-match',
+  meterBorderMismatch: '--token-meter-border-mismatch',
   boardBorder: '--token-board-border',
 
   depthRaised: '--token-depth-raised',
