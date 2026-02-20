@@ -63,7 +63,8 @@
       "Bash(curl:*)",
       "Bash(start \"\" \"C:\\\\Users\\\\emcha\\\\OneDrive\\\\Documents\\\\Code\\\\logic-puzzle\\\\mockups\\\\back-icon-mockup.html\")",
       "Bash(ls:*)",
-      "Bash(printf:*)"
+      "Bash(printf:*)",
+      "Bash(git diff:*)"
     ]
   }
 }

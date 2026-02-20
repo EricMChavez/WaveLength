@@ -18,21 +18,21 @@ export function PowerMeter({ vertical }: PowerMeterProps) {
     return (
       <div className={retro.groovePanel} style={{
         marginBottom: 0,
-        padding: '10px 8px',
+        padding: '0.93cqh 0.42cqw',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 8,
+        gap: '0.74cqh',
         boxSizing: 'border-box',
       }}>
         {/* Rotated "SIGNAL LEVEL" label */}
         <div style={{
           writingMode: 'vertical-lr',
           rotate: '180deg',
-          fontSize: 10,
+          fontSize: '0.93cqh',
           fontWeight: 600,
-          letterSpacing: 3,
+          letterSpacing: '0.16cqw',
           textTransform: 'uppercase' as const,
           color: '#6b624d',
           fontFamily: "'IBM Plex Mono', monospace",
@@ -42,7 +42,7 @@ export function PowerMeter({ vertical }: PowerMeterProps) {
         {/* Vertical bar */}
         <div style={{
           flex: 1,
-          width: 18,
+          width: '1.67cqh',
           borderRadius: 4,
           background: '#3a3426',
           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
@@ -64,7 +64,7 @@ export function PowerMeter({ vertical }: PowerMeterProps) {
 
         {/* Count */}
         <span style={{
-          fontSize: 11,
+          fontSize: '1.02cqh',
           fontWeight: 600,
           color: '#6b624d',
           fontFamily: "'IBM Plex Mono', monospace",

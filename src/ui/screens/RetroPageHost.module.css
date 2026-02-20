@@ -11,6 +11,7 @@
 .pageContainer {
   position: absolute;
   inset: 0;
+  container-type: size;
 }
 
 /* Idle: in place */

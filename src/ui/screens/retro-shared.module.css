@@ -35,8 +35,8 @@
 
 /* ===== Screws ===== */
 .screw {
-  width: 12px;
-  height: 12px;
+  width: 1.11cqh;
+  height: 1.11cqh;
   border-radius: 50%;
   background: linear-gradient(135deg, #b9b091, #a9a083);
   box-shadow:
@@ -51,16 +51,16 @@
 
 .screw::after {
   content: '+';
-  font-size: 10px;
+  font-size: 0.93cqh;
   color: rgba(0, 0, 0, 0.25);
   font-weight: bold;
   line-height: 1;
 }
 
-.screwTL { top: 16px; left: 16px; }
-.screwTR { top: 16px; right: 16px; }
-.screwBL { bottom: 16px; left: 16px; }
-.screwBR { bottom: 16px; right: 16px; }
+.screwTL { top: 1.48cqh; left: 0.83cqw; }
+.screwTR { top: 1.48cqh; right: 0.83cqw; }
+.screwBL { bottom: 1.48cqh; left: 0.83cqw; }
+.screwBR { bottom: 1.48cqh; right: 0.83cqw; }
 
 /* ===== Vents ===== */
 .vents {
@@ -130,8 +130,8 @@
 /* ===== CRT Screen ===== */
 .screenHousing {
   background: #3a3426;
-  border-radius: 20px;
-  padding: 16px;
+  border-radius: 1.04cqw;
+  padding: 0.83cqw;
   margin-bottom: 28px;
   overflow: hidden;
   box-shadow:
@@ -424,14 +424,14 @@
   text-transform: uppercase;
   border-radius: 3px;
   z-index: 1;
-  top: 3px;
-  bottom: 8px;
-  left: 7px;
-  right: 7px;
+  top: 0.28cqh;
+  bottom: 0.74cqh;
+  left: 0.36cqw;
+  right: 0.36cqw;
 }
 
 .keyLabel {
-  font-size: 14px;
+  font-size: 1.30cqh;
   letter-spacing: 0.5px;
   line-height: 1;
 }
@@ -441,7 +441,7 @@
 .sizeMd { width: 78px; height: 44px; }
 .sizeLg { width: 108px; height: 44px; }
 .sizeXl { width: 148px; height: 44px; }
-.sizeWide { height: 44px; width: 100%; }
+.sizeWide { height: 4.07cqh; width: 100%; }
 
 /* ===== Depressed Toggle State (radio button behavior) ===== */
 .keycapDepressed .keycapBase {

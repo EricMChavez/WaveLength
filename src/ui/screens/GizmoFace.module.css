@@ -10,15 +10,15 @@
   font-family: 'IBM Plex Mono', monospace;
   display: grid;
   grid-template-columns: auto auto auto;
-  grid-template-rows: 1fr 92px auto;
+  grid-template-rows: 1fr 8.52cqh auto;
   grid-template-areas:
     "monitor  monitor  signal"
     "monitor  monitor  ."
     "bottom   bottom   bottom";
   justify-content: center;
-  row-gap: 20px;
-  column-gap: 41px;
-  padding: 36px;
+  row-gap: 1.85cqh;
+  column-gap: 2.14cqw;
+  padding: 3.33cqh 1.88cqw;
   overflow: hidden;
   container-type: size;
 }
@@ -74,7 +74,7 @@
   grid-area: signal;
   position: relative;
   z-index: 1;
-  width: 100px;
+  width: 5.21cqw;
 }
 
 /* ===== L-Shaped Play Button ===== */
@@ -98,15 +98,15 @@
   position: absolute;
   bottom: 100%;
   right: 0;
-  width: 100px;
+  width: 5.21cqw;
   z-index: 2;
-  height: calc(92px + 20px); /* row 2 height + grid gap */
+  height: 10.37cqh; /* row 2 height + grid gap */
   cursor: pointer;
 }
 
 .playArmTop {
   position: absolute;
-  inset: 4px 8px 0;
+  inset: 0.37cqh 0.42cqw 0;
   border-radius: 8px 8px 0 0;
   background: linear-gradient(180deg, #ea7a48 0%, #de6a38 50%, #d46030 100%);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -122,7 +122,7 @@
   left: 0;
   right: -1px;
   top: 100%;
-  height: 21px; /* 20px grid gap + 1px overlap */
+  height: 1.94cqh; /* grid gap + overlap */
   background: #d46030;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -130,9 +130,9 @@
 .playBody {
   position: relative;
   z-index: 1;
-  height: 76px;
-  width: 148px;
-  border-radius: 12px 0 12px 12px;
+  height: 7.04cqh;
+  width: 7.71cqw;
+  border-radius: 0.63cqw 0 0.63cqw 0.63cqw;
   cursor: pointer;
   background: linear-gradient(180deg, #984016 0%, #8c3a14 100%);
   box-shadow:
@@ -152,16 +152,16 @@
   position: absolute;
   right: 0;
   bottom: calc(100% - 2px);
-  width: 100px;
-  height: calc(92px + 20px + 2px); /* row 2 height + grid gap + overlap */
-  border-radius: 12px 12px 0 0;
+  width: 5.21cqw;
+  height: 10.56cqh; /* row 2 height + grid gap + overlap */
+  border-radius: 0.63cqw 0.63cqw 0 0;
   background: linear-gradient(180deg, #c05224 0%, #ac491d 50%, #984016 100%);
 }
 
 .playBodyTop {
   position: absolute;
-  inset: 0 8px 10px 8px;
-  border-radius: 8px 0 8px 8px;
+  inset: 0 0.42cqw 0.93cqh 0.42cqw;
+  border-radius: 0.42cqw 0 0.42cqw 0.42cqw;
   background: #d46030;
   color: #fff;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
@@ -174,8 +174,8 @@
   justify-content: center;
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 3px;
+  font-size: 1.04cqi;
+  letter-spacing: 0.16cqw;
   text-transform: uppercase;
 }
 
@@ -228,28 +228,28 @@
 .tabColumn {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.56cqh;
 }
 
 /* ===== Indicator Channel (recessed groove) ===== */
 .indicatorChannel {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 0.42cqw;
   background: #cdc5a8;
-  padding: 6px 0 4px;
-  border-radius: 6px;
+  padding: 0.56cqh 0 0.37cqh;
+  border-radius: 0.31cqw;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .indicatorSlot {
   flex: 1;
-  min-width: 140px;
+  min-width: 7.29cqw;
 }
 
 .indicatorStrip {
-  height: 5px;
-  margin: 0 7px;
+  height: 0.46cqh;
+  margin: 0 0.36cqw;
   background: #3a3426;
   border-radius: 2px;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -269,7 +269,7 @@
   grid-area: bottom;
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 0.42cqw;
   align-items: stretch;
   justify-content: flex-end;
   position: relative;
@@ -280,17 +280,17 @@
 .tabRow {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 0.42cqw;
   align-items: stretch;
 }
 
 .tabRow > * {
   flex: 1;
-  min-width: 140px;
+  min-width: 7.29cqw;
 }
 
 .tabRow > * > * {
-  height: 76px;
+  height: 7.04cqh;
 }
 
 /* ===== Corner Screws ===== */
@@ -303,16 +303,16 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 0.93cqh;
   margin-right: auto;
   align-self: flex-end;
-  padding-bottom: 8px;
+  padding-bottom: 0.74cqh;
 }
 
 /* Recessed bezel surround — sized to match tab button area */
 .floppyBezel {
-  width: 436px;
-  height: 56px;
+  width: 22.71cqw;
+  height: 5.19cqh;
   background: linear-gradient(180deg, #c4bc9e 0%, #cbc3a6 40%, #d0c8ac 100%);
   border-radius: 4px;
   box-shadow:
@@ -324,14 +324,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
+  gap: 0.56cqh;
+  padding: 0.74cqh 0.83cqw;
 }
 
 /* The dark horizontal slot */
 .floppyOpening {
   width: 100%;
-  height: 8px;
+  height: 0.74cqh;
   background: #2a2418;
   border-radius: 2px;
   box-shadow:
@@ -347,7 +347,7 @@
   left: 50%;
   top: -1px;
   transform: translateX(-50%);
-  width: 24px;
+  width: 1.25cqw;
   height: calc(100% + 2px);
   background: rgba(0, 0, 0, 0.3);
   border-left: 1px solid rgba(0, 0, 0, 0.2);
@@ -356,27 +356,27 @@
 
 /* Eject bar below the slot */
 .floppyEjectBar {
-  width: 52px;
-  height: 8px;
+  width: 2.71cqw;
+  height: 0.74cqh;
   background: linear-gradient(180deg, #c0b89c 0%, #b5ad92 100%);
   border-radius: 2px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     0 1px 2px rgba(0, 0, 0, 0.18);
   align-self: flex-end;
-  margin-right: 4px;
+  margin-right: 0.21cqw;
 }
 
 /* Activity LED below the drive */
 .floppyLed {
-  width: 10px;
-  height: 10px;
+  width: 0.93cqh;
+  height: 0.93cqh;
   border-radius: 50%;
   background: #3a3426;
   box-shadow:
     inset 0 2px 3px rgba(0, 0, 0, 0.5),
     0 1px 0 rgba(255, 255, 255, 0.2);
-  margin-left: 12px;
+  margin-left: 0.63cqw;
 }
 
 /* ===== Ventilation Grilles ===== */
@@ -481,8 +481,8 @@
       "tabs"
       "playBody";
     justify-content: stretch;
-    padding: 16px;
-    gap: 12px;
+    padding: 1.48cqh 0.83cqw;
+    gap: 1.11cqh;
   }
 
   .playArm {
