@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useGameStore } from '../../store/index.ts';
 import { useTypewriter } from './useTypewriter.ts';
 import { SettingsTerminal } from './SettingsTerminal.tsx';
+import { AboutLinks } from './AboutLinks.tsx';
 import { PUZZLE_LEVELS } from '../../puzzle/levels/index.ts';
 import asciiArtRaw from '../../assets/ascii-wavelength.txt?raw';
 import retro from './retro-shared.module.css';
@@ -26,18 +27,18 @@ function getHomeLines(signalFull: boolean): string[] {
 const ABOUT_LINES = [
   '> ABOUT WAVELENGTH',
   '',
-  'A recursive tool-building puzzle game',
-  'about signal processing.',
+  'An idea years in the making. As an audio engineer, I always',
+  'wanted a puzzle game built around the tools I use every day:',
+  'waveforms, signal processing, and node-based thinking.',
   '',
-  'Wire together nodes to transform input',
-  'waveforms into target outputs.',
+  'I built WaveLength in under two weeks using agentic',
+  'development with Claude Code.',
   '',
-  'Every solved puzzle becomes a reusable',
-  'node for future puzzles, creating a',
-  'fractal, infinitely-nestable tool-building',
-  'loop.',
+  'What you\'re playing is a love letter to the audio world,',
+  'disguised as a puzzle game. If you\'ve patched a modular',
+  'synth, this will feel familiar. If not, welcome to waveforms.',
   '',
-  '7 fundamental nodes. Infinite possibilities.',
+  'I hope you enjoy playing it as much as I enjoyed building it.',
 ];
 
 const SETTINGS_HEADER_LINES = [
@@ -89,7 +90,10 @@ export function CrtContent() {
       {activeScreen === 'settings' && !isTyping && (
         <SettingsTerminal />
       )}
-      {activeScreen !== 'settings' && cursorVisible && !isTyping && (
+      {activeScreen === 'about' && !isTyping && (
+        <AboutLinks />
+      )}
+      {activeScreen !== 'settings' && activeScreen !== 'about' && cursorVisible && !isTyping && (
         <span className={retro.cursorBlink} />
       )}
     </div>

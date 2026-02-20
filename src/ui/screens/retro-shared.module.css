@@ -314,6 +314,24 @@
   z-index: 1;
 }
 
+.crtLink {
+  color: #33e8a0;
+  text-decoration: none;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+
+.crtLink:hover {
+  color: #5dffc0;
+  text-shadow:
+    0 0 6px rgba(93, 255, 192, 0.8),
+    0 0 24px rgba(93, 255, 192, 0.35);
+}
+
+.crtLink:focus-visible {
+  outline: 1px solid #33e8a0;
+  outline-offset: 2px;
+}
+
 .cursorBlink {
   display: inline-block;
   width: 0.71cqi;
@@ -776,6 +794,10 @@
 
   .cursorBlink {
     animation: none;
+  }
+
+  .crtLink {
+    transition: none;
   }
 
   .crtPowerOff,

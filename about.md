@@ -1,0 +1,6 @@
+About WaveLength
+WaveLength started as an idea I'd been sitting on for years. As someone with a background in audio engineering, I always wanted a puzzle game built around the mechanics I use every day: waveforms, signal processing, and the kind of node-based thinking that lives at the heart of sound design. I just never had a practical way to build it.
+That changed when I dove deep into agentic development with Claude Code. I spent time mastering context management, agent coordination, and AI-assisted engineering workflows until I had the skills to tackle something this technically ambitious. Live waveform processing, real-time graphing, node-based recursive mechanics — the kind of systems that would normally take a full team months to build.
+Armed with those skills, I built WaveLength in under two weeks.
+What you're playing is a love letter to the audio world, disguised as a puzzle game. Every mechanic in here comes from a real concept in signal processing. If you've ever worked in a DAW or patched a modular synth, some of this will feel familiar. If you haven't, welcome to the world of waveforms.
+I hope you enjoy playing it as much as I enjoyed building it.
