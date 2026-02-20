@@ -264,10 +264,8 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
 
     // If returning to the home board, rebuild it with fresh progression state
     if (entry.board.id === 'motherboard') {
-      const currentPage = state.motherboardLayout?.pagination?.currentPage;
       const { board: freshBoard, layout } = createMotherboard(
         state.completedLevels, state.isLevelUnlocked, state.customPuzzles,
-        currentPage,
       );
       set({
         boardStack: newStack,

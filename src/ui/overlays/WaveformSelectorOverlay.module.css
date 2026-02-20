@@ -202,3 +202,57 @@
   font-style: italic;
   line-height: 1.4;
 }
+
+.item.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.constantInput {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+}
+
+.constantNumberInput {
+  flex: 1;
+  background: #0e1012;
+  border: 1px solid #2a3632;
+  border-radius: 4px;
+  color: #d8dcd0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  padding: 8px 12px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.constantNumberInput::-webkit-inner-spin-button,
+.constantNumberInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.constantNumberInput:focus {
+  border-color: rgba(60, 145, 230, 0.5);
+}
+
+.constantOkBtn {
+  background: rgba(60, 145, 230, 0.12);
+  border: 1px solid rgba(60, 145, 230, 0.3);
+  border-radius: 4px;
+  color: #3c91e6;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.constantOkBtn:hover {
+  background: rgba(60, 145, 230, 0.2);
+  border-color: rgba(60, 145, 230, 0.5);
+}

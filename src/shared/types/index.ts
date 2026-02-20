@@ -36,11 +36,15 @@ export type FundamentalChipType =
   | 'offset'
   | 'scale'
   | 'threshold'
+  | 'add'
   | 'max'
   | 'min'
   | 'memory'
   | 'duplicate'
-  | 'negate';
+  | 'divide'
+  | 'negate'
+  | 'amp'
+  | 'average';
 
 /** State of a single chip on a gameboard */
 export interface ChipState {

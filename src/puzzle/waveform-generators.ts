@@ -40,8 +40,8 @@ function generateShape(shape: WaveformShape, tick: number, period: number, phase
     case 'triangle-quarter':
     case 'triangle-fifth':
     case 'triangle-sixth':
-      // Rises from -1 to +1 in the first half, falls from +1 to -1 in the second
-      raw = t < 0.5 ? -1 + 4 * t : 3 - 4 * t;
+      // Starts at 0, peaks at +1 at t=0.25, crosses 0 at t=0.5, troughs at -1 at t=0.75
+      raw = t < 0.25 ? 4 * t : t < 0.75 ? 2 - 4 * t : -4 + 4 * t;
       break;
     case 'sawtooth-full':
     case 'sawtooth-half':
@@ -49,8 +49,8 @@ function generateShape(shape: WaveformShape, tick: number, period: number, phase
     case 'sawtooth-quarter':
     case 'sawtooth-fifth':
     case 'sawtooth-sixth':
-      // Rises from -1 to +1 over the period
-      raw = -1 + 2 * t;
+      // Starts at 0, rises to +1 at t=0.5, jumps to -1, rises back to 0
+      raw = t < 0.5 ? 2 * t : -2 + 2 * t;
       break;
     default:
       raw = 0;
@@ -97,9 +97,9 @@ export function shapeAtPhase(base: FMBaseShape, phase: number): number {
     case 'square':
       return t < 0.5 ? 1 : -1;
     case 'triangle':
-      return t < 0.5 ? -1 + 4 * t : 3 - 4 * t;
+      return t < 0.25 ? 4 * t : t < 0.75 ? 2 - 4 * t : -4 + 4 * t;
     case 'sawtooth':
-      return -1 + 2 * t;
+      return t < 0.5 ? 2 * t : -2 + 2 * t;
     default:
       return 0;
   }
@@ -148,6 +148,24 @@ export function generateFMSamples(
   }
 
   return samples;
+}
+
+/**
+ * Build a WaveformDef with the canonical period auto-derived from the shape name.
+ * Prevents period rounding bugs by never accepting a manual period value.
+ * Not usable for 'samples' shape — those need explicit samples arrays.
+ */
+export function waveform(
+  shape: Exclude<WaveformShape, 'samples'>,
+  opts?: { amplitude?: number; phase?: number; offset?: number },
+): WaveformDef {
+  return {
+    shape,
+    amplitude: opts?.amplitude ?? 100,
+    period: getShapePeriod(shape),
+    phase: opts?.phase ?? 0,
+    offset: opts?.offset ?? 0,
+  };
 }
 
 /** Get the canonical period for a waveform shape. */

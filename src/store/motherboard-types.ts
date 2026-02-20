@@ -30,6 +30,8 @@ export interface MotherboardEdgeCP {
   visible: boolean;
   /** Whether the edge CP has active signal (draws path + plugs). False = socket hint only. */
   connected: boolean;
+  /** Optional alpha override for celebration fade-in (0-1). Undefined = full opacity. */
+  signalAlpha?: number;
 }
 
 /** Pagination state for the puzzle section. */

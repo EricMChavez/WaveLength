@@ -51,6 +51,8 @@ export interface GameboardSlice {
   batchKnobAdjust: (chipId: ChipId, paramKey: string, portIndex: number, value: number) => void;
   /** Toggle a meter slot's mode during utility editing: input→output→off→input. Returns false if blocked by paths. */
   toggleMeterMode: (cpIndex: number) => boolean;
+  /** Atomically replace an existing path with a new one (single graphVersion bump for undo). */
+  reconnectPath: (oldPathId: string, newPath: Path) => void;
 }
 
 /**
@@ -356,4 +358,18 @@ export const createGameboardSlice: StateCreator<GameStore, [], [], GameboardSlic
         graphVersion: state.graphVersion + 1,
       };
     }),
+
+  reconnectPath: (oldPathId, newPath) =>
+    set((state) => {
+      if (!state.activeBoard) return state;
+      return {
+        activeBoard: {
+          ...state.activeBoard,
+          paths: state.activeBoard.paths.filter(p => p.id !== oldPathId).concat(newPath),
+        },
+        graphVersion: state.graphVersion + 1,
+        routingVersion: state.routingVersion + 1,
+      };
+    }),
+
 });

@@ -70,6 +70,7 @@ function makeMockCtx() {
       bezierCurveTo: vi.fn(),
       fillStyle: '',
       fillRect: vi.fn(),
+      fill: vi.fn(),
     } as unknown as CanvasRenderingContext2D,
     calls,
   };

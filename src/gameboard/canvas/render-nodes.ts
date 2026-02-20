@@ -123,7 +123,7 @@ export function drawNodes(
       drawMenuChipPorts(ctx, tokens, node, cellSize);
     } else {
       const isLive = state.liveChipIds.has(node.id);
-      drawNodePorts(ctx, tokens, node, cellSize, isLive ? state.portSignals : EMPTY_PORT_SIGNALS, state.connectedSocketPorts, state.connectedPlugPorts, isLive);
+      drawNodePorts(ctx, tokens, node, cellSize, isLive ? state.portSignals : EMPTY_PORT_SIGNALS, state.connectedSocketPorts, state.connectedPlugPorts, isLive, state.blipHoldingPorts);
     }
   }
 
@@ -373,14 +373,12 @@ function drawNodePorts(
   connectedSocketPorts: ReadonlySet<string>,
   connectedPlugPorts: ReadonlySet<string>,
   isLive: boolean,
+  blipHoldingPorts?: ReadonlySet<string>,
 ): void {
   const devOverrides = getDevOverrides();
   const useOverrides = devOverrides.enabled;
   const portRadiusRatio = useOverrides ? devOverrides.nodeStyle.portRadius : NODE_STYLE.PORT_RADIUS_RATIO;
   const portRadius = portRadiusRatio * cellSize;
-  // When the node is not live (no upstream signal), use colorNeutral so ports
-  // match the neutral wire color instead of showing signalZero gray.
-  const colorOverride = isLive ? undefined : tokens.colorNeutral;
 
   for (let i = 0; i < node.socketCount; i++) {
     const pos = getNodePortPosition(node, 'input', i, cellSize);
@@ -396,12 +394,23 @@ function drawNodePorts(
       shape = { type: 'seated', openingDirection: physicalSide };
     }
 
+    // Blip mode: neutral unless a blip is holding at this port.
+    // Normal mode: neutral when not live (no upstream signal).
+    const colorOverride = blipHoldingPorts
+      ? (blipHoldingPorts.has(`${node.id}:socket:${i}`) ? undefined : tokens.colorNeutral)
+      : (isLive ? undefined : tokens.colorNeutral);
     drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, shape, colorOverride);
   }
 
   for (let i = 0; i < node.plugCount; i++) {
     const pos = getNodePortPosition(node, 'output', i, cellSize);
     const signalValue = portSignals.get(`${node.id}:plug:${i}`) ?? 0;
+
+    // Blip mode: neutral unless a blip is holding at this port.
+    // Normal mode: neutral when not live.
+    const colorOverride = blipHoldingPorts
+      ? (blipHoldingPorts.has(`${node.id}:plug:${i}`) ? undefined : tokens.colorNeutral)
+      : (isLive ? undefined : tokens.colorNeutral);
 
     // Connected plug ports show as sockets (plug has been "sent" along path)
     const isOutputConnected = connectedPlugPorts.has(`${node.id}:${i}`);

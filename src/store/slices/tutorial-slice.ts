@@ -10,7 +10,7 @@ export type TutorialHighlight =
   | { type: 'meter-zone'; side: 'left' | 'right'; slotIndex: number }
   | { type: 'full-board' };
 
-export type TooltipPosition = 'above' | 'below' | 'left' | 'right' | 'center';
+export type TooltipPosition = 'above' | 'below' | 'left' | 'right' | 'center' | 'board-top';
 
 export interface CursorAnimation {
   path: { col: number; row: number }[];

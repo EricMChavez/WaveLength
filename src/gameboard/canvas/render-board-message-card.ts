@@ -112,6 +112,7 @@ function getCardCache(
   // Measure title
   const titleFont = `${titleFontSize}px ${CARD_TITLE_FONT}`;
   measureCtx.font = titleFont;
+  measureCtx.letterSpacing = '1px';
   const maxTextWidth = maxWidth - paddingH * 2;
   const titleWidth = title ? Math.min(measureCtx.measureText(title).width, maxTextWidth) : 0;
   const titleHeight = title ? titleFontSize : 0;
@@ -154,6 +155,7 @@ function getCardCache(
   // Draw title (centered)
   if (hasTitle) {
     ctx.font = titleFont;
+    ctx.letterSpacing = '1px';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(title, cardWidth / 2, paddingV, maxTextWidth);

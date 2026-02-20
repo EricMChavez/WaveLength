@@ -10,3 +10,4 @@ export { divideChip } from './divide';
 export { memoryChip, createMemoryState, type MemoryState } from './memory';
 export { negateChip } from './negate';
 export { ampChip, type AmpParams } from './amp';
+export { averageChip } from './average';

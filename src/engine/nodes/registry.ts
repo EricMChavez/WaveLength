@@ -19,6 +19,7 @@ import {
   memoryChip,
   negateChip,
   ampChip,
+  averageChip,
 } from './definitions';
 
 // =============================================================================
@@ -41,6 +42,7 @@ const CHIP_DEFINITIONS: readonly ChipDefinition<Record<string, ParamValue>>[] = 
   memoryChip as ChipDefinition<Record<string, ParamValue>>,
   negateChip as ChipDefinition<Record<string, ParamValue>>,
   ampChip as ChipDefinition<Record<string, ParamValue>>,
+  averageChip as ChipDefinition<Record<string, ParamValue>>,
 ] as const;
 
 // =============================================================================

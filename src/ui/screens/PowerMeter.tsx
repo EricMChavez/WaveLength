@@ -10,7 +10,7 @@ export function PowerMeter({ vertical }: PowerMeterProps) {
   const completedLevels = useGameStore((s) => s.completedLevels);
 
   const total = PUZZLE_LEVELS.length;
-  const completed = completedLevels.size;
+  const completed = PUZZLE_LEVELS.filter(p => completedLevels.has(p.id)).length;
   const progress = total > 0 ? completed / total : 0;
   const pct = Math.round(progress * 100);
 

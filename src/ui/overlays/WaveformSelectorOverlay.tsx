@@ -8,7 +8,7 @@ import { extractOutputSamples, formatCustomWaveformEntry } from '../../puzzle/ex
 import { generateFMSamples, shapeAtPhase } from '../../puzzle/waveform-generators.ts';
 import styles from './WaveformSelectorOverlay.module.css';
 
-type WizardStep = 'direction' | 'shape' | 'frequency' | 'amplitude';
+type WizardStep = 'direction' | 'shape' | 'frequency' | 'amplitude' | 'constant';
 type BaseShape = 'sine' | 'triangle' | 'square' | 'sawtooth';
 type Frequency = 'full' | 'half' | 'third' | 'quarter' | 'fifth' | 'sixth';
 
@@ -144,6 +144,18 @@ function WaveformIcon({ shape, amplitude = 1 }: { shape: BaseShape | 'output' | 
   );
 }
 
+/** Flat horizontal line icon for constant values */
+function ConstantIcon() {
+  const width = 28;
+  const height = 16;
+  const mid = height / 2;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <path d={`M2,${mid} H${width - 2}`} fill="none" stroke="#F5AF28" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** Frequency icon: same base shape but different visual density */
 function FrequencyIcon({ base, freq }: { base: BaseShape; freq: Frequency }) {
   const width = 28;
@@ -238,7 +250,8 @@ function FMFrequencyIcon({ base, preset }: { base: BaseShape; preset: FMPreset }
   );
 }
 
-function StepIndicator({ currentStep }: { currentStep: 'shape' | 'frequency' | 'amplitude' }) {
+function StepIndicator({ currentStep }: { currentStep: 'shape' | 'frequency' | 'amplitude' | 'constant' }) {
+  if (currentStep === 'constant') return null;
   const steps = ['shape', 'frequency', 'amplitude'] as const;
   const currentIdx = steps.indexOf(currentStep);
 
@@ -277,6 +290,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   const [selectedFrequency, setSelectedFrequency] = useState<Frequency>('full');
   const [selectedFMPreset, setSelectedFMPreset] = useState<FMPreset | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
+  const [constantValue, setConstantValue] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   // In puzzle mode, close immediately
@@ -352,6 +366,25 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   const handleSelectInput = useCallback(() => {
     setStep('shape');
   }, []);
+
+  const handleSelectConstantInput = useCallback(() => {
+    setStep('constant');
+  }, []);
+
+  const handleCommitConstant = useCallback(() => {
+    ensureInputDirection();
+    // Store as a single-sample waveform so the cycle evaluator generates the same value for all 256 cycles
+    const waveform: WaveformDef = {
+      shape: 'samples',
+      amplitude: 100,
+      period: 1,
+      phase: 0,
+      offset: 0,
+      samples: [constantValue],
+    };
+    setCreativeSlotWaveform(slotIndex, waveform);
+    closeOverlay();
+  }, [slotIndex, constantValue, ensureInputDirection, setCreativeSlotWaveform, closeOverlay]);
 
   const handleSelectShape = useCallback((base: BaseShape) => {
     setSelectedShape(base);
@@ -432,7 +465,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
   }, [slotIndex, side, perSideIdx]);
 
   const handleBack = useCallback(() => {
-    if (step === 'shape') setStep('direction');
+    if (step === 'shape' || step === 'constant') setStep('direction');
     else if (step === 'frequency') setStep('shape');
     else if (step === 'amplitude') {
       setSelectedFMPreset(null);
@@ -463,6 +496,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
     shape: 'Choose Shape',
     frequency: 'Choose Frequency',
     amplitude: 'Choose Amplitude',
+    constant: 'Set Constant Value',
   };
 
   return (
@@ -486,7 +520,7 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
               <div className={styles.subtitle}>{slotLabel}</div>
             </div>
           </div>
-          {step !== 'direction' && <StepIndicator currentStep={step} />}
+          {step !== 'direction' && step !== 'constant' && <StepIndicator currentStep={step} />}
         </div>
 
         <div className={styles.list} ref={listRef} tabIndex={-1}>
@@ -526,15 +560,48 @@ function WaveformSelectorInner({ slotIndex }: { slotIndex: number }) {
 
               <div className={styles.divider} />
 
-              {/* Input (go to shape step) */}
+              {/* Constant Input */}
+              <button
+                className={`${styles.item} ${currentDirection === 'input' ? styles.active : ''}`}
+                onClick={handleSelectConstantInput}
+              >
+                <div className={styles.waveformIcon}><ConstantIcon /></div>
+                <span className={styles.waveformLabel}>Constant Input &#8594;</span>
+              </button>
+
+              {/* Waveform Input */}
               <button
                 className={`${styles.item} ${currentDirection === 'input' ? styles.active : ''}`}
                 onClick={handleSelectInput}
               >
                 <div className={styles.waveformIcon}><WaveformIcon shape="sine" /></div>
-                <span className={styles.waveformLabel}>Input (emits signal) &#8594;</span>
+                <span className={styles.waveformLabel}>Waveform Input &#8594;</span>
               </button>
             </>
+          )}
+
+          {step === 'constant' && (
+            <div className={styles.constantInput}>
+              <input
+                type="number"
+                className={styles.constantNumberInput}
+                min={-100}
+                max={100}
+                step={1}
+                value={constantValue}
+                onChange={(e) => setConstantValue(Math.max(-100, Math.min(100, Number(e.target.value) || 0)))}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCommitConstant();
+                  }
+                }}
+              />
+              <button className={styles.constantOkBtn} onClick={handleCommitConstant}>
+                OK
+              </button>
+            </div>
           )}
 
           {step === 'shape' && (

@@ -18,6 +18,7 @@ function makeState(overrides: Partial<KeyboardHandlerState> = {}): KeyboardHandl
   return {
     hasActiveOverlay: () => false,
     activeBoardReadOnly: false,
+    isHomeBoard: false,
     interactionMode: { type: 'idle' },
     selectedChipId: null,
     activeBoard: { chips: new Map(), paths: [] },
@@ -250,6 +251,26 @@ describe('getKeyboardAction', () => {
     nodes.set('n1', { ...makeNode('n1', 'memory', 10, 5), locked: true });
     setFocusTarget({ type: 'node', chipId: 'n1' });
     const action = getKeyboardAction('Backspace', makeKeyEvent(), makeState({ activeBoard: { chips: nodes, paths: [] } }));
+    expect(action.type).toBe('noop');
+  });
+
+  it('Space returns noop on motherboard', () => {
+    const action = getKeyboardAction(' ', makeKeyEvent(), makeState({ isHomeBoard: true }));
+    expect(action.type).toBe('noop');
+  });
+
+  it('P returns noop on motherboard', () => {
+    const action = getKeyboardAction('p', makeKeyEvent(), makeState({ isHomeBoard: true }));
+    expect(action.type).toBe('noop');
+  });
+
+  it('ArrowLeft playpoint stepping returns noop on motherboard', () => {
+    const action = getKeyboardAction('ArrowLeft', makeKeyEvent(), makeState({ isHomeBoard: true, playMode: 'paused' }));
+    expect(action.type).toBe('noop');
+  });
+
+  it('ArrowRight playpoint stepping returns noop on motherboard', () => {
+    const action = getKeyboardAction('ArrowRight', makeKeyEvent(), makeState({ isHomeBoard: true, playMode: 'paused' }));
     expect(action.type).toBe('noop');
   });
 });

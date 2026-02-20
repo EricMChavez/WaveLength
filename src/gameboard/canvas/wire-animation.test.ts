@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeWireAnimationCache } from './wire-animation';
+import { computeWireAnimationCache, computeBlipPortKeys } from './wire-animation';
 import type { CycleResults } from '../../engine/evaluation/index';
 import type { Path } from '../../shared/types/index';
 
@@ -226,5 +226,95 @@ describe('computeWireAnimationCache', () => {
     expect(t3.departPhase).toBeCloseTo(t4.departPhase); // both depart at depth 1/2
     expect(t3.arrivePhase).toBe(1); // output CPs at maxDepth
     expect(t4.arrivePhase).toBe(1);
+  });
+});
+
+describe('computeBlipPortKeys', () => {
+  it('source held when progress < departPhase', () => {
+    const wires: Path[] = [
+      makeWire('w1', 'nodeA', 0, 'nodeB', 0),
+    ];
+    const depths = new Map([['nodeA', 1], ['nodeB', 2]]);
+    const results = makeCycleResults(['nodeA', 'nodeB'], undefined, depths, 3);
+    const cache = computeWireAnimationCache(wires, new Map(), results, 0);
+
+    const t = cache.timings.get('w1')!;
+    // Progress before departPhase → source is held
+    const holding = computeBlipPortKeys(cache, wires, t.departPhase - 0.01);
+    expect(holding.has('nodeA:plug:0')).toBe(true);
+    expect(holding.has('nodeB:socket:0')).toBe(false);
+  });
+
+  it('source not held when progress >= departPhase', () => {
+    const wires: Path[] = [
+      makeWire('w1', 'nodeA', 0, 'nodeB', 0),
+    ];
+    const depths = new Map([['nodeA', 1], ['nodeB', 2]]);
+    const results = makeCycleResults(['nodeA', 'nodeB'], undefined, depths, 3);
+    const cache = computeWireAnimationCache(wires, new Map(), results, 0);
+
+    const t = cache.timings.get('w1')!;
+    const holding = computeBlipPortKeys(cache, wires, t.departPhase);
+    expect(holding.has('nodeA:plug:0')).toBe(false);
+  });
+
+  it('target held when progress >= arrivePhase', () => {
+    const wires: Path[] = [
+      makeWire('w1', 'nodeA', 0, 'nodeB', 0),
+    ];
+    const depths = new Map([['nodeA', 1], ['nodeB', 2]]);
+    const results = makeCycleResults(['nodeA', 'nodeB'], undefined, depths, 3);
+    const cache = computeWireAnimationCache(wires, new Map(), results, 0);
+
+    const t = cache.timings.get('w1')!;
+    const holding = computeBlipPortKeys(cache, wires, t.arrivePhase);
+    expect(holding.has('nodeB:socket:0')).toBe(true);
+  });
+
+  it('target not held when progress < arrivePhase', () => {
+    const wires: Path[] = [
+      makeWire('w1', 'nodeA', 0, 'nodeB', 0),
+    ];
+    const depths = new Map([['nodeA', 1], ['nodeB', 2]]);
+    const results = makeCycleResults(['nodeA', 'nodeB'], undefined, depths, 3);
+    const cache = computeWireAnimationCache(wires, new Map(), results, 0);
+
+    const t = cache.timings.get('w1')!;
+    const holding = computeBlipPortKeys(cache, wires, t.arrivePhase - 0.01);
+    expect(holding.has('nodeB:socket:0')).toBe(false);
+  });
+
+  it('empty set when all blips mid-transit', () => {
+    const wires: Path[] = [
+      makeWire('w1', '__cp_input_0__', 0, '__cp_output_0__', 0),
+    ];
+    const depths = new Map([['__cp_input_0__', 0], ['__cp_output_0__', 1]]);
+    const results = makeCycleResults([], undefined, depths, 1);
+    const cache = computeWireAnimationCache(wires, new Map(), results, 0);
+
+    // Mid-transit: past depart (0), before arrive (1)
+    const holding = computeBlipPortKeys(cache, wires, 0.5);
+    expect(holding.size).toBe(0);
+  });
+
+  it('CP-to-CP paths work correctly', () => {
+    const wires: Path[] = [
+      makeWire('w1', '__cp_input_0__', 0, '__cp_output_0__', 0),
+    ];
+    const depths = new Map([['__cp_input_0__', 0], ['__cp_output_0__', 1]]);
+    const results = makeCycleResults([], undefined, depths, 1);
+    const cache = computeWireAnimationCache(wires, new Map(), results, 0);
+
+    // At progress 0: source held (0 < 0 is false, so not held), target not held
+    // Actually departPhase = 0, so progress 0 is NOT < 0 → source not held
+    // arrivePhase = 1, so progress 0 is NOT >= 1 → target not held
+    const holdingStart = computeBlipPortKeys(cache, wires, 0);
+    expect(holdingStart.has('__cp_input_0__:plug:0')).toBe(false);
+    expect(holdingStart.has('__cp_output_0__:socket:0')).toBe(false);
+
+    // At progress 1: source not held, target held
+    const holdingEnd = computeBlipPortKeys(cache, wires, 1);
+    expect(holdingEnd.has('__cp_input_0__:plug:0')).toBe(false);
+    expect(holdingEnd.has('__cp_output_0__:socket:0')).toBe(true);
   });
 });

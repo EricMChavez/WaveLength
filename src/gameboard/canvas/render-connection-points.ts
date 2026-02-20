@@ -42,21 +42,34 @@ export function renderConnectionPoints(
     // Socket opening faces inward (left CPs face right, right CPs face left)
     const openingDirection = side === 'left' ? 'right' : 'left';
 
+    const isReconnecting = state.reconnectingCpKeys?.has(signalKey) ?? false;
+
     let shape: PortShape;
     if (slot.direction === 'input') {
       // Input CPs emit signal into the gameboard (source end of wires)
       const isConnected = state.connectedInputCPs.has(signalKey);
       shape = isConnected
         ? { type: 'socket', openingDirection, connected: true }  // plug "left" along wire
-        : { type: 'plug' };                                      // plug sitting, ready to connect
+        : isReconnecting
+          ? { type: 'socket', openingDirection, connected: true }  // socket with neutral nub during drag
+          : { type: 'plug' };                                      // plug sitting, ready to connect
     } else {
       // Output CPs receive signal from the gameboard (destination end of wires)
       const isConnected = state.connectedOutputCPs.has(signalKey);
       shape = isConnected
         ? { type: 'seated', openingDirection }   // plug "arrived" from wire
-        : { type: 'socket', openingDirection };  // empty socket, awaiting connection
+        : isReconnecting
+          ? { type: 'socket', openingDirection }   // empty socket during drag
+          : { type: 'socket', openingDirection };  // empty socket, awaiting connection
     }
 
-    drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, shape);
+    // Reconnecting CPs: neutral color to match preview wire.
+    // Blip mode: neutral unless a blip is holding at this CP.
+    const colorOverride = isReconnecting
+      ? tokens.colorNeutral
+      : state.blipHoldingCpKeys
+        ? (state.blipHoldingCpKeys.has(signalKey) ? undefined : tokens.colorNeutral)
+        : undefined;
+    drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, shape, colorOverride);
   }
 }

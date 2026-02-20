@@ -4,6 +4,7 @@ import { defineChip } from '../framework';
 export const divideChip = defineChip({
   type: 'divide',
   category: 'routing',
+  description: 'Splits one signal evenly across two outputs',
 
   sockets: [
     { name: 'A', side: 'left', gridPosition: 1 },

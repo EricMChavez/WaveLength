@@ -23,20 +23,36 @@ function titleToConstName(title: string): string {
 }
 
 /**
- * Format a number for source output — integers stay integer, floats get rounded.
+ * Format a number for source output — integers stay integer, floats keep full precision.
  */
 function formatNum(n: number): string {
   if (Number.isInteger(n)) return String(n);
-  return String(Math.round(n * 100) / 100);
+  // Use toPrecision(15) to avoid rounding periods like 256/6 = 42.666...
+  return parseFloat(n.toPrecision(15)).toString();
 }
 
 /**
  * Serialize a WaveformDef-like object to TypeScript source, indented.
+ * Non-samples shapes use the waveform() builder to prevent period rounding bugs.
  */
 function formatWaveformDef(
   wf: { shape: string; amplitude: number; period: number; phase: number; offset: number; samples?: number[] },
   indent: string,
 ): string {
+  // For non-samples shapes, emit waveform() builder call
+  if (wf.shape !== 'samples') {
+    const opts: string[] = [];
+    if (wf.amplitude !== 100) opts.push(`amplitude: ${formatNum(wf.amplitude)}`);
+    if (wf.phase !== 0) opts.push(`phase: ${formatNum(wf.phase)}`);
+    if (wf.offset !== 0) opts.push(`offset: ${formatNum(wf.offset)}`);
+
+    if (opts.length === 0) {
+      return `${indent}waveform('${wf.shape}')`;
+    }
+    return `${indent}waveform('${wf.shape}', { ${opts.join(', ')} })`;
+  }
+
+  // For samples shapes, keep the object literal format
   const lines = [
     `${indent}{`,
     `${indent}  shape: '${wf.shape}',`,
@@ -126,6 +142,7 @@ export function exportCustomPuzzleAsSource(puzzle: CustomPuzzle): string {
   // Build the source
   const lines: string[] = [
     `import type { PuzzleDefinition } from '../types.ts';`,
+    `import { waveform } from '../waveform-generators.ts';`,
     ``,
     `export const ${constName}: PuzzleDefinition = {`,
     `  id: '${id}',`,

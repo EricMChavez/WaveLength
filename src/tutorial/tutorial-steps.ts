@@ -17,7 +17,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // Step 0: Welcome
   {
     id: 'welcome',
-    text: 'Welcome! Match the input signal to the target output.',
+    text: 'This board is not transmitting signal properly',
     highlight: { type: 'none' },
     tooltipPosition: 'center',
     advanceOn: { type: 'next-button' },
@@ -48,7 +48,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'place-chip',
     text: 'Drag an Offset chip from the drawer onto the board.',
     highlight: { type: 'full-board' },
-    tooltipPosition: 'above',
+    tooltipPosition: 'board-top',
     advanceOn: { type: 'node-placed', nodeType: 'offset' },
   },
 
@@ -57,7 +57,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'wire-input-to-chip',
     text: 'Click the input port, then the chip to draw a path.',
     highlight: { type: 'full-board' },
-    tooltipPosition: 'above',
+    tooltipPosition: 'board-top',
     cursor: {
       path: [
         { col: 11, row: 18 },
@@ -76,7 +76,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'wire-chip-to-output',
     text: "Click the chip's output, then the board output.",
     highlight: { type: 'full-board' },
-    tooltipPosition: 'above',
+    tooltipPosition: 'board-top',
     cursor: {
       path: [
         { col: 36, row: 18 },
@@ -95,7 +95,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'adjust-knob',
     text: 'Click and drag the knob to set it to +50.',
     highlight: { type: 'full-board' },
-    tooltipPosition: 'above',
+    tooltipPosition: 'board-top',
     advanceOn: { type: 'validation-pass' },
   },
 
@@ -103,7 +103,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'complete',
     text: "You're ready! Click to return to the main board.",
-    subtext: 'Every puzzle you solve becomes a reusable chip.',
     highlight: { type: 'none' },
     tooltipPosition: 'center',
     advanceOn: { type: 'next-button' },

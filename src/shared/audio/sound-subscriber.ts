@@ -3,9 +3,6 @@ import { playSound } from './audio-manager.ts';
 /** Module-level flag to suppress all sound effects during puzzle loads */
 let _suppressed = false;
 
-/** Timeout IDs for the victory meter-valid burst, so we can cancel on status change */
-let _victoryTimeouts: ReturnType<typeof setTimeout>[] = [];
-
 /**
  * Run `fn` with sound effects suppressed.
  * Uses try/finally so the flag is always cleared, even on exceptions.
@@ -33,21 +30,6 @@ export function initSoundEffects(store: {
       playSound(state.playMode === 'playing' ? 'play' : 'pause');
     }
 
-    // Victory — rapid meter-valid burst (one per valid output port)
-    if (state.puzzleStatus === 'victory' && prev.puzzleStatus !== 'victory') {
-      const validCount = state.perPortMatch.filter(Boolean).length;
-      const INITIAL_DELAY = 400;
-      const INTERVAL = 120;
-      for (let i = 0; i < validCount; i++) {
-        _victoryTimeouts.push(setTimeout(() => playSound('meter-valid'), INITIAL_DELAY + i * INTERVAL));
-      }
-    }
-    // Cancel pending victory burst if puzzle breaks back to playing
-    if (state.puzzleStatus !== 'victory' && prev.puzzleStatus === 'victory') {
-      for (const id of _victoryTimeouts) clearTimeout(id);
-      _victoryTimeouts = [];
-    }
-
     // Playpoint step (next/prev cycle) — only when NOT in fade transition
     if (state.playpoint !== prev.playpoint && state.playMode === 'paused' && !state.playPauseTransitioning) {
       const delta = state.playpoint - prev.playpoint;
@@ -72,15 +54,16 @@ export function initSoundEffects(store: {
       // reveal-close-end is fired from render-loop.ts at 300ms into the reveal animation
     }
 
-    // Meter validation: individual port flipping from invalid → valid
-    if (state.perPortMatch !== prev.perPortMatch && state.perPortMatch.length > 0) {
+    // Meter valid: play when any output port transitions from unmatched to matched
+    if (state.perPortMatch !== prev.perPortMatch) {
       for (let i = 0; i < state.perPortMatch.length; i++) {
-        if (state.perPortMatch[i] && !prev.perPortMatch[i]) {
+        if (state.perPortMatch[i] === true && prev.perPortMatch[i] !== true) {
           playSound('meter-valid');
-          break; // One sound per validation update, even if multiple ports validate at once
+          break;
         }
       }
     }
+
   });
 }
 
@@ -88,8 +71,7 @@ export function initSoundEffects(store: {
 interface SoundState {
   playMode: string;
   playPauseTransitioning: boolean;
-  puzzleStatus: string;
   playpoint: number;
-  zoomTransitionState: { type: string; direction?: 'in' | 'out' };
   perPortMatch: boolean[];
+  zoomTransitionState: { type: string; direction?: 'in' | 'out' };
 }

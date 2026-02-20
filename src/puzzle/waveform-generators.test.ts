@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateWaveformValue, getShapePeriod, shapeAtPhase, generateFMSamples } from './waveform-generators.ts';
+import { generateWaveformValue, getShapePeriod, shapeAtPhase, generateFMSamples, waveform } from './waveform-generators.ts';
 import type { WaveformDef } from './types.ts';
 
 function makeDef(overrides: Partial<WaveformDef> = {}): WaveformDef {
@@ -92,20 +92,20 @@ describe.each([
   { shape: 'triangle-half' as const, period: 128 },
   { shape: 'triangle-quarter' as const, period: 64 },
 ])('$shape (period=$period)', ({ shape, period }) => {
-  it('starts at -amplitude', () => {
-    expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(-100, 5);
+  it('starts at 0', () => {
+    expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(0, 5);
   });
 
-  it('returns 0 at quarter period', () => {
-    expect(generateWaveformValue(period / 4, makeDef({ shape, period }))).toBeCloseTo(0, 5);
+  it('returns +amplitude at quarter period', () => {
+    expect(generateWaveformValue(period / 4, makeDef({ shape, period }))).toBeCloseTo(100, 5);
   });
 
-  it('returns +amplitude at half period', () => {
-    expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(100, 5);
+  it('returns 0 at half period', () => {
+    expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(0, 5);
   });
 
-  it('returns 0 at three-quarter period', () => {
-    expect(generateWaveformValue(period * 3 / 4, makeDef({ shape, period }))).toBeCloseTo(0, 5);
+  it('returns -amplitude at three-quarter period', () => {
+    expect(generateWaveformValue(period * 3 / 4, makeDef({ shape, period }))).toBeCloseTo(-100, 5);
   });
 });
 
@@ -138,12 +138,12 @@ describe.each([
   { shape: 'sawtooth-half' as const, period: 128 },
   { shape: 'sawtooth-quarter' as const, period: 64 },
 ])('$shape (period=$period)', ({ shape, period }) => {
-  it('starts at -amplitude', () => {
-    expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(-100, 5);
+  it('starts at 0', () => {
+    expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(0, 5);
   });
 
-  it('returns 0 at half period', () => {
-    expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(0, 5);
+  it('returns -amplitude at half period', () => {
+    expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(-100, 5);
   });
 });
 
@@ -230,12 +230,12 @@ describe('reduced variants', () => {
     { shape: 'triangle-half-reduced' as const, period: 128 },
     { shape: 'triangle-quarter-reduced' as const, period: 64 },
   ])('$shape (period=$period)', ({ shape, period }) => {
-    it('starts at -50 (half amplitude)', () => {
-      expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(-50, 5);
+    it('starts at 0 (half amplitude)', () => {
+      expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(0, 5);
     });
 
-    it('returns +50 (half amplitude) at half period', () => {
-      expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(50, 5);
+    it('returns +50 (half amplitude) at quarter period', () => {
+      expect(generateWaveformValue(period / 4, makeDef({ shape, period }))).toBeCloseTo(50, 5);
     });
   });
 
@@ -244,12 +244,12 @@ describe('reduced variants', () => {
     { shape: 'sawtooth-half-reduced' as const, period: 128 },
     { shape: 'sawtooth-quarter-reduced' as const, period: 64 },
   ])('$shape (period=$period)', ({ shape, period }) => {
-    it('starts at -50 (half amplitude)', () => {
-      expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(-50, 5);
+    it('starts at 0 (half amplitude)', () => {
+      expect(generateWaveformValue(0, makeDef({ shape, period }))).toBeCloseTo(0, 5);
     });
 
-    it('returns 0 at half period', () => {
-      expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(0, 5);
+    it('returns -50 at half period', () => {
+      expect(generateWaveformValue(period / 2, makeDef({ shape, period }))).toBeCloseTo(-50, 5);
     });
   });
 });
@@ -290,17 +290,17 @@ describe('shapeAtPhase', () => {
   });
 
   it('triangle: known values at key phases', () => {
-    expect(shapeAtPhase('triangle', 0)).toBeCloseTo(-1, 10);
-    expect(shapeAtPhase('triangle', 0.25)).toBeCloseTo(0, 10);
-    expect(shapeAtPhase('triangle', 0.5)).toBeCloseTo(1, 10);
-    expect(shapeAtPhase('triangle', 0.75)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('triangle', 0)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('triangle', 0.25)).toBeCloseTo(1, 10);
+    expect(shapeAtPhase('triangle', 0.5)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('triangle', 0.75)).toBeCloseTo(-1, 10);
   });
 
   it('sawtooth: known values at key phases', () => {
-    expect(shapeAtPhase('sawtooth', 0)).toBeCloseTo(-1, 10);
-    expect(shapeAtPhase('sawtooth', 0.25)).toBeCloseTo(-0.5, 10);
-    expect(shapeAtPhase('sawtooth', 0.5)).toBeCloseTo(0, 10);
-    expect(shapeAtPhase('sawtooth', 0.75)).toBeCloseTo(0.5, 10);
+    expect(shapeAtPhase('sawtooth', 0)).toBeCloseTo(0, 10);
+    expect(shapeAtPhase('sawtooth', 0.25)).toBeCloseTo(0.5, 10);
+    expect(shapeAtPhase('sawtooth', 0.5)).toBeCloseTo(-1, 10);
+    expect(shapeAtPhase('sawtooth', 0.75)).toBeCloseTo(-0.5, 10);
   });
 
   it('wraps phase values outside [0,1)', () => {
@@ -368,7 +368,7 @@ describe('generateFMSamples', () => {
       const t = i / 256;
       const phase = 3 * t;
       const rawPhase = ((phase % 1) + 1) % 1;
-      const raw = rawPhase < 0.5 ? -1 + 4 * rawPhase : 3 - 4 * rawPhase;
+      const raw = rawPhase < 0.25 ? 4 * rawPhase : rawPhase < 0.75 ? 2 - 4 * rawPhase : -4 + 4 * rawPhase;
       expect(fm[i]).toBeCloseTo(raw * 80, 5);
     }
   });
@@ -394,5 +394,79 @@ describe('generateFMSamples', () => {
       maxDiff = Math.max(maxDiff, Math.abs(fm[i] - constant[i]));
     }
     expect(maxDiff).toBeGreaterThan(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// waveform() builder
+// ---------------------------------------------------------------------------
+
+describe('waveform', () => {
+  it('auto-derives correct period for each shape suffix', () => {
+    expect(waveform('sine-full').period).toBe(256);
+    expect(waveform('sine-half').period).toBe(128);
+    expect(waveform('triangle-third').period).toBe(256 / 3);
+    expect(waveform('square-quarter').period).toBe(64);
+    expect(waveform('sawtooth-fifth').period).toBe(256 / 5);
+    expect(waveform('sawtooth-sixth').period).toBe(256 / 6);
+  });
+
+  it('uses exact fractional periods (no rounding)', () => {
+    // 256/3 and 256/6 should NOT be rounded to 85.33 or 42.67
+    const third = waveform('triangle-third');
+    expect(third.period).not.toBe(85.33);
+    expect(third.period).toBe(256 / 3);
+
+    const sixth = waveform('sawtooth-sixth');
+    expect(sixth.period).not.toBe(42.67);
+    expect(sixth.period).toBe(256 / 6);
+  });
+
+  it('defaults amplitude to 100, phase to 0, offset to 0', () => {
+    const def = waveform('sine-full');
+    expect(def.amplitude).toBe(100);
+    expect(def.phase).toBe(0);
+    expect(def.offset).toBe(0);
+  });
+
+  it('allows custom amplitude override', () => {
+    const def = waveform('sine-full', { amplitude: 75 });
+    expect(def.amplitude).toBe(75);
+    expect(def.phase).toBe(0);
+    expect(def.offset).toBe(0);
+  });
+
+  it('allows custom phase override', () => {
+    const def = waveform('sine-full', { phase: 64 });
+    expect(def.amplitude).toBe(100);
+    expect(def.phase).toBe(64);
+    expect(def.offset).toBe(0);
+  });
+
+  it('allows custom offset override', () => {
+    const def = waveform('sine-full', { offset: 25 });
+    expect(def.amplitude).toBe(100);
+    expect(def.phase).toBe(0);
+    expect(def.offset).toBe(25);
+  });
+
+  it('allows multiple custom overrides', () => {
+    const def = waveform('triangle-half', { amplitude: 50, phase: 10, offset: -20 });
+    expect(def.shape).toBe('triangle-half');
+    expect(def.amplitude).toBe(50);
+    expect(def.period).toBe(128);
+    expect(def.phase).toBe(10);
+    expect(def.offset).toBe(-20);
+  });
+
+  it('preserves the shape name in the returned def', () => {
+    expect(waveform('sawtooth-sixth').shape).toBe('sawtooth-sixth');
+    expect(waveform('sine-full-reduced').shape).toBe('sine-full-reduced');
+  });
+
+  it('works with reduced variants', () => {
+    const def = waveform('sine-full-reduced');
+    expect(def.period).toBe(256);
+    expect(def.amplitude).toBe(100);
   });
 });

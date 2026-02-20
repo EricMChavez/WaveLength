@@ -42,7 +42,7 @@ const PLAYABLE_WIDTH = MOTHERBOARD_PLAYABLE_END - MOTHERBOARD_PLAYABLE_START; //
  * Puzzles: right portion (paginated puzzle list).
  * Custom: below primary (only if custom puzzles exist).
  */
-function computeSections(hasCustom: boolean): MotherboardSection[] {
+function computeSections(puzzleCount: number, customCount: number): MotherboardSection[] {
   // Both sections are 10 cols wide (SECTION_PAD 2 + chip 6 + pad 2), centered with gap
   const leftCols = 10;
   const rightCols = 10;
@@ -52,7 +52,12 @@ function computeSections(hasCustom: boolean): MotherboardSection[] {
   const leftStart = MOTHERBOARD_PLAYABLE_START + Math.floor((PLAYABLE_WIDTH - totalWidth) / 2);
   const rightStart = leftStart + leftCols + gap;
 
-  const primaryRows = hasCustom ? 16 : 32;
+  // Compute section heights from content (bottom padding is 1 less than top)
+  const BOTTOM_PAD = SECTION_PAD - 1;
+  const PRIMARY_ITEM_COUNT = 2; // Creative + Tutorial
+  const primaryRows = SECTION_PAD + PRIMARY_ITEM_COUNT * MENU_ROWS + (PRIMARY_ITEM_COUNT - 1) * V_GAP + BOTTOM_PAD;
+  const puzzleRows = SECTION_PAD + puzzleCount * PUZZLE_MENU_ROWS + Math.max(0, puzzleCount - 1) * V_GAP + BOTTOM_PAD;
+
   const sections: MotherboardSection[] = [
     {
       id: 'primary',
@@ -60,25 +65,20 @@ function computeSections(hasCustom: boolean): MotherboardSection[] {
     },
     {
       id: 'puzzles',
-      gridBounds: { col: rightStart, row: 2, cols: rightCols, rows: 32 },
+      gridBounds: { col: rightStart, row: 2, cols: rightCols, rows: puzzleRows },
     },
   ];
 
-  if (hasCustom) {
+  if (customCount > 0) {
+    const SECTION_GAP = 2;
+    const customRows = SECTION_PAD + customCount * MENU_ROWS + Math.max(0, customCount - 1) * V_GAP + BOTTOM_PAD;
     sections.push({
       id: 'custom',
-      gridBounds: { col: leftStart, row: 2 + primaryRows + 2, cols: leftCols, rows: 32 - primaryRows - 2 },
+      gridBounds: { col: leftStart, row: 2 + primaryRows + SECTION_GAP, cols: leftCols, rows: customRows },
     });
   }
 
   return sections;
-}
-
-/** Compute how many puzzle chips fit on one page within the puzzle section. */
-function computeItemsPerPage(sectionRows: number): number {
-  const usable = sectionRows - SECTION_PAD * 2 - 2; // 2 rows reserved for pagination controls
-  const stride = PUZZLE_MENU_ROWS + V_GAP;
-  return Math.max(1, Math.floor(usable / stride));
 }
 
 // ---------------------------------------------------------------------------
@@ -191,13 +191,12 @@ export function createMotherboard(
   completedLevels: Set<string>,
   isLevelUnlocked: (index: number) => boolean,
   customPuzzles?: ReadonlyMap<string, CustomPuzzle>,
-  currentPage: number = 0,
 ): MotherboardResult {
   const chips = new Map<string, ChipState>();
   const allEdgeCPs: MotherboardEdgeCP[] = [];
 
-  const hasCustom = !!(customPuzzles && customPuzzles.size > 0);
-  const sections = computeSections(hasCustom);
+  const customCount = customPuzzles ? customPuzzles.size : 0;
+  const sections = computeSections(PUZZLE_LEVELS.length, customCount);
 
   const primaryBounds = sections.find(s => s.id === 'primary')!.gridBounds;
   const puzzleBounds = sections.find(s => s.id === 'puzzles')!.gridBounds;
@@ -207,20 +206,8 @@ export function createMotherboard(
   // ---------------------------------------------------------------------------
   const primaryCenterCol = primaryBounds.col + Math.floor(primaryBounds.cols / 2) - Math.floor(MENU_COLS / 2);
 
-  // Creative Mode chip (centered near top of primary section)
-  const creativeRow = primaryBounds.row + SECTION_PAD;
-  const creativeChip: ChipState = {
-    id: 'menu-creative',
-    type: 'menu:creative',
-    position: { col: primaryCenterCol, row: creativeRow },
-    params: { label: 'Creative Mode' },
-    socketCount: 0,
-    plugCount: 0,
-  };
-  chips.set(creativeChip.id, creativeChip);
-
-  // Tutorial chip (below creative)
-  const tutorialRow = creativeRow + MENU_ROWS + V_GAP;
+  // Tutorial chip (centered near top of primary section)
+  const tutorialRow = primaryBounds.row + SECTION_PAD;
   const tutorialChip: ChipState = {
     id: 'menu-tutorial',
     type: 'menu:tutorial',
@@ -231,24 +218,30 @@ export function createMotherboard(
   };
   chips.set(tutorialChip.id, tutorialChip);
 
+  // Creative Mode chip (below tutorial)
+  const creativeRow = tutorialRow + MENU_ROWS + V_GAP;
+  const creativeChip: ChipState = {
+    id: 'menu-creative',
+    type: 'menu:creative',
+    position: { col: primaryCenterCol, row: creativeRow },
+    params: { label: 'Creative Mode' },
+    socketCount: 0,
+    plugCount: 0,
+  };
+  chips.set(creativeChip.id, creativeChip);
+
   // ---------------------------------------------------------------------------
   // Puzzle section: paginated list of all puzzles (tutorials + puzzles combined)
   // ---------------------------------------------------------------------------
   const allPuzzles = PUZZLE_LEVELS;
-  const itemsPerPage = computeItemsPerPage(puzzleBounds.rows);
-  const totalPages = Math.max(1, Math.ceil(allPuzzles.length / itemsPerPage));
-  const safePage = Math.max(0, Math.min(currentPage, totalPages - 1));
-
-  const pageStart = safePage * itemsPerPage;
-  const pageEnd = Math.min(pageStart + itemsPerPage, allPuzzles.length);
 
   // Center chips horizontally within puzzle section
   const puzzleChipCol = puzzleBounds.col + Math.floor((puzzleBounds.cols - PUZZLE_MENU_COLS) / 2);
   const puzzleContentRow = puzzleBounds.row + SECTION_PAD;
 
-  for (let i = pageStart; i < pageEnd; i++) {
+  for (let i = 0; i < allPuzzles.length; i++) {
     const puzzle = allPuzzles[i];
-    const posInPage = i - pageStart;
+    const posInPage = i;
     const row = puzzleContentRow + posInPage * (PUZZLE_MENU_ROWS + V_GAP);
 
     const isCompleted = completedLevels.has(puzzle.id);
@@ -295,7 +288,7 @@ export function createMotherboard(
   // ---------------------------------------------------------------------------
   // Custom section (conditional)
   // ---------------------------------------------------------------------------
-  if (hasCustom) {
+  if (customCount > 0) {
     const customBounds = sections.find(s => s.id === 'custom')!.gridBounds;
     const customCenterCol = customBounds.col + Math.floor(customBounds.cols / 2) - Math.floor(MENU_COLS / 2);
     let customRow = customBounds.row + SECTION_PAD;
@@ -322,9 +315,9 @@ export function createMotherboard(
   }
 
   const pagination: PaginationState = {
-    currentPage: safePage,
-    totalPages,
-    itemsPerPage,
+    currentPage: 0,
+    totalPages: 1,
+    itemsPerPage: allPuzzles.length,
   };
 
   const board: GameboardState = {

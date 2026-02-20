@@ -1,10 +1,9 @@
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { MotherboardSection } from '../../store/motherboard-types.ts';
-import type { PaginationState } from '../../store/motherboard-types.ts';
 import { drawHighlightStreakRounded, getLightDirection } from './render-highlight-streak.ts';
 import { HIGHLIGHT_STREAK, DEPTH } from '../../shared/constants/index.ts';
 import { drawNoiseGrain } from './render-noise-grain.ts';
-import { CARD_BODY_FONT } from '../../shared/fonts/font-ready.ts';
+
 
 // ---------------------------------------------------------------------------
 // Section container rendering
@@ -68,117 +67,6 @@ export function drawMotherboardSections(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Pagination controls
-// ---------------------------------------------------------------------------
-
-/** Height of the pagination area in cells (at bottom of puzzle section). */
-const PAGINATION_HEIGHT_CELLS = 2;
-
-/**
- * Draw pagination controls at the bottom of the puzzle section.
- * Shows left/right arrows and a page indicator.
- */
-export function drawPaginationControls(
-  ctx: CanvasRenderingContext2D,
-  tokens: ThemeTokens,
-  puzzleSection: MotherboardSection,
-  pagination: PaginationState,
-  cellSize: number,
-): void {
-  if (pagination.totalPages <= 1) return;
-
-  const { col, row, cols, rows } = puzzleSection.gridBounds;
-  const sectionBottom = (row + rows) * cellSize;
-  const centerX = (col + cols / 2) * cellSize;
-  const controlY = sectionBottom - PAGINATION_HEIGHT_CELLS * cellSize;
-
-  const arrowSize = cellSize * 0.6;
-  const spacing = cellSize * 3;
-
-  // Page indicator text
-  const label = `${pagination.currentPage + 1} / ${pagination.totalPages}`;
-  const fontSize = Math.round(cellSize * 0.55);
-  ctx.fillStyle = tokens.textSecondary;
-  ctx.font = `${fontSize}px ${CARD_BODY_FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, centerX, controlY + cellSize);
-
-  // Left arrow
-  const canGoLeft = pagination.currentPage > 0;
-  drawArrow(ctx, centerX - spacing, controlY + cellSize, arrowSize, 'left',
-    canGoLeft ? tokens.textPrimary : tokens.textSecondary, canGoLeft ? 0.8 : 0.3);
-
-  // Right arrow
-  const canGoRight = pagination.currentPage < pagination.totalPages - 1;
-  drawArrow(ctx, centerX + spacing, controlY + cellSize, arrowSize, 'right',
-    canGoRight ? tokens.textPrimary : tokens.textSecondary, canGoRight ? 0.8 : 0.3);
-}
-
-/**
- * Hit-test pagination arrows. Returns 'prev' | 'next' | null.
- */
-export function hitTestPagination(
-  x: number, y: number,
-  puzzleSection: MotherboardSection,
-  pagination: PaginationState,
-  cellSize: number,
-): 'prev' | 'next' | null {
-  if (pagination.totalPages <= 1) return null;
-
-  const { col, row, cols, rows } = puzzleSection.gridBounds;
-  const sectionBottom = (row + rows) * cellSize;
-  const centerX = (col + cols / 2) * cellSize;
-  const controlY = sectionBottom - PAGINATION_HEIGHT_CELLS * cellSize;
-
-  const spacing = cellSize * 3;
-  const hitRadius = cellSize * 1.2;
-
-  const leftCx = centerX - spacing;
-  const rightCx = centerX + spacing;
-  const cy = controlY + cellSize;
-
-  if (Math.abs(x - leftCx) < hitRadius && Math.abs(y - cy) < hitRadius) {
-    return pagination.currentPage > 0 ? 'prev' : null;
-  }
-  if (Math.abs(x - rightCx) < hitRadius && Math.abs(y - cy) < hitRadius) {
-    return pagination.currentPage < pagination.totalPages - 1 ? 'next' : null;
-  }
-
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function drawArrow(
-  ctx: CanvasRenderingContext2D,
-  cx: number, cy: number,
-  size: number,
-  direction: 'left' | 'right',
-  color: string,
-  alpha: number,
-): void {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  if (direction === 'left') {
-    ctx.moveTo(cx + size / 2, cy - size / 2);
-    ctx.lineTo(cx - size / 2, cy);
-    ctx.lineTo(cx + size / 2, cy + size / 2);
-  } else {
-    ctx.moveTo(cx - size / 2, cy - size / 2);
-    ctx.lineTo(cx + size / 2, cy);
-    ctx.lineTo(cx - size / 2, cy + size / 2);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
 /**
  * Draw dot matrix at grid intersections inside a section, clipped to rounded corners.
  * Matches the gameboard dot style from render-grid.ts.
@@ -224,7 +112,84 @@ function drawSectionDots(
 
 export interface PuzzleIndicatorLight {
   gridRow: number;
+  chipId: string;
   state: 'locked' | 'unlocked' | 'completed';
+  transitionProgress?: number;  // 0-1 animation progress
+  transitionFrom?: 'locked' | 'unlocked' | 'completed';
+}
+
+/** RGB color triple for lerping. */
+interface RGB { r: number; g: number; b: number }
+
+/** Visual properties for a given indicator light state. */
+interface LightVisuals {
+  fill: RGB;
+  glowColor: RGB;
+  glowAlpha: number;
+  glowBlur: number; // multiplier of cellSize
+  specularColor: RGB;
+  specularAlpha: number;
+}
+
+/** Compute light visuals for a given state (snapshot at current instant). */
+function getLightVisuals(state: 'locked' | 'unlocked' | 'completed', now: number): LightVisuals {
+  if (state === 'locked') {
+    return {
+      fill: { r: 74, g: 74, b: 58 },
+      glowColor: { r: 0, g: 0, b: 0 },
+      glowAlpha: 0,
+      glowBlur: 0,
+      specularColor: { r: 255, g: 255, b: 255 },
+      specularAlpha: 0.15,
+    };
+  }
+  if (state === 'unlocked') {
+    const pulse = 0.5 + 0.5 * Math.sin((now / 1200) * Math.PI * 2);
+    const brightness = 0.55 + 0.45 * pulse;
+    return {
+      fill: { r: Math.round(224 * brightness), g: Math.round(56 * brightness), b: Math.round(56 * brightness) },
+      glowColor: { r: 224, g: 56, b: 56 },
+      glowAlpha: 0.3 + 0.5 * pulse,
+      glowBlur: 0.3 + 0.4 * pulse,
+      specularColor: { r: 255, g: 200, b: 200 },
+      specularAlpha: 0.4,
+    };
+  }
+  // completed
+  return {
+    fill: { r: 39, g: 251, b: 107 },
+    glowColor: { r: 39, g: 251, b: 107 },
+    glowAlpha: 0.6,
+    glowBlur: 0.5,
+    specularColor: { r: 160, g: 253, b: 194 },
+    specularAlpha: 0.45,
+  };
+}
+
+/** Linearly interpolate between two RGB colors. */
+function lerpRGB(a: RGB, b: RGB, t: number): RGB {
+  return {
+    r: Math.round(a.r + (b.r - a.r) * t),
+    g: Math.round(a.g + (b.g - a.g) * t),
+    b: Math.round(a.b + (b.b - a.b) * t),
+  };
+}
+
+/** Linearly interpolate between two numbers. */
+function lerpNum(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/** Interpolate between two LightVisuals. */
+function lerpVisuals(from: LightVisuals, to: LightVisuals, t: number): LightVisuals {
+  return {
+    fill: lerpRGB(from.fill, to.fill, t),
+    glowColor: lerpRGB(from.glowColor, to.glowColor, t),
+    glowAlpha: lerpNum(from.glowAlpha, to.glowAlpha, t),
+    glowBlur: lerpNum(from.glowBlur, to.glowBlur, t),
+    specularColor: lerpRGB(from.specularColor, to.specularColor, t),
+    specularAlpha: lerpNum(from.specularAlpha, to.specularAlpha, t),
+  };
 }
 
 /**
@@ -234,6 +199,8 @@ export interface PuzzleIndicatorLight {
  * - locked: dark gray, no glow
  * - unlocked: pulsing red
  * - completed: steady green glow
+ *
+ * Supports animated transitions via transitionProgress/transitionFrom fields.
  */
 export function drawPuzzleIndicatorLights(
   ctx: CanvasRenderingContext2D,
@@ -248,6 +215,16 @@ export function drawPuzzleIndicatorLights(
 
   for (const light of lights) {
     const cy = light.gridRow * cellSize;
+
+    // Resolve visuals — lerp if transitioning
+    let visuals: LightVisuals;
+    if (light.transitionProgress !== undefined && light.transitionFrom !== undefined) {
+      const fromV = getLightVisuals(light.transitionFrom, now);
+      const toV = getLightVisuals(light.state, now);
+      visuals = lerpVisuals(fromV, toV, light.transitionProgress);
+    } else {
+      visuals = getLightVisuals(light.state, now);
+    }
 
     // --- Housing bezel (dark ring) ---
     ctx.save();
@@ -268,26 +245,13 @@ export function drawPuzzleIndicatorLights(
     ctx.restore();
 
     // --- Glow pass ---
-    if (light.state === 'unlocked') {
-      // Pulsing red glow: sin wave over 1200ms period
-      const pulse = 0.5 + 0.5 * Math.sin((now / 1200) * Math.PI * 2);
-      const glowAlpha = 0.3 + 0.5 * pulse;
+    if (visuals.glowAlpha > 0) {
       ctx.save();
-      ctx.shadowColor = `rgba(224, 56, 56, ${glowAlpha})`;
-      ctx.shadowBlur = cellSize * (0.3 + 0.4 * pulse);
+      ctx.shadowColor = `rgba(${visuals.glowColor.r}, ${visuals.glowColor.g}, ${visuals.glowColor.b}, ${visuals.glowAlpha})`;
+      ctx.shadowBlur = cellSize * visuals.glowBlur;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(224, 56, 56, 0)'; // transparent fill, shadow provides glow
-      ctx.fill();
-      ctx.restore();
-    } else if (light.state === 'completed') {
-      // Steady green glow
-      ctx.save();
-      ctx.shadowColor = 'rgba(80, 200, 120, 0.6)';
-      ctx.shadowBlur = cellSize * 0.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(80, 200, 120, 0)';
+      ctx.fillStyle = `rgba(${visuals.glowColor.r}, ${visuals.glowColor.g}, ${visuals.glowColor.b}, 0)`;
       ctx.fill();
       ctx.restore();
     }
@@ -295,18 +259,7 @@ export function drawPuzzleIndicatorLights(
     // --- LED fill ---
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    if (light.state === 'locked') {
-      ctx.fillStyle = '#4a4a3a';
-    } else if (light.state === 'unlocked') {
-      const pulse = 0.5 + 0.5 * Math.sin((now / 1200) * Math.PI * 2);
-      const brightness = 0.55 + 0.45 * pulse;
-      const r = Math.round(224 * brightness);
-      const g = Math.round(56 * brightness);
-      const b = Math.round(56 * brightness);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-    } else {
-      ctx.fillStyle = '#50c878';
-    }
+    ctx.fillStyle = `rgb(${visuals.fill.r},${visuals.fill.g},${visuals.fill.b})`;
     ctx.fill();
 
     // --- Border ring ---
@@ -321,13 +274,7 @@ export function drawPuzzleIndicatorLights(
     const hlY = cy - radius * 0.3;
     const hlRadius = radius * 0.35;
     const grad = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, hlRadius);
-    if (light.state === 'locked') {
-      grad.addColorStop(0, 'rgba(255,255,255,0.15)');
-    } else if (light.state === 'unlocked') {
-      grad.addColorStop(0, 'rgba(255,200,200,0.4)');
-    } else {
-      grad.addColorStop(0, 'rgba(200,255,220,0.45)');
-    }
+    grad.addColorStop(0, `rgba(${visuals.specularColor.r},${visuals.specularColor.g},${visuals.specularColor.b},${visuals.specularAlpha})`);
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.beginPath();
     ctx.arc(hlX, hlY, hlRadius, 0, Math.PI * 2);

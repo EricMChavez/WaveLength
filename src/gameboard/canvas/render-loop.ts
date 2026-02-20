@@ -3,7 +3,7 @@ import { getThemeTokens, isReducedMotion } from '../../shared/tokens/theme-manag
 import { getPerSampleMatch } from '../../simulation/cycle-runner.ts';
 import { generateWaveformValue } from '../../puzzle/waveform-generators.ts';
 import { GRID_COLS, GRID_ROWS, METER_LEFT_START, METER_RIGHT_START, gridRectToPixels, pixelToGrid } from '../../shared/grid/index.ts';
-import { drawMeter } from '../meters/render-meter.ts';
+import { drawMeter, drawMeterLabel } from '../meters/render-meter.ts';
 import type { RenderMeterState } from '../meters/render-meter.ts';
 import { METER_GRID_ROWS, METER_GRID_COLS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS, meterKey, modeToDirection } from '../meters/meter-types.ts';
 import type { MeterKey } from '../meters/meter-types.ts';
@@ -12,7 +12,7 @@ import { buildSlotConfig, directionIndexToSlot, slotToDirectionIndex } from '../
 import type { SlotConfig } from '../../puzzle/types.ts';
 import { drawNodes, drawSingleNode } from './render-nodes.ts';
 import { drawWires } from './render-wires.ts';
-import { computeWireAnimationCache } from './wire-animation.ts';
+import { computeWireAnimationCache, computeBlipPortKeys } from './wire-animation.ts';
 import type { WireAnimationCache } from './wire-animation.ts';
 import { drawWireBlips } from './render-wire-blips.ts';
 import { renderConnectionPoints } from './render-connection-points.ts';
@@ -27,10 +27,11 @@ import { registerCropCapture, unregisterCropCapture } from './snapshot.ts';
 import { drawKeyboardFocus } from './render-focus.ts';
 import { getFocusTarget, isFocusVisible } from '../interaction/keyboard-focus.ts';
 import { getRejectedKnobChipId } from './rejected-knob.ts';
+import { getReconnectingPathId } from './reconnecting-path.ts';
 import { drawPlaybackBar, getHoveredPlaybackButton, getPressedPlaybackButton } from './render-playback-bar.ts';
 import { drawBackButton, getHoveredBackButton } from './render-back-button.ts';
 import { drawRecordButton, getHoveredRecordButton, setRecordButtonDisabled } from './render-record-button.ts';
-import { drawMotherboardSections, drawPaginationControls, drawPuzzleIndicatorLights } from './render-motherboard-sections.ts';
+import { drawMotherboardSections, drawPuzzleIndicatorLights } from './render-motherboard-sections.ts';
 import type { PuzzleIndicatorLight } from './render-motherboard-sections.ts';
 import { drawEdgeCPs } from './render-edge-cps.ts';
 import { playSound } from '../../shared/audio/index.ts';
@@ -276,6 +277,11 @@ let cachedWireAnim: WireAnimationCache | null = null;
 let cachedWireAnimResults: CycleResults | null = null;
 let cachedWireAnimPlaypoint = -1;
 let revealCloseSoundFired = false;
+
+// Celebration animation state
+const CELEBRATION_PHASE_MS = 225;
+const CELEBRATION_WAIT_MS = 150;
+let lastCelebPhase: string = 'idle';
 
 // Play/pause color fade transition state
 let colorFade = 1; // 0 = neutral only, 1 = full polarity color
@@ -532,6 +538,10 @@ export function startRenderLoop(
         if (state.tutorialState.type === 'active' && state.tutorialState.overlayHidden) {
           state.setTutorialOverlayHidden(false);
         }
+        // Start queued celebration after zoom-out completes
+        if (state.celebrationState.type === 'pending') {
+          state.startCelebration(timestamp);
+        }
         // Fall through to normal rendering — no blank frame
       }
     }
@@ -578,6 +588,27 @@ export function startRenderLoop(
     // Read paths early (needed for chip/path rendering on all boards)
     const boardPaths = state.activeBoard?.paths ?? null;
 
+    // Filter out the path being reconnected (hidden during drag)
+    const reconnPathId = getReconnectingPathId();
+    const visiblePaths = reconnPathId && boardPaths
+      ? boardPaths.filter(p => p.id !== reconnPathId)
+      : boardPaths;
+
+    // Compute CP keys involved in reconnecting path (for socket-with-nub rendering)
+    let reconnectingCpKeys: ReadonlySet<string> | undefined;
+    if (reconnPathId && boardPaths) {
+      const reconnPath = boardPaths.find(p => p.id === reconnPathId);
+      if (reconnPath) {
+        const chips = state.activeBoard?.chips;
+        const set = new Set<string>();
+        const srcSlot = getCpSlotIdx(reconnPath.source.chipId, 'input', chips);
+        if (srcSlot >= 0) set.add(`input:${srcSlot}`);
+        const tgtSlot = getCpSlotIdx(reconnPath.target.chipId, 'output', chips);
+        if (tgtSlot >= 0) set.add(`output:${tgtSlot}`);
+        if (set.size > 0) reconnectingCpKeys = set;
+      }
+    }
+
     // Meters and connection points (skip on motherboard — no meter zones)
     let meterSignalArrays: ReadonlyMap<string, number[]> = _meterSignalCache;
     let connectedOutputCPs: ReadonlySet<string> = _connectedOutputCPsCache;
@@ -618,34 +649,36 @@ export function startRenderLoop(
       // Build connected output CP set (cached on paths reference)
       // Output CPs receive signal from the graph — paths target them
       // Keys: `output:${slotIndex}` uniformly
-      if (boardPaths !== _connectedOutputCPsPaths) {
+      // Uses visiblePaths so reconnecting path's CP appears unconnected during drag
+      if (visiblePaths !== _connectedOutputCPsPaths) {
         const set = new Set<string>();
-        if (boardPaths) {
-          for (const p of boardPaths) {
+        if (visiblePaths) {
+          for (const p of visiblePaths) {
             const targetId = p.target.chipId;
             const slotIdx = getCpSlotIdx(targetId, 'output', state.activeBoard?.chips);
             if (slotIdx >= 0) set.add(`output:${slotIdx}`);
           }
         }
         _connectedOutputCPsCache = set;
-        _connectedOutputCPsPaths = boardPaths;
+        _connectedOutputCPsPaths = visiblePaths;
       }
       connectedOutputCPs = _connectedOutputCPsCache;
 
       // Build connected input CP set (cached on paths reference)
       // Input CPs emit signal into the graph — paths source from them
       // Keys: `input:${slotIndex}` uniformly
-      if (boardPaths !== _connectedInputCPsPaths) {
+      // Uses visiblePaths so reconnecting path's CP appears unconnected during drag
+      if (visiblePaths !== _connectedInputCPsPaths) {
         const set = new Set<string>();
-        if (boardPaths) {
-          for (const p of boardPaths) {
+        if (visiblePaths) {
+          for (const p of visiblePaths) {
             const sourceId = p.source.chipId;
             const slotIdx = getCpSlotIdx(sourceId, 'input', state.activeBoard?.chips);
             if (slotIdx >= 0) set.add(`input:${slotIdx}`);
           }
         }
         _connectedInputCPsCache = set;
-        _connectedInputCPsPaths = boardPaths;
+        _connectedInputCPsPaths = visiblePaths;
       }
 
       // Calculate meter starting offset (meters fill the full height)
@@ -687,12 +720,20 @@ export function startRenderLoop(
           isConnected,
           borderState: dir === 'output' && state.perPortMatch[i] === true
             ? 'matched'
-            : dir === 'output' && isConnected && meterTargetArrays.has(`target:${i}`)
+            : dir === 'output' && meterTargetArrays.has(`target:${i}`)
               ? 'mismatched'
               : 'neutral',
           isUtilityEditing,
         };
         drawMeter(ctx!, tokens, renderState, meterRect);
+
+        // Position label below meter
+        if (slot.mode !== 'hidden') {
+          const LEFT_LABELS = ['A', 'B', 'C'];
+          const RIGHT_LABELS = ['X', 'Y', 'Z'];
+          const label = side === 'left' ? LEFT_LABELS[perSideIdx] : RIGHT_LABELS[perSideIdx];
+          drawMeterLabel(ctx!, tokens, label, meterRect, cellSize, side);
+        }
       }
 
       // Compute signal values for port/CP coloring from meter signal arrays (cached)
@@ -718,33 +759,35 @@ export function startRenderLoop(
     }
     const portSignals = _portSignalsCache;
 
-    // Build connected socket port set (cached on paths reference)
-    if (boardPaths !== _connectedSocketPortsPaths) {
+    // Build connected socket port set (cached on visible paths reference)
+    // Uses visiblePaths so reconnecting path's ports appear unconnected during drag
+    if (visiblePaths !== _connectedSocketPortsPaths) {
       const set = new Set<string>();
-      if (boardPaths) {
-        for (const p of boardPaths) {
+      if (visiblePaths) {
+        for (const p of visiblePaths) {
           if (p.target.side === 'socket') {
             set.add(`${p.target.chipId}:${p.target.portIndex}`);
           }
         }
       }
       _connectedSocketPortsCache = set;
-      _connectedSocketPortsPaths = boardPaths;
+      _connectedSocketPortsPaths = visiblePaths;
     }
     const connectedSocketPorts = _connectedSocketPortsCache;
 
-    // Build connected plug port set (cached on paths reference)
-    if (boardPaths !== _connectedPlugPortsPaths) {
+    // Build connected plug port set (cached on visible paths reference)
+    // Uses visiblePaths so reconnecting path's ports appear unconnected during drag
+    if (visiblePaths !== _connectedPlugPortsPaths) {
       const set = new Set<string>();
-      if (boardPaths) {
-        for (const p of boardPaths) {
+      if (visiblePaths) {
+        for (const p of visiblePaths) {
           if (p.source.side === 'plug') {
             set.add(`${p.source.chipId}:${p.source.portIndex}`);
           }
         }
       }
       _connectedPlugPortsCache = set;
-      _connectedPlugPortsPaths = boardPaths;
+      _connectedPlugPortsPaths = visiblePaths;
     }
     const connectedPlugPorts = _connectedPlugPortsCache;
 
@@ -769,22 +812,49 @@ export function startRenderLoop(
     const liveChipIds = _liveChipIdsCache;
     const livePathIds = _livePathIdsCache;
 
+    let blipHoldingPorts: ReadonlySet<string> | undefined;
+    let blipHoldingCpKeys: ReadonlySet<string> | undefined;
+
     if (state.activeBoard) {
       // Wire rendering: fully paused (fade complete) shows neutral + blips;
       // everything else (playing, fading, reduced-motion paused) uses colorFade
       const fullyPaused = state.playMode === 'paused' && fadeDirection === null;
-      if (fullyPaused && cycleResults && cycleResults.processingOrder.length > 0 && !isReducedMotion()) {
+      const renderPaths = visiblePaths ?? state.activeBoard.paths;
+      if (fullyPaused && cycleResults && renderPaths.length > 0 && !isReducedMotion()) {
         // Recompute animation cache if cycleResults or playpoint changed
         if (cachedWireAnimResults !== cycleResults || cachedWireAnimPlaypoint !== playpoint) {
           cachedWireAnim = computeWireAnimationCache(
-            state.activeBoard.paths, state.activeBoard.chips, cycleResults, playpoint,
+            renderPaths, state.activeBoard.chips, cycleResults, playpoint,
           );
           cachedWireAnimResults = cycleResults;
           cachedWireAnimPlaypoint = playpoint;
         }
-        drawWires(ctx!, tokens, state.activeBoard.paths, cellSize, state.activeBoard.chips, undefined, true, livePathIds);
+        drawWires(ctx!, tokens, renderPaths, cellSize, state.activeBoard.chips, undefined, true, livePathIds);
         if (cachedWireAnim) {
-          drawWireBlips(ctx!, tokens, state.activeBoard.paths, state.activeBoard.chips, cellSize, cachedWireAnim, pauseProgress, livePathIds);
+          drawWireBlips(ctx!, tokens, renderPaths, state.activeBoard.chips, cellSize, cachedWireAnim, pauseProgress, livePathIds);
+
+          // Compute which ports/CPs are currently "holding" a blip for neutral coloring
+          const holdingPorts = computeBlipPortKeys(cachedWireAnim, renderPaths, pauseProgress);
+          blipHoldingPorts = holdingPorts;
+
+          // Translate chip port keys → CP signal keys (direction:slotIdx)
+          const holdingCpKeys = new Set<string>();
+          for (const key of holdingPorts) {
+            // Parse "chipId:plug:portIndex" or "chipId:socket:portIndex"
+            const lastColon = key.lastIndexOf(':');
+            const rest = key.slice(0, lastColon);
+            const secondColon = rest.lastIndexOf(':');
+            const chipId = rest.slice(0, secondColon);
+            const side = rest.slice(secondColon + 1) as 'plug' | 'socket';
+
+            // Plug ports on CPs → input direction; Socket ports on CPs → output direction
+            const dir: 'input' | 'output' = side === 'plug' ? 'input' : 'output';
+            const slotIdx = getCpSlotIdx(chipId, dir, state.activeBoard!.chips);
+            if (slotIdx >= 0) {
+              holdingCpKeys.add(`${dir}:${slotIdx}`);
+            }
+          }
+          blipHoldingCpKeys = holdingCpKeys;
         }
       } else {
         if (
@@ -797,7 +867,7 @@ export function startRenderLoop(
           _pathValuesPlaypoint = playpoint;
           _pathValuesPaths = state.activeBoard.paths;
         }
-        drawWires(ctx!, tokens, state.activeBoard.paths, cellSize, state.activeBoard.chips, _pathValuesCache, false, livePathIds, undefined, colorFade);
+        drawWires(ctx!, tokens, renderPaths, cellSize, state.activeBoard.chips, _pathValuesCache, false, livePathIds, undefined, colorFade);
       }
 
       // Compute knob values from cycle results (cached)
@@ -815,10 +885,35 @@ export function startRenderLoop(
       }
       const knobValues = _knobValuesCache;
 
+      // Override next-puzzle chip body to stay locked during celebration phases
+      // before 'next-unlock'. Without this, the chip renders as unlocked immediately
+      // because completeLevel() runs before zoomOut() rebuilds the motherboard.
+      const celebState = state.celebrationState;
+      let chipsForRender: ReadonlyMap<string, ChipState> = state.activeBoard.chips;
+      if (isHomeBoard && celebState.type !== 'idle' && celebState.data.nextChipId) {
+        const shouldLockNext =
+          celebState.type === 'pending' ||
+          celebState.type === 'paths-flow' ||
+          celebState.type === 'light-wait' ||
+          celebState.type === 'light-on' ||
+          celebState.type === 'next-paths';
+        if (shouldLockNext) {
+          const nextChip = state.activeBoard.chips.get(celebState.data.nextChipId);
+          if (nextChip && !nextChip.params.locked) {
+            const patched = new Map(state.activeBoard.chips);
+            patched.set(celebState.data.nextChipId, {
+              ...nextChip,
+              params: { ...nextChip.params, locked: true },
+            });
+            chipsForRender = patched;
+          }
+        }
+      }
+
       drawNodes(ctx!, tokens, {
         craftedPuzzles: state.craftedPuzzles,
         craftedUtilities: state.craftedUtilities,
-        chips: state.activeBoard.chips,
+        chips: chipsForRender,
         selectedChipId: state.selectedChipId,
         hoveredChipId: state.hoveredChipId,
         knobValues,
@@ -827,6 +922,7 @@ export function startRenderLoop(
         connectedSocketPorts,
         connectedPlugPorts,
         liveChipIds,
+        blipHoldingPorts,
       }, cellSize);
 
       // Keyboard focus ring (after nodes, before path preview)
@@ -841,12 +937,89 @@ export function startRenderLoop(
 
     // Motherboard edge CPs and pagination (after nodes, on home board only)
     if (isHomeBoard && state.motherboardLayout) {
-      drawEdgeCPs(ctx!, tokens, state.motherboardLayout.edgeCPs, playpoint, cellSize);
+      // --- Celebration animation phase management ---
+      const celebState = state.celebrationState;
+      let celebProgress = 0;
+      if (
+        celebState.type === 'paths-flow' ||
+        celebState.type === 'light-wait' ||
+        celebState.type === 'light-on' ||
+        celebState.type === 'next-paths' ||
+        celebState.type === 'next-unlock'
+      ) {
+        const elapsed = timestamp - celebState.startTime;
+        const phaseDuration = celebState.type === 'light-wait' ? CELEBRATION_WAIT_MS : CELEBRATION_PHASE_MS;
+        celebProgress = Math.min(elapsed / phaseDuration, 1);
+
+        // Phase advancement
+        if (celebProgress >= 1) {
+          if (celebState.type === 'paths-flow') {
+            state.advanceCelebration('light-wait', timestamp);
+          } else if (celebState.type === 'light-wait') {
+            state.advanceCelebration('light-on', timestamp);
+          } else if (celebState.type === 'light-on') {
+            if (celebState.data.nextChipId) {
+              state.advanceCelebration('next-paths', timestamp);
+            } else {
+              state.advanceCelebration('idle', timestamp);
+            }
+          } else if (celebState.type === 'next-paths') {
+            if (celebState.data.nextChipId) {
+              state.advanceCelebration('next-unlock', timestamp);
+            } else {
+              state.advanceCelebration('idle', timestamp);
+            }
+          } else if (celebState.type === 'next-unlock') {
+            state.advanceCelebration('idle', timestamp);
+          }
+          // Re-read after advancement
+          celebProgress = 0;
+        }
+
+        // Play pitched-up sound on first frame of light-on phase (major 3rd = 4 semitones)
+        if (celebState.type === 'light-on' && lastCelebPhase !== 'light-on') {
+          playSound('meter-valid', { playbackRate: 2 ** (4 / 12) });
+        }
+      }
+      lastCelebPhase = celebState.type;
+
+      // --- Override edge CPs during celebration ---
+      let edgeCPs = state.motherboardLayout.edgeCPs;
+      if (celebState.type !== 'idle') {
+        edgeCPs = edgeCPs.map(cp => {
+          // Completed chip output CPs (direction 'input' = receives from chip output)
+          if (cp.chipId === celebState.data.completedChipId && cp.direction === 'input') {
+            if (celebState.type === 'pending') {
+              return { ...cp, connected: false };
+            }
+            if (celebState.type === 'paths-flow') {
+              return { ...cp, signalAlpha: celebProgress };
+            }
+            // light-wait, light-on, next-paths, next-unlock: normal (fully visible)
+          }
+          // Next chip input CPs (direction 'output' = feeds into chip input)
+          if (celebState.data.nextChipId && cp.chipId === celebState.data.nextChipId && cp.direction === 'output') {
+            if (
+              celebState.type === 'pending' ||
+              celebState.type === 'paths-flow' ||
+              celebState.type === 'light-wait' ||
+              celebState.type === 'light-on'
+            ) {
+              return { ...cp, connected: false };
+            }
+            if (celebState.type === 'next-paths') {
+              return { ...cp, signalAlpha: celebProgress };
+            }
+            // next-unlock: normal (fully visible)
+          }
+          return cp;
+        });
+      }
+      drawEdgeCPs(ctx!, tokens, edgeCPs, playpoint, cellSize);
+
       const puzzleSection = state.motherboardLayout.sections.find(s => s.id === 'puzzles');
       if (puzzleSection) {
-        drawPaginationControls(ctx!, tokens, puzzleSection, state.motherboardLayout.pagination, cellSize);
-
-        // Build indicator lights from puzzle chips on the current page
+        // Build indicator lights from puzzle chips
         const lights: PuzzleIndicatorLight[] = [];
         for (const node of state.activeBoard!.chips.values()) {
           if (!node.params.isPuzzleChip) continue;
@@ -856,7 +1029,45 @@ export function startRenderLoop(
             : node.params.locked
               ? 'locked'
               : 'unlocked';
-          lights.push({ gridRow, state: lightState });
+          const lightEntry: PuzzleIndicatorLight = { gridRow, chipId: node.id, state: lightState };
+
+          // --- Celebration overrides for indicator lights ---
+          if (celebState.type !== 'idle') {
+            if (node.id === celebState.data.completedChipId) {
+              if (
+                celebState.type === 'pending' ||
+                celebState.type === 'paths-flow' ||
+                celebState.type === 'light-wait'
+              ) {
+                // Before light-on: show as unlocked (red) so it matches pre-solve appearance
+                lightEntry.state = 'unlocked';
+              } else if (celebState.type === 'light-on') {
+                // Lerp unlocked(red) → completed(green)
+                lightEntry.transitionFrom = 'unlocked';
+                lightEntry.transitionProgress = celebProgress;
+              }
+              // After light-on (next-paths, next-unlock): completed state renders normally (already green)
+            }
+            if (celebState.data.nextChipId && node.id === celebState.data.nextChipId) {
+              if (
+                celebState.type === 'pending' ||
+                celebState.type === 'paths-flow' ||
+                celebState.type === 'light-wait' ||
+                celebState.type === 'light-on' ||
+                celebState.type === 'next-paths'
+              ) {
+                // Override to locked until next-unlock phase
+                lightEntry.state = 'locked';
+              } else if (celebState.type === 'next-unlock') {
+                // Lerp locked(dark) → unlocked(red)
+                lightEntry.state = 'unlocked';
+                lightEntry.transitionFrom = 'locked';
+                lightEntry.transitionProgress = celebProgress;
+              }
+            }
+          }
+
+          lights.push(lightEntry);
         }
         if (lights.length > 0) {
           const rightCol = puzzleSection.gridBounds.col + puzzleSection.gridBounds.cols;
@@ -943,6 +1154,8 @@ export function startRenderLoop(
         cpSignals,
         connectedOutputCPs,
         connectedInputCPs: _connectedInputCPsCache,
+        blipHoldingCpKeys,
+        reconnectingCpKeys,
       }, cellSize);
     }
 
@@ -957,8 +1170,6 @@ export function startRenderLoop(
         if (!slot) continue;
         const dir = modeToDirection(slot.mode);
         if (dir !== 'output') continue;
-        const isConnected = connectedOutputCPs.has(`output:${i}`);
-        if (!isConnected) continue;
         if (!_meterTargetCache.has(`target:${i}`)) continue;
         hasOutputWithTarget = true;
         if (state.perPortMatch[i] !== true) {

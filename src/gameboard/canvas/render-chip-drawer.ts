@@ -411,9 +411,10 @@ export function hitTestDeleteZone(
     // Expanded zone: handle + full tray area
     const handle = getHandleRect(cellSize, _drawerProgress);
     const tray = getTrayRect(cellSize, _drawerProgress);
-    const margin = cellSize * 0.5;
+    const margin = cellSize;
+    const gridBottom = GRID_ROWS * cellSize;
     const top = handle.top - margin;
-    const bottom = tray.top + tray.height + margin;
+    const bottom = Math.max(gridBottom, tray.top + tray.height) + margin;
     const left = Math.min(handle.left, tray.left) - margin;
     const right = Math.max(handle.left + handle.width, tray.left + tray.width) + margin;
     return x >= left && x <= right && y >= top && y <= bottom;
@@ -771,6 +772,18 @@ function drawTray(
   ctx.fillStyle = 'rgba(0,0,0,0.06)';
   ctx.fillRect(tray.left, tray.top + tray.height - 1, tray.width, 1);
 
+  // Empty state message when no chips are available
+  if (paletteItems.length === 0) {
+    const fontSize = Math.round(cellSize * 0.9);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.font = `${fontSize}px ${CARD_BODY_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No chips available', tray.left + tray.width / 2, tray.top + tray.height / 2);
+    ctx.restore();
+    return null;
+  }
+
   // Draw chip slots (positioned at current progress — slide up with handle)
   const { slots } = getChipSlotRects(cellSize, paletteItems.length, _scrollOffset, _drawerProgress);
 
@@ -897,7 +910,7 @@ function drawBadge(
   count: number,
   cellSize: number,
 ): void {
-  const fontSize = Math.round(cellSize * 0.3);
+  const fontSize = Math.round(cellSize * 0.6);
   const text = String(count);
   ctx.font = `bold ${fontSize}px ${CARD_BODY_FONT}`;
   const tw = ctx.measureText(text).width;
@@ -933,8 +946,8 @@ function drawTooltip(
   const def = getChipDefinition(item.chipType);
   const description = def?.description ?? '';
 
-  const titleSize = Math.round(cellSize * 0.4);
-  const descSize = Math.round(cellSize * 0.32);
+  const titleSize = Math.round(cellSize * 0.8);
+  const descSize = Math.round(cellSize * 0.64);
   const padX = cellSize * 0.4;
   const padY = cellSize * 0.3;
   const gap = cellSize * 0.15;

@@ -59,6 +59,7 @@ export type KeyboardAction =
 export interface KeyboardHandlerState {
   hasActiveOverlay: () => boolean;
   activeBoardReadOnly: boolean;
+  isHomeBoard: boolean;
   interactionMode: InteractionMode;
   selectedChipId: string | null;
   activeBoard: { chips: ReadonlyMap<string, ChipState>; paths: ReadonlyArray<Path> } | null;
@@ -107,8 +108,8 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
       return { type: 'move-ghost', delta };
     }
 
-    // When paused and idle: left/right step playpoint
-    if (state.playMode === 'paused' && mode.type === 'idle') {
+    // When paused and idle: left/right step playpoint (not on motherboard)
+    if (state.playMode === 'paused' && mode.type === 'idle' && !state.isHomeBoard) {
       if (key === 'ArrowLeft') return { type: 'step-playpoint', delta: -1 };
       if (key === 'ArrowRight') return { type: 'step-playpoint', delta: 1 };
     }
@@ -202,9 +203,9 @@ export function getKeyboardAction(key: string, e: { shiftKey: boolean; ctrlKey: 
     return { type: 'drawer-select' };
   }
 
-  // Space or P → toggle play/pause
+  // Space or P → toggle play/pause (not on motherboard — no playback bar there)
   if ((key === ' ' || key.toLowerCase() === 'p') && !e.ctrlKey && !e.metaKey) {
-    if (isOverlayActive) return { type: 'noop' };
+    if (isOverlayActive || state.isHomeBoard) return { type: 'noop' };
     if (mode.type === 'idle' || mode.type === 'keyboard-wiring') {
       return { type: 'toggle-play' };
     }

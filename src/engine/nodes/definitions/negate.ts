@@ -4,6 +4,7 @@ import { defineChip } from '../framework';
 export const negateChip = defineChip({
   type: 'negate',
   category: 'math',
+  description: 'Flips the polarity of a signal',
 
   sockets: [{ name: 'A', gridPosition: 0 }],
   plugs: [{ name: 'Out', gridPosition: 0 }],

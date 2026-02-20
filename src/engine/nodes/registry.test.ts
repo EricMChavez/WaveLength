@@ -25,7 +25,7 @@ describe('Chip Registry', () => {
     });
 
     it('has correct count', () => {
-      expect(chipRegistry.all).toHaveLength(11);
+      expect(chipRegistry.all).toHaveLength(12);
     });
 
     it('has byType lookup', () => {
@@ -34,7 +34,7 @@ describe('Chip Registry', () => {
     });
 
     it('has byCategory lookup', () => {
-      expect(chipRegistry.byCategory.math).toHaveLength(8); // offset, scale, threshold, add, max, min, negate, amp
+      expect(chipRegistry.byCategory.math).toHaveLength(9); // offset, scale, threshold, add, max, min, negate, amp, average
       expect(chipRegistry.byCategory.routing).toHaveLength(2); // duplicate, divide
       expect(chipRegistry.byCategory.timing).toHaveLength(1); // memory
     });

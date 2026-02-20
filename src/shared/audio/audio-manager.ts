@@ -156,7 +156,7 @@ export async function initAudio(): Promise<void> {
 /**
  * Play a named sound effect. No-ops if muted or sound not loaded.
  */
-export function playSound(name: string): void {
+export function playSound(name: string, opts?: { playbackRate?: number }): void {
   if (muted) return;
   const buffer = buffers.get(name);
   if (!buffer) return;
@@ -172,6 +172,7 @@ export function playSound(name: string): void {
     }
     const source = ctx.createBufferSource();
     source.buffer = buffer;
+    if (opts?.playbackRate) source.playbackRate.value = opts.playbackRate;
     const gain = ctx.createGain();
     gain.gain.value = vol;
     source.connect(gain);

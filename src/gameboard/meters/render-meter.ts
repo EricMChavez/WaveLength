@@ -2,6 +2,7 @@ import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { PixelRect } from '../../shared/grid/types.ts';
 import type { MeterSlotState } from './meter-types.ts';
 import { CHANNEL_RATIOS, VERTICAL_HEIGHT_RATIO, METER_BUFFER_CAPACITY, modeToDirection } from './meter-types.ts';
+import { CARD_TITLE_FONT } from '../../shared/fonts/font-ready.ts';
 import { drawWaveformChannel } from './render-waveform-channel.ts';
 import { drawLevelBar, type LevelBarCutout } from './render-level-bar.ts';
 import { drawNeedle, type NeedleTip } from './render-needle.ts';
@@ -83,7 +84,7 @@ export function drawMeter(
     drawMeterStreak(ctx, waveformRect, levelBarRect, side, meterHard, meterSoft);
     // Direction arrow or X
     const dirIndicator: 'input' | 'output' | 'off' = mode === 'off' ? 'off' : mode;
-    drawDirectionIndicator(ctx, tokens, waveformRect, side, dirIndicator);
+    drawDirectionIndicator(ctx, tokens, waveformRect, levelBarRect, side, dirIndicator);
     return;
   }
 
@@ -100,7 +101,7 @@ export function drawMeter(
     drawMeterInterior(ctx, meterInteriorColor, waveformRect, levelBarRect, cutout, side);
     drawMeterBorder(ctx, tokens, waveformRect, levelBarRect, VERTICAL_HEIGHT_RATIO, side, 'neutral');
     drawMeterStreak(ctx, waveformRect, levelBarRect, side, meterHard, meterSoft);
-    drawDirectionIndicator(ctx, tokens, waveformRect, side, 'off');
+    drawDirectionIndicator(ctx, tokens, waveformRect, levelBarRect, side, 'off');
     return;
   }
 
@@ -228,25 +229,31 @@ export function drawMeter(
 }
 
 /**
- * Draw a direction indicator arrow (or X for 'off') in the waveform channel area.
+ * Draw a direction indicator arrow (or X for 'off') centered in the full meter area.
  * - Input: arrow pointing toward board center
  * - Output: arrow pointing away from board center
  * - Off: X mark
  */
 function drawDirectionIndicator(
   ctx: CanvasRenderingContext2D,
-  tokens: ThemeTokens,
+  _tokens: ThemeTokens,
   waveformRect: PixelRect,
+  levelBarRect: PixelRect,
   side: 'left' | 'right',
   direction: 'input' | 'output' | 'off',
 ): void {
-  const cx = waveformRect.x + waveformRect.width / 2;
+  // Center in the full meter housing area (waveform + levelBar combined)
+  const left = Math.min(waveformRect.x, levelBarRect.x);
+  const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
+  const meterWidth = right - left;
+  const cx = left + meterWidth / 2;
   const cy = waveformRect.y + waveformRect.height / 2;
-  const size = Math.min(waveformRect.width, waveformRect.height) * 0.25;
+  const size = Math.min(meterWidth, waveformRect.height) * 0.25;
 
   ctx.save();
-  ctx.globalAlpha = 0.7;
-  ctx.strokeStyle = tokens.colorNeutral;
+  // Match meter label style: white at 0.45 alpha
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -600,5 +607,38 @@ function drawNeedleConnector(
   ctx.moveTo(fromX, needleTip.tipY);
   ctx.lineTo(toX, needleTip.tipY);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw a position label (A/B/C or X/Y/Z) centered below a meter.
+ * Centers on the housing (waveform + levelBar) rather than the full rect.
+ */
+export function drawMeterLabel(
+  ctx: CanvasRenderingContext2D,
+  tokens: ThemeTokens,
+  label: string,
+  meterRect: PixelRect,
+  cellSize: number,
+  side: 'left' | 'right',
+): void {
+  // Center on housing bounds (waveform + levelBar), not full rect including needle
+  const { waveformRect, levelBarRect } = computeChannelRects(meterRect, side);
+  const left = Math.min(waveformRect.x, levelBarRect.x);
+  const right = Math.max(waveformRect.x + waveformRect.width, levelBarRect.x + levelBarRect.width);
+  const cx = left + (right - left) / 2;
+  const meterCenterY = meterRect.y + meterRect.height / 2;
+  const meterHalfH = (meterRect.height * VERTICAL_HEIGHT_RATIO) / 2;
+  const meterBottom = meterCenterY + meterHalfH;
+  const padding = cellSize * 0.5;
+
+  ctx.save();
+  ctx.font = `bold ${cellSize * 1.2}px ${CARD_TITLE_FONT}`;
+  ctx.letterSpacing = '1px';
+  ctx.fillStyle = '#ffffff';
+  ctx.globalAlpha = 0.45;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, cx, meterBottom + padding);
   ctx.restore();
 }

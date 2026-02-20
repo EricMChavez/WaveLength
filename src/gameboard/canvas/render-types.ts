@@ -36,6 +36,8 @@ export interface RenderNodesState {
   connectedPlugPorts: ReadonlySet<string>;
   /** Set of chip IDs reachable from input sources (live chips) */
   liveChipIds: ReadonlySet<string>;
+  /** When set (blip mode), port keys where a blip is currently holding. Ports not in this set render neutral. */
+  blipHoldingPorts?: ReadonlySet<string>;
 }
 
 /** State needed by renderConnectionPoints */
@@ -52,6 +54,10 @@ export interface RenderConnectionPointsState {
   connectedOutputCPs: ReadonlySet<string>;
   /** Set of connected input CP keys: `input:${cpIndex}` */
   connectedInputCPs: ReadonlySet<string>;
+  /** When set (blip mode), CP signal keys where a blip is currently holding. CPs not in this set render neutral. */
+  blipHoldingCpKeys?: ReadonlySet<string>;
+  /** CP signal keys being reconnected — render as socket with neutral nub instead of unconnected shape. */
+  reconnectingCpKeys?: ReadonlySet<string>;
 }
 
 /** State needed by drawGrid */

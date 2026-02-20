@@ -7,7 +7,7 @@
 import type { ThemeTokens } from '../../shared/tokens/token-types.ts';
 import type { TutorialStep, TutorialHighlight, CursorAnimation } from '../../store/slices/tutorial-slice.ts';
 import { PLAYABLE_START, PLAYABLE_END, METER_LEFT_START, METER_RIGHT_START, METER_RIGHT_END, GRID_ROWS } from '../../shared/grid/constants.ts';
-import { METER_GRID_ROWS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS } from '../meters/meter-types.ts';
+import { METER_GRID_ROWS, METER_GAP_ROWS, METER_VERTICAL_OFFSETS, CHANNEL_RATIOS, VERTICAL_HEIGHT_RATIO } from '../meters/meter-types.ts';
 
 export interface TutorialRenderState {
   step: TutorialStep;
@@ -84,19 +84,35 @@ function getHighlightRect(
       const meterCols = highlight.side === 'left' ? (PLAYABLE_START - METER_LEFT_START) : (METER_RIGHT_END - METER_RIGHT_START + 1);
       const meterStride = METER_GRID_ROWS + METER_GAP_ROWS;
       const meterRow = highlight.slotIndex * meterStride + (METER_VERTICAL_OFFSETS[highlight.slotIndex] ?? 0);
+
+      // Match drawMeterBorder() bounds: waveform+levelBar horizontally, VERTICAL_HEIGHT_RATIO vertically
+      const meterX = offset.x + meterCol * cellSize;
+      const meterY = offset.y + meterRow * cellSize;
+      const meterW = meterCols * cellSize;
+      const meterH = METER_GRID_ROWS * cellSize;
+
+      const totalRatio = CHANNEL_RATIOS.waveform + CHANNEL_RATIOS.gapA + CHANNEL_RATIOS.levelBar + CHANNEL_RATIOS.gapB + CHANNEL_RATIOS.needle;
+      const borderW = meterW * (CHANNEL_RATIOS.waveform + CHANNEL_RATIOS.levelBar) / totalRatio;
+      const borderX = highlight.side === 'left'
+        ? meterX  // left: waveform starts at left edge
+        : meterX + meterW * (CHANNEL_RATIOS.needle + CHANNEL_RATIOS.gapB) / totalRatio;  // right: skip needle
+
+      const centerY = meterY + meterH / 2;
+      const halfH = (meterH * VERTICAL_HEIGHT_RATIO) / 2;
+
       return {
-        x: offset.x + meterCol * cellSize,
-        y: offset.y + meterRow * cellSize,
-        w: meterCols * cellSize,
-        h: METER_GRID_ROWS * cellSize,
+        x: borderX,
+        y: centerY - halfH,
+        w: borderW,
+        h: halfH * 2,
       };
     }
 
     case 'full-board':
       return {
-        x: offset.x + PLAYABLE_START * cellSize,
+        x: offset.x + (PLAYABLE_START - 1) * cellSize,
         y: offset.y,
-        w: (PLAYABLE_END - PLAYABLE_START + 1) * cellSize,
+        w: (PLAYABLE_END - PLAYABLE_START + 3) * cellSize,
         h: GRID_ROWS * cellSize,
       };
   }
@@ -188,6 +204,7 @@ function drawTooltipCard(
 
   // Measure text
   ctx.font = `bold ${TEXT_FONT_SIZE}px 'Bungee', monospace`;
+  ctx.letterSpacing = '1px';
   const textWidth = ctx.measureText(step.text).width;
   ctx.font = `${SUBTEXT_FONT_SIZE}px 'IBM Plex Mono', monospace`;
   const subtextWidth = step.subtext ? ctx.measureText(step.subtext).width : 0;
@@ -213,6 +230,7 @@ function drawTooltipCard(
 
   // Primary text
   ctx.font = `bold ${TEXT_FONT_SIZE}px 'Bungee', monospace`;
+  ctx.letterSpacing = '1px';
   ctx.fillStyle = tokens.textPrimary;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -265,6 +283,11 @@ function computeTooltipPosition(
         x = cutoutRect.x + cutoutRect.w + TOOLTIP_MARGIN;
         y = cutoutRect.y + (cutoutRect.h - cardHeight) / 2;
         break;
+      case 'board-top':
+        // Centered horizontally in cutout, vertically at row 11.5 (gap between top and middle meter borders)
+        x = cutoutRect.x + (cutoutRect.w - cardWidth) / 2;
+        y = cutoutRect.y + cutoutRect.h * (11.5 / GRID_ROWS) - cardHeight / 2;
+        break;
       default:
         x = (vpWidth - cardWidth) / 2;
         y = (vpHeight - cardHeight) / 2;
@@ -316,6 +339,7 @@ function drawNextButton(
 
   // Button text
   ctx.font = `bold ${NEXT_BTN_FONT_SIZE}px 'Bungee', monospace`;
+  ctx.letterSpacing = '1px';
   ctx.fillStyle = NEXT_BTN_TEXT_COLOR;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

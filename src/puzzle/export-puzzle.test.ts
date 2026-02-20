@@ -25,9 +25,10 @@ function makeCustomPuzzle(overrides: Partial<CustomPuzzle> = {}): CustomPuzzle {
 }
 
 describe('exportCustomPuzzleAsSource', () => {
-  it('generates valid TypeScript with correct import', () => {
+  it('generates valid TypeScript with correct imports', () => {
     const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
     expect(result).toContain("import type { PuzzleDefinition } from '../types.ts';");
+    expect(result).toContain("import { waveform } from '../waveform-generators.ts';");
   });
 
   it('derives kebab-case id from title', () => {
@@ -46,11 +47,9 @@ describe('exportCustomPuzzleAsSource', () => {
     expect(result).toContain('activeOutputs: 1');
   });
 
-  it('includes input waveform definitions', () => {
+  it('includes input waveform definitions using waveform() builder', () => {
     const result = exportCustomPuzzleAsSource(makeCustomPuzzle());
-    expect(result).toContain("shape: 'sine-full'");
-    expect(result).toContain('amplitude: 100');
-    expect(result).toContain('period: 256');
+    expect(result).toContain("waveform('sine-full')");
   });
 
   it('includes output samples as shape samples', () => {
@@ -187,8 +186,8 @@ describe('exportCustomPuzzleAsSource', () => {
     const result = exportCustomPuzzleAsSource(puzzle);
     expect(result).toContain('activeInputs: 2');
     expect(result).toContain('activeOutputs: 2');
-    expect(result).toContain("shape: 'sine-full'");
-    expect(result).toContain("shape: 'square-half'");
+    expect(result).toContain("waveform('sine-full')");
+    expect(result).toContain("waveform('square-half', { amplitude: 80 })");
     // Both output sample arrays should be present
     expect(result).toContain('samples: [0, 50, 100]');
     expect(result).toContain('samples: [10, 20, 30]');

@@ -66,6 +66,14 @@
   margin-bottom: 4px;
 }
 
+.readoutDescription {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  color: #5a5e52;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
 .readoutGroup {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 10px;
@@ -96,12 +104,11 @@
   text-align: right;
 }
 
-.readoutRoute {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 11px;
-  color: #6a6e62;
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.miniWaveform {
+  width: 100%;
+  height: 48px;
+  border-radius: 3px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.03);
 }
+

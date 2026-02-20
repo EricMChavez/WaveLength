@@ -103,7 +103,7 @@ export function getWireSignal(
  * Get the pixel position of a port for wire rendering.
  * Handles both regular nodes and connection point virtual nodes.
  */
-function getPortPixelPosition(
+export function getPortPixelPosition(
   chipId: string,
   side: 'socket' | 'plug',
   portIndex: number,

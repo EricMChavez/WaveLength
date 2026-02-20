@@ -86,3 +86,38 @@ export function computeWireAnimationCache(
 
   return { timings };
 }
+
+/**
+ * Compute the set of port keys where a blip is currently "holding" (at source or target).
+ *
+ * A source port holds a blip when globalProgress < departPhase (blip hasn't left yet).
+ * A target port holds a blip when globalProgress >= arrivePhase (blip has arrived).
+ *
+ * Port key format matches computePortSignals:
+ *   `${chipId}:plug:${portIndex}` for source ports
+ *   `${chipId}:socket:${portIndex}` for target ports
+ */
+export function computeBlipPortKeys(
+  cache: WireAnimationCache,
+  wires: ReadonlyArray<Path>,
+  globalProgress: number,
+): Set<string> {
+  const holding = new Set<string>();
+
+  for (const wire of wires) {
+    const timing = cache.timings.get(wire.id);
+    if (!timing) continue;
+
+    // Source port holds blip before it departs
+    if (globalProgress < timing.departPhase) {
+      holding.add(`${wire.source.chipId}:plug:${wire.source.portIndex}`);
+    }
+
+    // Target port holds blip after it arrives
+    if (globalProgress >= timing.arrivePhase) {
+      holding.add(`${wire.target.chipId}:socket:${wire.target.portIndex}`);
+    }
+  }
+
+  return holding;
+}

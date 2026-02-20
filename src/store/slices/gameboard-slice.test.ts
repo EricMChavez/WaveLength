@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { ChipState, GameboardState } from '../../shared/types/index.ts';
+import type { ChipState, GameboardState, Path } from '../../shared/types/index.ts';
+import { createPath } from '../../shared/types/index.ts';
 import { createGameboardSlice, reconstructKnobConstants } from './gameboard-slice.ts';
 
 function makeNode(id: string, type: string, col: number, row: number, overrides: Partial<ChipState> = {}): ChipState {
@@ -138,3 +139,87 @@ describe('gameboard-slice setActiveBoard', () => {
     expect(state.portConstants.get('a1:1')).toBe(100);
   });
 });
+
+describe('gameboard-slice reconnectPath', () => {
+  function makeSlice() {
+    const n1 = makeNode('n1', 'max', 15, 10, { socketCount: 2 });
+    const n2 = makeNode('n2', 'max', 25, 10, { socketCount: 2 });
+    const n3 = makeNode('n3', 'max', 35, 10, { socketCount: 2 });
+    const oldPath: Path = createPath('p1',
+      { chipId: 'n1', portIndex: 0, side: 'plug' },
+      { chipId: 'n2', portIndex: 0, side: 'socket' },
+    );
+    const board: GameboardState = {
+      id: 'test-board',
+      chips: new Map([['n1', n1], ['n2', n2], ['n3', n3]]),
+      paths: [oldPath],
+    };
+    let state: any = {
+      activeBoard: board,
+      graphVersion: 5,
+      routingVersion: 3,
+    };
+    const get = () => state;
+    const set = (fn: any) => {
+      const result = typeof fn === 'function' ? fn(state) : fn;
+      state = { ...state, ...result };
+    };
+    const slice = createGameboardSlice(set as any, get as any, {} as any);
+    return { slice, getState: () => state };
+  }
+
+  it('atomically replaces old path with new path', () => {
+    const { slice, getState } = makeSlice();
+    const newPath: Path = createPath('p2',
+      { chipId: 'n1', portIndex: 0, side: 'plug' },
+      { chipId: 'n3', portIndex: 0, side: 'socket' },
+    );
+    slice.reconnectPath('p1', newPath);
+    const s = getState();
+    expect(s.activeBoard.paths).toHaveLength(1);
+    expect(s.activeBoard.paths[0].id).toBe('p2');
+    expect(s.activeBoard.paths[0].target.chipId).toBe('n3');
+  });
+
+  it('bumps graphVersion and routingVersion exactly once', () => {
+    const { slice, getState } = makeSlice();
+    const newPath: Path = createPath('p2',
+      { chipId: 'n1', portIndex: 0, side: 'plug' },
+      { chipId: 'n3', portIndex: 0, side: 'socket' },
+    );
+    slice.reconnectPath('p1', newPath);
+    const s = getState();
+    expect(s.graphVersion).toBe(6);
+    expect(s.routingVersion).toBe(4);
+  });
+
+  it('is a no-op when activeBoard is null', () => {
+    let state: any = { activeBoard: null, graphVersion: 0, routingVersion: 0 };
+    const set = (fn: any) => {
+      const result = typeof fn === 'function' ? fn(state) : fn;
+      state = { ...state, ...result };
+    };
+    const slice = createGameboardSlice(set as any, () => state, {} as any);
+    const newPath: Path = createPath('p2',
+      { chipId: 'n1', portIndex: 0, side: 'plug' },
+      { chipId: 'n3', portIndex: 0, side: 'socket' },
+    );
+    slice.reconnectPath('nonexistent', newPath);
+    expect(state.activeBoard).toBeNull();
+    expect(state.graphVersion).toBe(0);
+  });
+
+  it('adds new path even when old pathId does not exist', () => {
+    const { slice, getState } = makeSlice();
+    const newPath: Path = createPath('p2',
+      { chipId: 'n1', portIndex: 0, side: 'plug' },
+      { chipId: 'n3', portIndex: 0, side: 'socket' },
+    );
+    slice.reconnectPath('nonexistent', newPath);
+    const s = getState();
+    // Old path (p1) still there + new path (p2) added
+    expect(s.activeBoard.paths).toHaveLength(2);
+    expect(s.activeBoard.paths.map((p: Path) => p.id).sort()).toEqual(['p1', 'p2']);
+  });
+});
+

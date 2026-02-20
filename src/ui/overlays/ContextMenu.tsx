@@ -8,6 +8,7 @@ import { createUtilityGameboard } from '../../puzzle/utility-gameboard.ts';
 import { exportCustomPuzzleAsSource } from '../../puzzle/export-puzzle.ts';
 import { captureViewportSnapshot, captureCropSnapshot } from '../../gameboard/canvas/snapshot.ts';
 import { getNodeGridSize } from '../../shared/grid/index.ts';
+import { drawMiniWaveform } from './mini-waveform.ts';
 import styles from './ContextMenu.module.css';
 
 /** Capture viewport and start zoom-in transition for a chip. */
@@ -73,8 +74,18 @@ function SignalValue({ value }: { value: number | null }) {
   if (value === null) {
     return <span className={styles.readoutValue} style={{ color: '#5a5e52' }}>—</span>;
   }
-  const color = value > 0 ? '#F5AF28' : value < 0 ? '#1ED2C3' : '#8a8e82';
+  const color = value > 0 ? '#F5AF28' : value < 0 ? '#3c91e6' : '#8a8e82';
   return <span className={styles.readoutValue} style={{ color }}>{Math.round(value)}</span>;
+}
+
+function getChipDescription(chipType: string): string | undefined {
+  const def = getChipDefinition(chipType);
+  if (def) return def.description;
+  if (chipType.startsWith('puzzle:')) {
+    const puzzleId = chipType.slice('puzzle:'.length);
+    return useGameStore.getState().craftedPuzzles.get(puzzleId)?.description;
+  }
+  return undefined;
 }
 
 function ChipReadout({ chipId }: { chipId: string }) {
@@ -86,6 +97,7 @@ function ChipReadout({ chipId }: { chipId: string }) {
   const chip = activeBoard.chips.get(chipId);
   if (!chip) return null;
 
+  const description = getChipDescription(chip.type);
   const def = getChipDefinition(chip.type);
   const socketCount = def ? def.sockets.length : chip.socketCount;
   const plugCount = def ? def.plugs.length : chip.plugCount;
@@ -110,6 +122,7 @@ function ChipReadout({ chipId }: { chipId: string }) {
   return (
     <div className={styles.readout}>
       <div className={styles.readoutHeader}>{getChipLabel(chip.type)}</div>
+      {description && <div className={styles.readoutDescription}>{description}</div>}
       {socketCount > 0 && (
         <>
           <div className={styles.readoutGroup}>Inputs</div>
@@ -139,27 +152,29 @@ function ChipReadout({ chipId }: { chipId: string }) {
 function PathReadout({ pathId }: { pathId: string }) {
   const playpoint = useGameStore((s) => s.playpoint);
   const cycleResults = useGameStore((s) => s.cycleResults);
-  const activeBoard = useGameStore((s) => s.activeBoard);
-
-  if (!activeBoard) return null;
-  const path = activeBoard.paths.find((p) => p.id === pathId);
-  if (!path) return null;
-
-  const sourceChip = activeBoard.chips.get(path.source.chipId);
-  const targetChip = activeBoard.chips.get(path.target.chipId);
-
-  const sourceName = sourceChip ? getChipLabel(sourceChip.type) : '?';
-  const targetName = targetChip ? getChipLabel(targetChip.type) : '?';
-  const sourcePort = sourceChip ? getPortName(sourceChip.type, path.source.portIndex, 'plug') : '?';
-  const targetPort = targetChip ? getPortName(targetChip.type, path.target.portIndex, 'socket') : '?';
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const vals = cycleResults?.pathValues.get(pathId);
   const value = vals ? vals[playpoint] : null;
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !vals) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    drawMiniWaveform(ctx, vals, w, h, playpoint);
+  }, [vals, playpoint]);
+
   return (
     <div className={styles.readout}>
       <div className={styles.readoutHeader}>Path</div>
-      <div className={styles.readoutRoute}>{sourceName}.{sourcePort} → {targetName}.{targetPort}</div>
+      <canvas ref={canvasRef} className={styles.miniWaveform} />
       <div className={styles.readoutRow}>
         <span className={styles.readoutPortName}>Signal</span>
         <SignalValue value={value} />
@@ -184,7 +199,8 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
       const def = getChipDefinition(chipType);
       const sCount = def ? def.sockets.length : chip.socketCount;
       const pCount = def ? def.plugs.length : chip.plugCount;
-      readoutH = 32 + (sCount > 0 ? 16 + sCount * 20 : 0) + (pCount > 0 ? 16 + pCount * 20 : 0) + 5;
+      const hasDesc = getChipDescription(chipType) !== undefined;
+      readoutH = 32 + (hasDesc ? 16 : 0) + (sCount > 0 ? 16 + sCount * 20 : 0) + (pCount > 0 ? 16 + pCount * 20 : 0) + 5;
     }
     if (chipType.startsWith('puzzle:')) {
       const puzzleId = chipType.slice('puzzle:'.length);
@@ -194,7 +210,7 @@ function ContextMenuInner({ position, target, menuRef, focusIndexRef }: InnerPro
       isCustomPuzzle = state.customPuzzles.has(puzzleId);
     }
   } else if (target.type === 'path') {
-    readoutH = 70;
+    readoutH = 108;
   }
 
   const menuTarget = target.type === 'chip'

@@ -34,6 +34,13 @@ export function drawEdgeCPs(
     const portX = cp.portGridPosition.col * cellSize;
     const portY = cp.portGridPosition.row * cellSize;
 
+    // Apply signalAlpha override for celebration fade-in
+    const hasAlpha = cp.signalAlpha !== undefined && cp.signalAlpha < 1;
+    if (hasAlpha) {
+      ctx.save();
+      ctx.globalAlpha = cp.signalAlpha!;
+    }
+
     // --- Draw horizontal wire from edge CP to chip port ---
     ctx.save();
     ctx.strokeStyle = color;
@@ -60,6 +67,10 @@ export function drawEdgeCPs(
       // Right-side: chip port is source → empty socket, edge CP receives → seated plug
       drawPort(ctx, tokens, portX, portY, portRadius, value, { type: 'socket', openingDirection: chipOpenDir, connected: true }, portColorOverride);
       drawPort(ctx, tokens, edgeX, edgeY, portRadius, value, { type: 'seated', openingDirection: edgeOpenDir }, portColorOverride);
+    }
+
+    if (hasAlpha) {
+      ctx.restore();
     }
   }
 }

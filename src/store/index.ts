@@ -35,6 +35,8 @@ import { createMotherboardSlice } from './slices/motherboard-slice.ts';
 import type { MotherboardSlice } from './slices/motherboard-slice.ts';
 import { createTutorialSlice } from './slices/tutorial-slice.ts';
 import type { TutorialSlice } from './slices/tutorial-slice.ts';
+import { createCelebrationSlice } from './slices/celebration-slice.ts';
+import type { CelebrationSlice } from './slices/celebration-slice.ts';
 import { initPersistence } from './persistence.ts';
 import { initCustomPuzzlePersistence } from './custom-puzzle-persistence.ts';
 import { initCycleRunner } from '../simulation/cycle-runner.ts';
@@ -42,7 +44,7 @@ import { initSoundEffects } from '../shared/audio/index.ts';
 import { initMeterAudioSubscriber } from '../simulation/meter-audio-subscriber.ts';
 import { initTutorialSubscriber } from '../tutorial/tutorial-subscriber.ts';
 
-export type GameStore = GameboardSlice & InteractionSlice & PlaypointSlice & PuzzleSlice & PaletteSlice & NavigationSlice & ProgressionSlice & HistorySlice & MeterSlice & RoutingSlice & OverlaySlice & AnimationSlice & CreativeSlice & CustomPuzzleSlice & AuthoringSlice & ScreenSlice & MotherboardSlice & TutorialSlice;
+export type GameStore = GameboardSlice & InteractionSlice & PlaypointSlice & PuzzleSlice & PaletteSlice & NavigationSlice & ProgressionSlice & HistorySlice & MeterSlice & RoutingSlice & OverlaySlice & AnimationSlice & CreativeSlice & CustomPuzzleSlice & AuthoringSlice & ScreenSlice & MotherboardSlice & TutorialSlice & CelebrationSlice;
 
 export const useGameStore = create<GameStore>()((...a) => ({
   ...createGameboardSlice(...a),
@@ -63,6 +65,7 @@ export const useGameStore = create<GameStore>()((...a) => ({
   ...createScreenSlice(...a),
   ...createMotherboardSlice(...a),
   ...createTutorialSlice(...a),
+  ...createCelebrationSlice(...a),
 }));
 
 // Set up undo/redo auto-capture via graphVersion subscriber

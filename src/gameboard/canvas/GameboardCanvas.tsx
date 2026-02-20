@@ -31,7 +31,9 @@ import {
 import { getKnobConfig } from '../../engine/nodes/framework.ts';
 import { hasEditableParams } from '../../ui/overlays/context-menu-items.ts';
 import { rejectKnob } from './rejected-knob.ts';
+import { setReconnectingPathId } from './reconnecting-path.ts';
 import { radialAngleToValue } from './render-knob.ts';
+import { getPortPixelPosition } from './render-wires.ts';
 import { getKnobMode } from '../../shared/settings/knob-mode.ts';
 import { playNodeDrop, playWireDrop, playKnobTic } from '../../shared/audio/index.ts';
 import { registerSnapshotCapture, unregisterSnapshotCapture, registerViewportCapture, unregisterViewportCapture, captureViewportSnapshot, captureCropSnapshot } from './snapshot.ts';
@@ -39,9 +41,7 @@ import { getNodeGridSize } from '../../shared/grid/index.ts';
 import { hitTestPlaybackBar, setHoveredPlaybackButton, setPressedPlaybackButton } from './render-playback-bar.ts';
 import { hitTestBackButton, setHoveredBackButton } from './render-back-button.ts';
 import { hitTestRecordButton, setHoveredRecordButton, isRecordButtonDisabled } from './render-record-button.ts';
-import { hitTestPagination } from './render-motherboard-sections.ts';
 import { navigateFromMenuNode } from './menu-navigation.ts';
-import { createMotherboard } from '../../store/motherboard.ts';
 import { isTutorialPaletteBlocked } from '../../tutorial/tutorial-input-guard.ts';
 import { getNextButtonRect } from './render-tutorial-overlay.ts';
 import {
@@ -55,6 +55,7 @@ import {
   isDeleteMode, setDeleteMode,
 } from './render-chip-drawer.ts';
 import { buildPaletteItems, computeRemainingBudgets } from '../../ui/overlays/palette-items.ts';
+import { PUZZLE_LEVELS } from '../../puzzle/levels/index.ts';
 
 function getCanvasLogicalSize(canvas: HTMLCanvasElement) {
   const cellSize = parseInt(canvas.dataset.cellSize || '0', 10);
@@ -96,6 +97,14 @@ function orderPath(from: PortRef, to: PortRef): { plug: PortRef; socket: PortRef
 function orderPathArgs(from: PortRef, to: PortRef): [PortRef, PortRef] {
   const { plug, socket } = orderPath(from, to);
   return [{ ...plug, side: 'plug' }, { ...socket, side: 'socket' }];
+}
+
+/** Find the path connected to a given port, if any. */
+function findPathAtPort(port: PortRef, paths: ReadonlyArray<import('../../shared/types/index.ts').Path>): import('../../shared/types/index.ts').Path | null {
+  return paths.find(p =>
+    (p.source.chipId === port.chipId && p.source.portIndex === port.portIndex && port.side === 'plug') ||
+    (p.target.chipId === port.chipId && p.target.portIndex === port.portIndex && port.side === 'socket'),
+  ) ?? null;
 }
 
 /**
@@ -175,8 +184,14 @@ function trySnapComplete(
   fromPort: PortRef,
   state: ReturnType<typeof useGameStore.getState>,
   cellSize: number,
+  excludePathId?: string,
 ): boolean {
   if (!state.activeBoard) return false;
+  const paths = state.activeBoard.paths;
+  const isOccupied = (port: PortRef) => {
+    const check = excludePathId ? paths.filter(p => p.id !== excludePathId) : paths;
+    return isPortOccupied(port, check);
+  };
   const maxRadiusPx = WIRE_SNAP_RADIUS_CELLS * cellSize;
   const snapHit = findNearestSnapTarget(
     x, y, maxRadiusPx,
@@ -187,11 +202,11 @@ function trySnapComplete(
     state.meterSlots,
     (hit) => {
       if (hit.type === 'port') {
-        return canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, state.activeBoard!.paths);
+        return canCompleteWire(fromPort, hit.portRef) && !isOccupied(hit.portRef);
       }
       if (hit.type === 'connection-point') {
         const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard!.chips, 'end', state.activePuzzle?.slotConfig);
-        return !!cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard!.paths);
+        return !!cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isOccupied(cpPortRef);
       }
       return false;
     },
@@ -199,13 +214,23 @@ function trySnapComplete(
   if (!snapHit) return false;
 
   if (snapHit.type === 'port') {
-    state.addPath(createPath(generateId(), ...orderPathArgs(fromPort, snapHit.portRef)));
+    const newPath = createPath(generateId(), ...orderPathArgs(fromPort, snapHit.portRef));
+    if (excludePathId) {
+      state.reconnectPath(excludePathId, newPath);
+    } else {
+      state.addPath(newPath);
+    }
     return true;
   }
   if (snapHit.type === 'connection-point') {
     const cpPortRef = connectionPointToPortRef(snapHit.slotIndex, snapHit.direction, state.activeBoard.chips, 'end', state.activePuzzle?.slotConfig);
     if (cpPortRef) {
-      state.addPath(createPath(generateId(), ...orderPathArgs(fromPort, cpPortRef)));
+      const newPath = createPath(generateId(), ...orderPathArgs(fromPort, cpPortRef));
+      if (excludePathId) {
+        state.reconnectPath(excludePathId, newPath);
+      } else {
+        state.addPath(newPath);
+      }
       return true;
     }
   }
@@ -267,6 +292,9 @@ export function GameboardCanvas() {
   // Path drag tracking refs
   const potentialPathDragRef = useRef<{ portRef: PortRef; position: { x: number; y: number }; startX: number; startY: number } | null>(null);
   const pathDragActiveRef = useRef(false);
+
+  // Reconnection tracking: non-null when dragging an existing path endpoint
+  const reconnectRef = useRef<{ pathId: string; anchorPort: PortRef; anchorPosition: { x: number; y: number } } | null>(null);
 
   // Knob drag: track last snapped value to play tic only on change
   const lastKnobValueRef = useRef<number | null>(null);
@@ -385,7 +413,14 @@ export function GameboardCanvas() {
           isOverlayEscapeDismissible: state.isOverlayEscapeDismissible,
           closeOverlay: state.closeOverlay,
           interactionMode: state.interactionMode,
-          cancelPathDraw: state.cancelPathDraw,
+          cancelPathDraw: () => {
+            state.cancelPathDraw();
+            // On Escape, preserve the original path (don't remove it)
+            reconnectRef.current = null;
+            setReconnectingPathId(null);
+            pathDragActiveRef.current = false;
+            potentialPathDragRef.current = null;
+          },
           cancelPlacing: state.cancelPlacing,
           cancelKeyboardWiring: state.cancelKeyboardWiring,
           commitKnobAdjust: state.commitKnobAdjust,
@@ -418,7 +453,7 @@ export function GameboardCanvas() {
       // Skip all non-Escape keys when a screen page is covering the gameboard
       if (state.activeScreen !== null) return;
 
-      const kbAction = getKeyboardAction(e.key, e, state);
+      const kbAction = getKeyboardAction(e.key, e, { ...state, isHomeBoard: state.activeBoardId === 'motherboard' });
       if (kbAction.type === 'noop') return;
 
       // Tutorial: block palette before it's introduced
@@ -646,6 +681,19 @@ export function GameboardCanvas() {
                 versionHash: '',
                 savedBoard: boardSnapshot,
               });
+
+              // Queue celebration animation for first-time solves
+              const completedChipId = `menu-level-${puzzleId}`;
+              const puzzleIndex = PUZZLE_LEVELS.findIndex(p => p.id === puzzleId);
+              let nextChipId: string | null = null;
+              if (puzzleIndex >= 0 && puzzleIndex + 1 < PUZZLE_LEVELS.length) {
+                const nextPuzzle = PUZZLE_LEVELS[puzzleIndex + 1];
+                // Only animate unlock if the next level wasn't already unlocked
+                if (!state.isLevelUnlocked(puzzleIndex + 1)) {
+                  nextChipId = `menu-level-${nextPuzzle.id}`;
+                }
+              }
+              state.queueCelebration({ completedChipId, nextChipId });
             }
           }
         }
@@ -692,24 +740,6 @@ export function GameboardCanvas() {
         else if (pbHit.button === 'prev' && state.playMode === 'paused') state.stepPlaypoint(-1);
         else if (pbHit.button === 'next' && state.playMode === 'paused') state.stepPlaypoint(1);
         return;
-      }
-    }
-
-    // --- Motherboard pagination click ---
-    if (state.activeBoardId === 'motherboard' && state.motherboardLayout) {
-      const puzzleSection = state.motherboardLayout.sections.find(s => s.id === 'puzzles');
-      if (puzzleSection) {
-        const pageHit = hitTestPagination(x, y, puzzleSection, state.motherboardLayout.pagination, cellSizeRef.current);
-        if (pageHit) {
-          const currentPage = state.motherboardLayout.pagination.currentPage;
-          const newPage = pageHit === 'prev' ? currentPage - 1 : currentPage + 1;
-          const { board, layout } = createMotherboard(
-            state.completedLevels, state.isLevelUnlocked, state.customPuzzles, newPage,
-          );
-          state.setActiveBoard(board);
-          state.setMotherboardLayout(layout);
-          return;
-        }
       }
     }
 
@@ -848,43 +878,64 @@ export function GameboardCanvas() {
     // --- Drawing path mode ---
     if (state.interactionMode.type === 'drawing-path') {
       const fromPort = state.interactionMode.fromPort;
+      const reconnecting = reconnectRef.current;
+      const excludeId = reconnecting?.pathId;
+      const pathsForOccupancy = excludeId ? state.activeBoard.paths.filter(p => p.id !== excludeId) : state.activeBoard.paths;
+
+      let completed = false;
 
       // Complete path to a chip port
       if (hit.type === 'port') {
-        if (canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, state.activeBoard.paths)) {
-          state.addPath(
-            createPath(
-              generateId(),
-              ...orderPathArgs(fromPort, hit.portRef),
-            ),
-          );
+        if (canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, pathsForOccupancy)) {
+          const newPath = createPath(generateId(), ...orderPathArgs(fromPort, hit.portRef));
+          if (reconnecting) {
+            state.reconnectPath(reconnecting.pathId, newPath);
+          } else {
+            state.addPath(newPath);
+          }
           playWireDrop();
+          completed = true;
+        }
+        if (!completed && reconnecting) {
+          state.removePath(reconnecting.pathId);
         }
         state.cancelPathDraw();
+        reconnectRef.current = null;
+        setReconnectingPathId(null);
         return;
       }
 
       // Complete path to a connection point
       if (hit.type === 'connection-point') {
         const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.chips, 'end', state.activePuzzle?.slotConfig);
-        if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard.paths)) {
-          state.addPath(
-            createPath(
-              generateId(),
-              ...orderPathArgs(fromPort, cpPortRef),
-            ),
-          );
+        if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, pathsForOccupancy)) {
+          const newPath = createPath(generateId(), ...orderPathArgs(fromPort, cpPortRef));
+          if (reconnecting) {
+            state.reconnectPath(reconnecting.pathId, newPath);
+          } else {
+            state.addPath(newPath);
+          }
           playWireDrop();
+          completed = true;
+        }
+        if (!completed && reconnecting) {
+          state.removePath(reconnecting.pathId);
         }
         state.cancelPathDraw();
+        reconnectRef.current = null;
+        setReconnectingPathId(null);
         return;
       }
 
       // Clicked empty space or chip body — try snap before cancelling
-      if (trySnapComplete(x, y, fromPort, state, cellSizeRef.current)) {
+      if (trySnapComplete(x, y, fromPort, state, cellSizeRef.current, excludeId)) {
         playWireDrop();
+      } else if (reconnecting) {
+        state.removePath(reconnecting.pathId);
       }
       state.cancelPathDraw();
+      reconnectRef.current = null;
+      setReconnectingPathId(null);
       return;
     }
 
@@ -952,6 +1003,11 @@ export function GameboardCanvas() {
 
     if (state.interactionMode.type === 'drawing-path') {
       state.cancelPathDraw();
+      // On cancel, preserve the original path (don't remove it)
+      reconnectRef.current = null;
+      setReconnectingPathId(null);
+      pathDragActiveRef.current = false;
+      potentialPathDragRef.current = null;
       return;
     }
 
@@ -1057,6 +1113,44 @@ export function GameboardCanvas() {
       }
     }
 
+    // Reconnect from occupied chip port (either plug or socket)
+    if (hit.type === 'port' && isPortOccupied(hit.portRef, state.activeBoard.paths)) {
+      const existingPath = findPathAtPort(hit.portRef, state.activeBoard.paths);
+      if (existingPath) {
+        // Anchor = the opposite end of the path (the end that stays)
+        const isSource = existingPath.source.chipId === hit.portRef.chipId && existingPath.source.portIndex === hit.portRef.portIndex;
+        const anchorPort: PortRef = isSource
+          ? { chipId: existingPath.target.chipId, portIndex: existingPath.target.portIndex, side: 'socket' }
+          : { chipId: existingPath.source.chipId, portIndex: existingPath.source.portIndex, side: 'plug' };
+        const anchorPosition = getPortPixelPosition(anchorPort.chipId, anchorPort.side, anchorPort.portIndex, state.activeBoard.chips, cellSizeRef.current);
+        if (anchorPosition) {
+          reconnectRef.current = { pathId: existingPath.id, anchorPort, anchorPosition };
+          potentialPathDragRef.current = { portRef: anchorPort, position: anchorPosition, startX: x, startY: y };
+          return;
+        }
+      }
+    }
+
+    // Reconnect from occupied connection point
+    if (hit.type === 'connection-point') {
+      const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.chips, 'start', state.activePuzzle?.slotConfig);
+      if (cpPortRef && isPortOccupied(cpPortRef, state.activeBoard.paths)) {
+        const existingPath = findPathAtPort(cpPortRef, state.activeBoard.paths);
+        if (existingPath) {
+          const isSource = existingPath.source.chipId === cpPortRef.chipId && existingPath.source.portIndex === cpPortRef.portIndex;
+          const anchorPort: PortRef = isSource
+            ? { chipId: existingPath.target.chipId, portIndex: existingPath.target.portIndex, side: 'socket' }
+            : { chipId: existingPath.source.chipId, portIndex: existingPath.source.portIndex, side: 'plug' };
+          const anchorPosition = getPortPixelPosition(anchorPort.chipId, anchorPort.side, anchorPort.portIndex, state.activeBoard.chips, cellSizeRef.current);
+          if (anchorPosition) {
+            reconnectRef.current = { pathId: existingPath.id, anchorPort, anchorPosition };
+            potentialPathDragRef.current = { portRef: anchorPort, position: anchorPosition, startX: x, startY: y };
+            return;
+          }
+        }
+      }
+    }
+
     // Start knob adjust on knob hit (when knob port is unwired)
     if (hit.type === 'knob') {
       const node = state.activeBoard.chips.get(hit.chipId);
@@ -1096,6 +1190,7 @@ export function GameboardCanvas() {
 
     // Handle path drag complete
     if (pathDragActiveRef.current && state.interactionMode.type === 'drawing-path') {
+      const reconnecting = reconnectRef.current;
       const canvas = canvasRef.current;
       if (canvas && state.activeBoard) {
         const rect = canvas.getBoundingClientRect();
@@ -1104,20 +1199,41 @@ export function GameboardCanvas() {
         const { w, h } = getCanvasLogicalSize(canvas);
         const hit = hitTest(ux, uy, state.activeBoard.chips, w, h, cellSizeRef.current, state.activeBoard.paths, state.activePuzzle?.activeInputs, state.activePuzzle?.activeOutputs, state.activePuzzle?.slotConfig, state.editingUtilityId, state.meterSlots);
         const fromPort = state.interactionMode.fromPort;
+        // During reconnection, exclude the original path from occupancy checks
+        const excludeId = reconnecting?.pathId;
+        const pathsForOccupancy = excludeId ? state.activeBoard.paths.filter(p => p.id !== excludeId) : state.activeBoard.paths;
 
-        if (hit.type === 'port' && canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, state.activeBoard.paths)) {
-          state.addPath(createPath(generateId(), ...orderPathArgs(fromPort, hit.portRef)));
+        let completed = false;
+        if (hit.type === 'port' && canCompleteWire(fromPort, hit.portRef) && !isPortOccupied(hit.portRef, pathsForOccupancy)) {
+          const newPath = createPath(generateId(), ...orderPathArgs(fromPort, hit.portRef));
+          if (reconnecting) {
+            state.reconnectPath(reconnecting.pathId, newPath);
+          } else {
+            state.addPath(newPath);
+          }
           playWireDrop();
+          completed = true;
         } else if (hit.type === 'connection-point') {
           const cpPortRef = connectionPointToPortRef(hit.slotIndex, hit.direction, state.activeBoard.chips, 'end', state.activePuzzle?.slotConfig);
-          if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, state.activeBoard.paths)) {
-            state.addPath(createPath(generateId(), ...orderPathArgs(fromPort, cpPortRef)));
+          if (cpPortRef && canCompleteWire(fromPort, cpPortRef) && !isPortOccupied(cpPortRef, pathsForOccupancy)) {
+            const newPath = createPath(generateId(), ...orderPathArgs(fromPort, cpPortRef));
+            if (reconnecting) {
+              state.reconnectPath(reconnecting.pathId, newPath);
+            } else {
+              state.addPath(newPath);
+            }
             playWireDrop();
+            completed = true;
           }
-        } else {
+        }
+
+        if (!completed) {
           // No direct hit — try snap to nearest valid target
-          if (trySnapComplete(ux, uy, fromPort, state, cellSizeRef.current)) {
+          if (trySnapComplete(ux, uy, fromPort, state, cellSizeRef.current, excludeId)) {
             playWireDrop();
+          } else if (reconnecting) {
+            // Invalid drop during reconnection — delete the path
+            state.removePath(reconnecting.pathId);
           }
         }
         state.cancelPathDraw();
@@ -1125,12 +1241,15 @@ export function GameboardCanvas() {
       pathDragActiveRef.current = false;
       justDraggedRef.current = true;
       potentialPathDragRef.current = null;
+      reconnectRef.current = null;
+      setReconnectingPathId(null);
       return;
     }
 
     // Clear potential path drag on mouseup (no drag happened — let click handle it)
     if (potentialPathDragRef.current) {
       potentialPathDragRef.current = null;
+      reconnectRef.current = null;
     }
 
     // Handle knob adjust commit
@@ -1338,6 +1457,10 @@ export function GameboardCanvas() {
       const dy = y - startY;
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance > DRAG_THRESHOLD_PX) {
+        // If reconnecting, hide the original path in the render loop
+        if (reconnectRef.current) {
+          setReconnectingPathId(reconnectRef.current.pathId);
+        }
         state.startPathDraw(potentialPathDragRef.current.portRef, potentialPathDragRef.current.position);
         potentialPathDragRef.current = null;
         pathDragActiveRef.current = true;
