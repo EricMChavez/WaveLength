@@ -71,5 +71,56 @@ export function renderConnectionPoints(
         ? (state.blipHoldingCpKeys.has(signalKey) ? undefined : tokens.colorNeutral)
         : undefined;
     drawPort(ctx, tokens, pos.x, pos.y, portRadius, signalValue, shape, colorOverride);
+
+    // Lock indicator for parent-connected slots (live X-ray)
+    if (state.connectedSlots?.has(i)) {
+      drawLockIcon(ctx, tokens, pos.x, pos.y, portRadius);
+    }
   }
+}
+
+/** Draw a small padlock icon below a connection point to indicate parent-board lock. */
+function drawLockIcon(
+  ctx: CanvasRenderingContext2D,
+  tokens: ThemeTokens,
+  cx: number,
+  cy: number,
+  portRadius: number,
+): void {
+  const size = portRadius * 0.6;
+  const lockX = cx - size * 0.5;
+  const lockY = cy + portRadius * 1.3;
+
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+
+  // Lock body (rounded rect)
+  const bodyW = size;
+  const bodyH = size * 0.7;
+  const r = size * 0.15;
+  ctx.fillStyle = tokens.colorNeutral;
+  ctx.beginPath();
+  ctx.moveTo(lockX + r, lockY);
+  ctx.lineTo(lockX + bodyW - r, lockY);
+  ctx.arcTo(lockX + bodyW, lockY, lockX + bodyW, lockY + r, r);
+  ctx.lineTo(lockX + bodyW, lockY + bodyH - r);
+  ctx.arcTo(lockX + bodyW, lockY + bodyH, lockX + bodyW - r, lockY + bodyH, r);
+  ctx.lineTo(lockX + r, lockY + bodyH);
+  ctx.arcTo(lockX, lockY + bodyH, lockX, lockY + bodyH - r, r);
+  ctx.lineTo(lockX, lockY + r);
+  ctx.arcTo(lockX, lockY, lockX + r, lockY, r);
+  ctx.closePath();
+  ctx.fill();
+
+  // Lock shackle (arc)
+  const shackleW = size * 0.5;
+  const shackleCx = lockX + bodyW * 0.5;
+  ctx.strokeStyle = tokens.colorNeutral;
+  ctx.lineWidth = size * 0.15;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(shackleCx, lockY, shackleW * 0.5, Math.PI, 0);
+  ctx.stroke();
+
+  ctx.restore();
 }

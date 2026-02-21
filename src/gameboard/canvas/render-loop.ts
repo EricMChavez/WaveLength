@@ -1156,6 +1156,7 @@ export function startRenderLoop(
         connectedInputCPs: _connectedInputCPsCache,
         blipHoldingCpKeys,
         reconnectingCpKeys,
+        connectedSlots: state.parentSignalContext?.connectedSlots,
       }, cellSize);
     }
 
@@ -1419,10 +1420,18 @@ function buildMeterSignalArrays(
     ? (activePuzzle.slotConfig ?? buildSlotConfig(activePuzzle.activeInputs, activePuzzle.activeOutputs))
     : null;
 
-  // Input signals from test case waveforms or creative mode slots
-  // Skip when editing a utility node (no input waveforms — only direction arrows)
+  // Input signals from test case waveforms, parent signals, or creative mode slots
   if (state.editingUtilityId) {
-    // No input signal arrays for utility editing — meters show direction only
+    // Utility editing: show parent signals on input meters when available (live X-ray)
+    const psc = state.parentSignalContext;
+    if (psc) {
+      for (let i = 0; i < 6; i++) {
+        const signal = psc.slotSignals[i];
+        if (signal) {
+          result.set(`input:${i}`, signal as number[]);
+        }
+      }
+    }
   } else if (activePuzzle && config) {
     const testCase = activePuzzle.testCases[activeTestCaseIndex];
     if (testCase) {

@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { GameStore } from '../index.ts';
-import type { GameboardId, GameboardState, ChipId, ChipState, Path, ChipRotation } from '../../shared/types/index.ts';
+import type { GameboardId, GameboardState, ChipId, ChipState, Path, ChipRotation, ParentSignalContext } from '../../shared/types/index.ts';
 import type { GridPoint } from '../../shared/grid/types.ts';
 import { recomputeOccupancy, markNodeOccupied, clearNodeOccupied, createOccupancyGrid } from '../../shared/grid/index.ts';
 import { creativeSlotId, utilitySlotId, createUtilitySlotNode } from '../../puzzle/connection-point-nodes.ts';
@@ -22,6 +22,8 @@ export interface GameboardSlice {
   routingVersion: number;
   /** Occupancy grid (66x36): true = cell occupied by a chip bounding box */
   occupancy: boolean[][];
+  /** Captured parent-board signals for live X-ray during utility editing */
+  parentSignalContext: ParentSignalContext | null;
 
   /** Set the active gameboard */
   setActiveBoard: (board: GameboardState) => void;
@@ -53,6 +55,8 @@ export interface GameboardSlice {
   toggleMeterMode: (cpIndex: number) => boolean;
   /** Atomically replace an existing path with a new one (single graphVersion bump for undo). */
   reconnectPath: (oldPathId: string, newPath: Path) => void;
+  /** Set or clear the parent signal context for utility editing */
+  setParentSignalContext: (ctx: ParentSignalContext | null) => void;
 }
 
 /**
@@ -81,6 +85,7 @@ export const createGameboardSlice: StateCreator<GameStore, [], [], GameboardSlic
   graphVersion: 0,
   routingVersion: 0,
   occupancy: createOccupancyGrid(),
+  parentSignalContext: null,
 
   setActiveBoard: (board) =>
     set((state) => ({
@@ -298,6 +303,9 @@ export const createGameboardSlice: StateCreator<GameStore, [], [], GameboardSlic
     const state = get();
     if (!state.activeBoard) return false;
 
+    // Block toggle for slots connected to the parent board (live X-ray)
+    if (state.parentSignalContext?.connectedSlots.has(cpIndex)) return false;
+
     const chipId = utilitySlotId(cpIndex);
 
     // Check if any paths connect to this CP — block toggle if so
@@ -371,5 +379,7 @@ export const createGameboardSlice: StateCreator<GameStore, [], [], GameboardSlic
         routingVersion: state.routingVersion + 1,
       };
     }),
+
+  setParentSignalContext: (ctx) => set({ parentSignalContext: ctx }),
 
 });

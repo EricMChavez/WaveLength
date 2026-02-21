@@ -16,6 +16,7 @@ import {
 } from '../../puzzle/connection-point-nodes.ts';
 import type { CraftedPuzzleEntry, CraftedUtilityEntry } from './palette-slice.ts';
 import type { PuzzleDefinition } from '../../puzzle/types.ts';
+import { captureParentSignals } from '../capture-parent-signals.ts';
 
 export function computeBreadcrumbs(
   boardStack: BoardStackEntry[],
@@ -278,6 +279,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
         occupancy: recomputeOccupancy(freshBoard.chips),
         meterSlots: entry.meterSlots,
         motherboardLayout: layout,
+        parentSignalContext: null,
       });
       return;
     }
@@ -292,6 +294,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       selectedChipId: null,
       occupancy: recomputeOccupancy(entry.board.chips),
       meterSlots: entry.meterSlots,
+      parentSignalContext: null,
     });
   },
 
@@ -320,6 +323,22 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
     // Derive meter slots from utility slot nodes on the board
     const utilityMeterSlots = deriveUtilityMeterSlots(migratedBoard);
 
+    // Capture parent-board signals for live X-ray (before switching boards)
+    let parentSignalContext = null;
+    if (chipIdInParent && state.cycleResults) {
+      const chip = state.activeBoard.chips.get(chipIdInParent);
+      const cpLayout = chip?.params.cpLayout as ('input' | 'output' | 'off')[] | undefined;
+      if (cpLayout) {
+        parentSignalContext = captureParentSignals(
+          state.activeBoard,
+          state.cycleResults,
+          state.portConstants,
+          chipIdInParent,
+          cpLayout,
+        );
+      }
+    }
+
     set({
       boardStack: newStack,
       activeBoard: migratedBoard,
@@ -332,6 +351,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       editingChipIdInParent: (chipIdInParent ?? null) as ChipId | null,
       occupancy: recomputeOccupancy(migratedBoard.chips),
       meterSlots: utilityMeterSlots,
+      parentSignalContext,
     });
   },
 
@@ -372,6 +392,7 @@ export const createNavigationSlice: StateCreator<GameStore, [], [], NavigationSl
       editingChipIdInParent: null,
       occupancy: recomputeOccupancy(parentBoard.chips),
       meterSlots: entry.meterSlots,
+      parentSignalContext: null,
     });
   },
 });

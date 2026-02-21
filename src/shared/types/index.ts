@@ -71,6 +71,14 @@ export interface GameboardState {
   paths: Path[];
 }
 
+/** Captured parent-board signals for "live X-ray" utility editing. */
+export interface ParentSignalContext {
+  /** Per slot (0-5): 256-cycle signal array if externally connected, null otherwise */
+  slotSignals: (readonly number[] | null)[];
+  /** Slot indices (0-5) that have external path connections (for locking toggles) */
+  connectedSlots: ReadonlySet<number>;
+}
+
 /** Creates a new path */
 export function createPath(
   id: string,

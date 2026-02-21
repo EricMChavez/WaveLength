@@ -64,14 +64,19 @@ function runCycleEvaluation(): void {
   let inputGenerator: (cycleIndex: number) => number[];
 
   if (editingUtilityId) {
-    // Utility editing: inputs from port constants (utility slot CPs)
-    // Takes priority over creative mode (utility can be entered from creative)
-    inputGenerator = (_cycleIndex: number) => {
+    // Utility editing: parent signals override port constants when available (live X-ray)
+    const { parentSignalContext } = store;
+    inputGenerator = (cycleIndex: number) => {
       const inputs: number[] = [];
       for (let i = 0; i < 6; i++) {
-        const chipId = utilitySlotId(i);
-        const key = `${chipId}:0`;
-        inputs.push(constants.get(key) ?? 0);
+        const parentSignal = parentSignalContext?.slotSignals[i];
+        if (parentSignal) {
+          inputs.push(parentSignal[cycleIndex]);
+        } else {
+          const chipId = utilitySlotId(i);
+          const key = `${chipId}:0`;
+          inputs.push(constants.get(key) ?? 0);
+        }
       }
       return inputs;
     };

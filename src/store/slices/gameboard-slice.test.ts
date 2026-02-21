@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ChipState, GameboardState, Path } from '../../shared/types/index.ts';
+import type { ChipState, GameboardState, Path, ParentSignalContext } from '../../shared/types/index.ts';
 import { createPath } from '../../shared/types/index.ts';
 import { createGameboardSlice, reconstructKnobConstants } from './gameboard-slice.ts';
 
@@ -220,6 +220,68 @@ describe('gameboard-slice reconnectPath', () => {
     // Old path (p1) still there + new path (p2) added
     expect(s.activeBoard.paths).toHaveLength(2);
     expect(s.activeBoard.paths.map((p: Path) => p.id).sort()).toEqual(['p1', 'p2']);
+  });
+});
+
+describe('gameboard-slice toggleMeterMode parent lock guard', () => {
+  function makeToggleSlice(parentSignalContext: ParentSignalContext | null) {
+    const board: GameboardState = {
+      id: 'test-board',
+      chips: new Map([
+        ['__cp_utility_0__', makeNode('__cp_utility_0__', 'connection-input', 0, 0, { socketCount: 0, plugCount: 1 })],
+        ['__cp_utility_1__', makeNode('__cp_utility_1__', 'connection-input', 0, 10, { socketCount: 0, plugCount: 1 })],
+      ]),
+      paths: [],
+    };
+    let state: any = {
+      activeBoard: board,
+      graphVersion: 0,
+      routingVersion: 0,
+      occupancy: Array.from({ length: 66 }, () => new Array(36).fill(false)),
+      parentSignalContext,
+      meterSlots: new Map([
+        ['slot:0', { mode: 'input' }],
+        ['slot:1', { mode: 'input' }],
+      ]),
+    };
+    const get = () => state;
+    const set = (fn: any) => {
+      if (typeof fn === 'function') {
+        const result = fn(state);
+        state = { ...state, ...result };
+      } else {
+        state = { ...state, ...fn };
+      }
+    };
+    const slice = createGameboardSlice(set as any, get as any, {} as any);
+    return { slice, getState: () => state };
+  }
+
+  it('blocks toggle for parent-connected slot', () => {
+    const psc: ParentSignalContext = {
+      slotSignals: [Array(256).fill(50), null, null, null, null, null],
+      connectedSlots: new Set([0]),
+    };
+    const { slice } = makeToggleSlice(psc);
+    const result = slice.toggleMeterMode(0);
+    expect(result).toBe(false);
+  });
+
+  it('allows toggle for non-connected slot when parent context exists', () => {
+    const psc: ParentSignalContext = {
+      slotSignals: [Array(256).fill(50), null, null, null, null, null],
+      connectedSlots: new Set([0]),
+    };
+    const { slice } = makeToggleSlice(psc);
+    // Slot 1 is not in connectedSlots, so toggle should succeed
+    const result = slice.toggleMeterMode(1);
+    expect(result).toBe(true);
+  });
+
+  it('allows toggle when parentSignalContext is null', () => {
+    const { slice } = makeToggleSlice(null);
+    const result = slice.toggleMeterMode(1);
+    expect(result).toBe(true);
   });
 });
 

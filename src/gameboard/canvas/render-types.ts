@@ -58,6 +58,8 @@ export interface RenderConnectionPointsState {
   blipHoldingCpKeys?: ReadonlySet<string>;
   /** CP signal keys being reconnected — render as socket with neutral nub instead of unconnected shape. */
   reconnectingCpKeys?: ReadonlySet<string>;
+  /** Slot indices (0-5) connected to the parent board (live X-ray lock indicator) */
+  connectedSlots?: ReadonlySet<number>;
 }
 
 /** State needed by drawGrid */
